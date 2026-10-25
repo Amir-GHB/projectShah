@@ -115,6 +115,8 @@ void UClimbRuntimeComponent::StopClimbing()
     }
 
     SetRuntimeState(EClimbRuntimeState::Inactive);
+    MovementDirection = EClimbMovementDirection::None;
+    bActiveDropCatch = false;
     CurrentRoute.Reset();
     CurrentNodeId.Invalidate();
     TargetRoute.Reset();
@@ -153,7 +155,7 @@ bool UClimbRuntimeComponent::FindClosestAttachNode(
 
         for (const FClimbRouteNode& Node : Route->Nodes)
         {
-            if (!Node.bCanStartTraversal)
+            if (!Node.bCanStartTraversal || Node.Type == EClimbRouteNodeType::Exit)
             {
                 continue;
             }
@@ -201,16 +203,51 @@ bool UClimbRuntimeComponent::GetCharacterLocationAtNode(
         return false;
     }
 
+    const FClimbRouteNode* Node = Route->FindNode(NodeId);
+    if (!Node)
+    {
+        return false;
+    }
+
     float CapsuleRadius = 42.0f;
+    float CapsuleHalfHeight = 96.0f;
     if (const ACharacter* Character = Cast<ACharacter>(GetOwner()))
     {
         if (const UCapsuleComponent* Capsule = Character->GetCapsuleComponent())
         {
             CapsuleRadius = Capsule->GetScaledCapsuleRadius();
+            CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
         }
     }
 
     const FVector OutwardNormal = NodeTransform.GetUnitAxis(EAxis::X).GetSafeNormal();
+    if (Node->Type == EClimbRouteNodeType::Exit)
+    {
+        // Exit nodes are authored on upward-facing, approximately horizontal surfaces.
+        // GetNodeWorldTransform already includes SurfaceOffset, so recover the surface
+        // contact point before placing the capsule upright on top of it.
+        const FVector SurfacePoint = NodeTransform.GetLocation()
+            - OutwardNormal * Node->SurfaceOffset;
+        OutLocation = SurfacePoint + FVector::UpVector * CapsuleHalfHeight;
+
+        FVector Forward = FVector::VectorPlaneProject(
+            NodeTransform.GetUnitAxis(EAxis::Z), FVector::UpVector).GetSafeNormal();
+        if (Forward.IsNearlyZero())
+        {
+            if (const ACharacter* Character = Cast<ACharacter>(GetOwner()))
+            {
+                Forward = FVector::VectorPlaneProject(
+                    Character->GetActorForwardVector(), FVector::UpVector).GetSafeNormal();
+            }
+        }
+        if (Forward.IsNearlyZero())
+        {
+            Forward = FVector::ForwardVector;
+        }
+        OutRotation = FRotationMatrix::MakeFromXZ(Forward, FVector::UpVector).Rotator();
+        return true;
+    }
+
     OutLocation = NodeTransform.GetLocation()
         + OutwardNormal * (CapsuleRadius + AttachmentClearance);
     OutRotation = GetClimbingRotation(NodeTransform);
@@ -303,9 +340,10 @@ bool UClimbRuntimeComponent::FindBestConnection(FRuntimeConnection& OutConnectio
             return;
         }
 
+        const FVector Delta = CandidateTransform.GetLocation()
+            - CurrentTransform.GetLocation();
         const FVector Direction = FVector::VectorPlaneProject(
-            CandidateTransform.GetLocation() - CurrentTransform.GetLocation(),
-            OutwardNormal).GetSafeNormal();
+            Delta, OutwardNormal).GetSafeNormal();
         if (Direction.IsNearlyZero())
         {
             return;
@@ -321,6 +359,10 @@ bool UClimbRuntimeComponent::FindBestConnection(FRuntimeConnection& OutConnectio
             OutConnection.bIsTraversalLink = bIsTraversalLink;
             OutConnection.Duration = Duration;
             OutConnection.ArcHeight = ArcHeight;
+            const bool bDescending = FVector::DotProduct(
+                Delta.GetSafeNormal(), SurfaceUp) < -0.55f;
+            OutConnection.bDropCatch = Type == EClimbTraversalType::Drop
+                || (!bIsTraversalLink && bDescending);
             bFound = true;
         }
     };
@@ -381,26 +423,51 @@ void UClimbRuntimeComponent::BeginConnection(const FRuntimeConnection& Connectio
     TargetNodeId = Connection.TargetNodeId;
     ActiveTraversalType = Connection.Type;
     bActiveConnectionIsTraversalLink = Connection.bIsTraversalLink;
+    bActiveDropCatch = Connection.bDropCatch;
     ActiveTraversalArcHeight = Connection.ArcHeight;
 
-    ActiveTraversalDuration = Connection.bIsTraversalLink
-        ? FMath::Max(Connection.Duration, 0.05f)
-        : FMath::Max(FVector::Distance(TraversalStartLocation, TraversalEndLocation)
-            / FMath::Max(ClimbSpeed, 1.0f), 0.05f);
+    FTransform SourceTransform;
+    FTransform DestinationTransform;
+    if (CurrentRoute.IsValid())
+    {
+        CurrentRoute->GetNodeWorldTransform(CurrentNodeId, SourceTransform);
+    }
+    DestinationRoute->GetNodeWorldTransform(Connection.TargetNodeId, DestinationTransform);
+    const FClimbRouteNode* DestinationNode = DestinationRoute->FindNode(Connection.TargetNodeId);
+    MovementDirection = DestinationNode && DestinationNode->Type == EClimbRouteNodeType::Exit
+        ? EClimbMovementDirection::Exit
+        : ClassifyMovementDirection(SourceTransform, DestinationTransform, Connection.Type);
+
+    const float Distance = FVector::Distance(TraversalStartLocation, TraversalEndLocation);
+    if (bActiveDropCatch)
+    {
+        ActiveTraversalDuration = FMath::Clamp(
+            FMath::Sqrt(FMath::Max(Distance, 1.0f) / 980.0f) * 2.0f,
+            0.28f, 0.75f);
+    }
+    else
+    {
+        ActiveTraversalDuration = Connection.bIsTraversalLink
+            ? FMath::Max(Connection.Duration, 0.05f)
+            : FMath::Max(Distance / FMath::Max(ClimbSpeed, 1.0f), 0.05f);
+    }
 
     ActiveTraversalElapsed = 0.0f;
-    SetRuntimeState(Connection.bIsTraversalLink
-        ? EClimbRuntimeState::ExecutingTraversal
-        : EClimbRuntimeState::MovingAlongSection);
+    SetRuntimeState(bActiveDropCatch
+        ? EClimbRuntimeState::DroppingToCatch
+        : (Connection.bIsTraversalLink
+            ? EClimbRuntimeState::ExecutingTraversal
+            : EClimbRuntimeState::MovingAlongSection));
 }
 
 void UClimbRuntimeComponent::FinishConnection()
 {
     ACharacter* Character = Cast<ACharacter>(GetOwner());
     AClimbRouteActor* DestinationRoute = TargetRoute.Get();
+    const FClimbRouteNode* DestinationNode = IsValid(DestinationRoute)
+        ? DestinationRoute->FindNode(TargetNodeId) : nullptr;
 
-    if (!IsValid(Character) || !IsValid(DestinationRoute)
-        || !DestinationRoute->FindNode(TargetNodeId))
+    if (!IsValid(Character) || !IsValid(DestinationRoute) || !DestinationNode)
     {
         StopClimbing();
         return;
@@ -415,6 +482,13 @@ void UClimbRuntimeComponent::FinishConnection()
             DestinationRotation, false, nullptr, ETeleportType::TeleportPhysics);
     }
 
+    if (DestinationNode->Type == EClimbRouteNodeType::Exit)
+    {
+        // Reaching an exit node returns control to ordinary character movement.
+        StopClimbing();
+        return;
+    }
+
     CurrentRoute = DestinationRoute;
     CurrentNodeId = TargetNodeId;
     TargetRoute.Reset();
@@ -422,7 +496,54 @@ void UClimbRuntimeComponent::FinishConnection()
     ActiveTraversalElapsed = 0.0f;
     ActiveTraversalDuration = 0.0f;
     ActiveTraversalArcHeight = 0.0f;
+    bActiveDropCatch = false;
+    MovementDirection = EClimbMovementDirection::None;
     SetRuntimeState(EClimbRuntimeState::Attached);
+}
+
+EClimbMovementDirection UClimbRuntimeComponent::ClassifyMovementDirection(
+    const FTransform& FromTransform,
+    const FTransform& ToTransform,
+    const EClimbTraversalType Type) const
+{
+    if (Type == EClimbTraversalType::Jump)
+    {
+        return EClimbMovementDirection::Jump;
+    }
+    if (Type == EClimbTraversalType::Mantle)
+    {
+        return EClimbMovementDirection::Mantle;
+    }
+    if (Type == EClimbTraversalType::Drop)
+    {
+        return EClimbMovementDirection::Down;
+    }
+
+    const FVector Normal = FromTransform.GetUnitAxis(EAxis::X).GetSafeNormal();
+    const FVector Up = GetSurfaceUp(FromTransform);
+    const FVector Right = FVector::CrossProduct(Up, -Normal).GetSafeNormal();
+    const FVector Delta = FVector::VectorPlaneProject(
+        ToTransform.GetLocation() - FromTransform.GetLocation(), Normal).GetSafeNormal();
+    const float VerticalAmount = FVector::DotProduct(Delta, Up);
+    const float HorizontalAmount = FVector::DotProduct(Delta, Right);
+
+    if (VerticalAmount > 0.45f)
+    {
+        return EClimbMovementDirection::Up;
+    }
+    if (VerticalAmount < -0.45f)
+    {
+        return EClimbMovementDirection::Down;
+    }
+    if (HorizontalAmount > 0.35f)
+    {
+        return EClimbMovementDirection::Right;
+    }
+    if (HorizontalAmount < -0.35f)
+    {
+        return EClimbMovementDirection::Left;
+    }
+    return EClimbMovementDirection::None;
 }
 
 void UClimbRuntimeComponent::SetRuntimeState(const EClimbRuntimeState NewState)
@@ -472,7 +593,8 @@ void UClimbRuntimeComponent::TickComponent(
     }
 
     if (RuntimeState != EClimbRuntimeState::MovingAlongSection
-        && RuntimeState != EClimbRuntimeState::ExecutingTraversal)
+        && RuntimeState != EClimbRuntimeState::ExecutingTraversal
+        && RuntimeState != EClimbRuntimeState::DroppingToCatch)
     {
         return;
     }
@@ -486,9 +608,27 @@ void UClimbRuntimeComponent::TickComponent(
     ActiveTraversalElapsed += DeltaTime;
     const float Alpha = FMath::Clamp(
         ActiveTraversalElapsed / FMath::Max(ActiveTraversalDuration, 0.05f), 0.0f, 1.0f);
+    const float MovementAlpha = bActiveDropCatch
+        ? FMath::InterpEaseInOut(0.0f, 1.0f, Alpha, 2.2f)
+        : Alpha;
 
-    FVector Location = FMath::Lerp(TraversalStartLocation, TraversalEndLocation, Alpha);
-    if (bActiveConnectionIsTraversalLink
+    FVector Location = FMath::Lerp(
+        TraversalStartLocation, TraversalEndLocation, MovementAlpha);
+    if (bActiveDropCatch)
+    {
+        FTransform SourceTransform;
+        if (CurrentRoute.IsValid()
+            && CurrentRoute->GetNodeWorldTransform(CurrentNodeId, SourceTransform))
+        {
+            const FVector OutwardNormal =
+                SourceTransform.GetUnitAxis(EAxis::X).GetSafeNormal();
+            // The body briefly peels away from the wall before accelerating down
+            // and easing into the catch pose at the lower authored node.
+            Location += OutwardNormal * FMath::Sin(Alpha * PI)
+                * DropCatchOutwardDistance;
+        }
+    }
+    else if (bActiveConnectionIsTraversalLink
         && (ActiveTraversalType == EClimbTraversalType::Jump
             || ActiveTraversalType == EClimbTraversalType::Mantle))
     {
@@ -498,7 +638,7 @@ void UClimbRuntimeComponent::TickComponent(
     const FQuat Rotation = FQuat::Slerp(
         TraversalStartRotation.Quaternion(),
         TraversalEndRotation.Quaternion(),
-        Alpha);
+        bActiveDropCatch ? FMath::Clamp(Alpha * 1.2f, 0.0f, 1.0f) : Alpha);
 
     Character->SetActorLocationAndRotation(Location, Rotation, false, nullptr,
         ETeleportType::TeleportPhysics);
@@ -507,7 +647,9 @@ void UClimbRuntimeComponent::TickComponent(
     {
         DrawDebugLine(GetWorld(), TraversalStartLocation, TraversalEndLocation,
             RuntimeState == EClimbRuntimeState::ExecutingTraversal
-                ? FColor::Orange : FColor::Cyan,
+                ? FColor::Orange
+                : (RuntimeState == EClimbRuntimeState::DroppingToCatch
+                    ? FColor::Yellow : FColor::Cyan),
             false, 0.0f, 0, 2.0f);
     }
 
