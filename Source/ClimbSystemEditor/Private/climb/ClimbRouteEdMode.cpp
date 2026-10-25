@@ -451,7 +451,7 @@ void FClimbRouteEdMode::DrawRoute(
             FLinearColor::Red, SDPG_World, 2.0f);
 
         // Show a compact radial menu only for the selected source node.
-        if (!bIsSource)
+        if (!bIsSource || Node.Type == EClimbRouteNodeType::Exit)
         {
             continue;
         }
