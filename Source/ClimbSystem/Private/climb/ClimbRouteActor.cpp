@@ -38,14 +38,7 @@ AClimbRouteActor::AClimbRouteActor()
         TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
     if (BasicMaterial.Succeeded())
     {
-        UMaterialInstanceDynamic* DynamicMaterial =
-            UMaterialInstanceDynamic::Create(BasicMaterial.Object, this);
-        if (DynamicMaterial)
-        {
-            DynamicMaterial->SetVectorParameterValue(TEXT("Color"), RuntimePathColor);
-            DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), RuntimePathColor);
-            RuntimePathVisualization->SetMaterial(0, DynamicMaterial);
-        }
+        RuntimePathVisualization->SetMaterial(0, BasicMaterial.Object);
     }
 }
 
@@ -75,12 +68,18 @@ void AClimbRouteActor::BuildRuntimePathVisualization()
     }
 
     RuntimePathVisualization->SetVisibility(true, true);
-    if (UMaterialInstanceDynamic* DynamicMaterial =
-        Cast<UMaterialInstanceDynamic>(RuntimePathVisualization->GetMaterial(0)))
+    UMaterialInterface* BaseMaterial = RuntimePathVisualization->GetMaterial(0);
+    if (BaseMaterial)
     {
-        DynamicMaterial->SetVectorParameterValue(TEXT("Color"), RuntimePathColor);
-        DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), RuntimePathColor);
-        DynamicMaterial->SetScalarParameterValue(TEXT("Opacity"), RuntimePathColor.A);
+        UMaterialInstanceDynamic* DynamicMaterial =
+            UMaterialInstanceDynamic::Create(BaseMaterial, this);
+        if (DynamicMaterial)
+        {
+            DynamicMaterial->SetVectorParameterValue(TEXT("Color"), RuntimePathColor);
+            DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), RuntimePathColor);
+            DynamicMaterial->SetScalarParameterValue(TEXT("Opacity"), RuntimePathColor.A);
+            RuntimePathVisualization->SetMaterial(0, DynamicMaterial);
+        }
     }
 
     for (const FClimbRouteSection& Section : Sections)
