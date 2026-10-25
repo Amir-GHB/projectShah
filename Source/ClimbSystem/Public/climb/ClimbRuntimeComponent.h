@@ -3,12 +3,12 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "climb/ClimbRouteTypes.h"
 #include "ClimbRuntimeComponent.generated.h"
 
 class AClimbRouteActor;
 class ACharacter;
-class UCharacterMovementComponent;
 
 /** Runtime state exposed for animation and future gameplay-system coordination. */
 UENUM(BlueprintType)
