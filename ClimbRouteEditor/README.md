@@ -1,8 +1,6 @@
 # Climbing Route Authoring v2
 
-This is the first authoring foundation for the new climbing route system. It is developed on the
-`feature/climbing-route-authoring-v2` branch and intentionally leaves the legacy `AClimbRoute`
-and `UClimbingComponent` implementation in place while the replacement is built.
+This branch contains the authoring foundation and the first route-driven runtime climbing pass for the new climbing system. The new runtime is `UClimbRuntimeComponent`; it consumes `AClimbRouteActor` data and does not depend on the old spline-based route graph.
 
 ## Data model
 
@@ -32,10 +30,17 @@ The authoring path does not use `USplineComponent`. The reserved curved interpol
 
 The current prototype uses the visibility collision channel and complex traces. Geometry must have collision that blocks that channel.
 
+## Runtime climbing prototype
+
+The new `UClimbRuntimeComponent` provides route discovery, closest-node attachment, surface-facing orientation, explicit graph navigation, section movement, and initial jump/mantle/drop link execution. It exposes runtime state and Blueprint-callable methods for clean future animation and combat coordination.
+
+See [RuntimeClimbing.md](RuntimeClimbing.md) for setup instructions, input wiring, smoke tests, and current limitations.
+
 ## Current scope and limitations
 
-- Straight paths only; curved interpolation is not implemented.
-- The editor mode currently provides node/edge visualization, color-coded clickable handles, and click-to-place interaction.
-- Drag-to-move handles, a true ghost character preview, skeletal preview, and runtime graph compilation are subsequent milestones.
-- The route actor validates graph references but does not yet perform gameplay reachability analysis.
+- Straight section movement currently interpolates between section endpoint nodes; intermediate path points are not yet followed.
+- Jump and mantle links use a simple sine arc. Drop and surface-transfer links use direct interpolation in this first pass.
+- Movement currently sets the character movement mode to `MOVE_None` and moves the actor directly. Collision-aware movement, animation/root-motion matching, and robust corner transitions are future work.
+- Dynamic routes spawned after BeginPlay require calling `RefreshAvailableRoutes`.
+- The editor route actor validates graph references but does not yet perform gameplay reachability analysis.
 - This branch has not been compiled against an installed Unreal Engine in this environment. Compile and smoke-test in UE 5.8 before merging.
