@@ -83,10 +83,10 @@ bool UClimbRuntimeComponent::StartClimbing()
     TargetRoute.Reset();
     TargetNodeId.Invalidate();
     ClimbInput = FVector2D::ZeroVector;
-    SetRuntimeState(EClimbRuntimeState::Attached);
 
     Character->SetActorLocationAndRotation(TargetLocation, TargetRotation, false, nullptr,
         ETeleportType::TeleportPhysics);
+    SetRuntimeState(EClimbRuntimeState::Attached);
 
     UE_LOG(LogTemp, Log, TEXT("Climbing: attached to route '%s', node %s."),
         *GetNameSafe(Route), *NodeId.ToString());
