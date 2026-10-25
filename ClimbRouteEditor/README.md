@@ -20,23 +20,22 @@ The authoring path does not use `USplineComponent`. The reserved curved interpol
 2. Open the Unreal Editor and place an `AClimbRouteActor` in the level.
 3. Select that actor.
 4. Activate the **Climb Route** mode from the editor Modes menu.
-5. Click near an existing node to select it as the source. The selected source is drawn larger and yellow.
-6. Use the keyboard:
-   - `N`: toggle isolated-node placement.
-   - `P`: toggle straight-section endpoint placement.
-   - `J`: toggle jump destination placement.
-   - `D`: toggle drop destination placement.
-   - `M`: toggle mantle destination placement.
-   - `Escape`: cancel the current placement mode.
-7. While a placement mode is active, click valid collision geometry. The contact frame is aligned to the hit surface normal, with a stable up-axis fallback and a 5 cm default outward offset.
-8. The tool continues from the newly created node, making it possible to build a chain of sections or traversal links.
+5. Click near an existing node to choose it as the source. The selected source is drawn larger and yellow.
+6. Color-coded action handles appear around each node:
+   - Blue handles on either side: create a straight section.
+   - Orange handle pointing outward: create a jump link.
+   - Green upper handle: create a mantle link.
+   - Purple lower handle: create a drop link.
+7. Clicking a handle selects its source node and enters destination-placement mode. Click valid geometry to create the destination.
+8. Keyboard alternatives: `N` toggles isolated-node placement, `P` toggles section placement, `J` jump, `D` drop, `M` mantle, and `Escape` cancels.
+9. The contact frame is aligned to the hit surface normal, with a stable up-axis fallback and a 5 cm default outward offset.
 
 The current prototype uses the visibility collision channel and complex traces. Geometry must have collision that blocks that channel.
 
 ## Current scope and limitations
 
 - Straight paths only; curved interpolation is not implemented.
-- The first editor mode provides node/edge visualization and click-to-place interaction.
-- Contextual directional buttons, drag handles, ghost character preview, skeletal preview, and runtime graph compilation are subsequent milestones.
+- The editor mode currently provides node/edge visualization, color-coded clickable handles, and click-to-place interaction.
+- Drag-to-move handles, a true ghost character preview, skeletal preview, and runtime graph compilation are subsequent milestones.
 - The route actor validates graph references but does not yet perform gameplay reachability analysis.
 - This branch has not been compiled against an installed Unreal Engine in this environment. Compile and smoke-test in UE 5.8 before merging.

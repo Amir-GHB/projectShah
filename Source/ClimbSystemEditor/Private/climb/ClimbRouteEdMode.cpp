@@ -8,11 +8,41 @@
 #include "Engine/World.h"
 #include "Components/PrimitiveComponent.h"
 #include "EditorViewportClient.h"
+#include "HitProxies.h"
 #include "SceneManagement.h"
 #include "ScopedTransaction.h"
 #include "UnrealClient.h"
 
 #define LOCTEXT_NAMESPACE "ClimbRouteEdMode"
+
+namespace
+{
+    enum class ERouteHandleAction : uint8
+    {
+        SelectNode,
+        Section,
+        Jump,
+        Drop,
+        Mantle
+    };
+
+    struct HClimbRouteHandleProxy : public HHitProxy
+    {
+        DECLARE_HIT_PROXY();
+
+        HClimbRouteHandleProxy(const FGuid& InNodeId, ERouteHandleAction InAction)
+            : HHitProxy(HPP_World)
+            , NodeId(InNodeId)
+            , Action(InAction)
+        {
+        }
+
+        FGuid NodeId;
+        ERouteHandleAction Action;
+    };
+
+    IMPLEMENT_HIT_PROXY(HClimbRouteHandleProxy, HHitProxy);
+}
 
 const FEditorModeID FClimbRouteEdMode::EM_ClimbRoute = TEXT("EM_ClimbRoute");
 
@@ -93,6 +123,31 @@ bool FClimbRouteEdMode::HandleClick(
     if (!IsValid(Route))
     {
         return false;
+    }
+
+    if (HClimbRouteHandleProxy* HandleProxy = HitProxyCast<HClimbRouteHandleProxy>(HitProxy))
+    {
+        SourceNodeId = HandleProxy->NodeId;
+        switch (HandleProxy->Action)
+        {
+        case ERouteHandleAction::Section:
+            PlacementIntent = EPlacementIntent::Section;
+            break;
+        case ERouteHandleAction::Jump:
+            PlacementIntent = EPlacementIntent::Jump;
+            break;
+        case ERouteHandleAction::Drop:
+            PlacementIntent = EPlacementIntent::Drop;
+            break;
+        case ERouteHandleAction::Mantle:
+            PlacementIntent = EPlacementIntent::Mantle;
+            break;
+        default:
+            PlacementIntent = EPlacementIntent::None;
+            break;
+        }
+        ReportModeState();
+        return true;
     }
 
     FHitResult Hit;
@@ -312,23 +367,54 @@ void FClimbRouteEdMode::DrawRoute(
             continue;
         }
 
+        const FVector Origin = NodeTransform.GetLocation();
+        const FVector AxisX = NodeTransform.GetRotation().GetAxisX();
+        const FVector AxisY = NodeTransform.GetRotation().GetAxisY();
+        const FVector AxisZ = NodeTransform.GetRotation().GetAxisZ();
         const bool bIsSource = Node.NodeId == SourceNodeId;
-        const FLinearColor NodeColor = bIsSource
-            ? FLinearColor::Yellow
-            : (Node.Type == EClimbRouteNodeType::Entry
-                ? FLinearColor::Green : FLinearColor::White);
-        PDI->DrawPoint(NodeTransform.GetLocation(), NodeColor,
-            bIsSource ? 16.0f : 10.0f, SDPG_World);
-        PDI->DrawLine(
-            NodeTransform.GetLocation(),
-            NodeTransform.GetLocation() + NodeTransform.GetRotation().GetAxisX() * 28.0f,
+
+        PDI->SetHitProxy(new HClimbRouteHandleProxy(
+            Node.NodeId, ERouteHandleAction::SelectNode));
+        PDI->DrawPoint(Origin, bIsSource ? FLinearColor::Yellow : FLinearColor::White,
+            bIsSource ? 16.0f : 12.0f, SDPG_Foreground);
+        PDI->SetHitProxy(nullptr);
+
+        PDI->DrawLine(Origin, Origin + AxisX * 28.0f,
             FLinearColor::Red, SDPG_World, 2.0f);
+
+        // Viewport action handles: tangent +/- create straight sections,
+        // outward creates a jump, up creates a mantle, and down creates a drop.
+        struct FHandleSpec
+        {
+            FVector Offset;
+            FLinearColor Color;
+            ERouteHandleAction Action;
+            float Size;
+        };
+
+        const FHandleSpec Handles[] =
+        {
+            { AxisY * 42.0f, FLinearColor(0.1f, 0.7f, 1.0f), ERouteHandleAction::Section, 11.0f },
+            { AxisY * -42.0f, FLinearColor(0.1f, 0.7f, 1.0f), ERouteHandleAction::Section, 11.0f },
+            { AxisX * 42.0f, FLinearColor(1.0f, 0.55f, 0.1f), ERouteHandleAction::Jump, 12.0f },
+            { AxisZ * 42.0f, FLinearColor(0.25f, 0.9f, 0.35f), ERouteHandleAction::Mantle, 11.0f },
+            { AxisZ * -42.0f, FLinearColor(0.85f, 0.3f, 0.9f), ERouteHandleAction::Drop, 11.0f }
+        };
+
+        for (const FHandleSpec& Handle : Handles)
+        {
+            const FVector HandlePosition = Origin + Handle.Offset;
+            PDI->SetHitProxy(new HClimbRouteHandleProxy(Node.NodeId, Handle.Action));
+            PDI->DrawPoint(HandlePosition, Handle.Color, Handle.Size, SDPG_Foreground);
+            PDI->SetHitProxy(nullptr);
+            PDI->DrawLine(Origin, HandlePosition, Handle.Color, SDPG_Foreground, 1.0f);
+        }
     }
 }
 
 void FClimbRouteEdMode::ReportModeState() const
 {
-    const TCHAR* IntentName = TEXT("Select node");
+    const TCHAR* IntentName = TEXT("Select node or click a colored handle");
     switch (PlacementIntent)
     {
     case EPlacementIntent::IsolatedNode: IntentName = TEXT("Place node"); break;
