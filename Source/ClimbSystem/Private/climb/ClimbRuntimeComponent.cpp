@@ -608,9 +608,25 @@ void UClimbRuntimeComponent::TickComponent(
     ActiveTraversalElapsed += DeltaTime;
     const float Alpha = FMath::Clamp(
         ActiveTraversalElapsed / FMath::Max(ActiveTraversalDuration, 0.05f), 0.0f, 1.0f);
-    const float MovementAlpha = bActiveDropCatch
-        ? FMath::InterpEaseInOut(0.0f, 1.0f, Alpha, 2.2f)
-        : Alpha;
+    float MovementAlpha = Alpha;
+    if (bActiveDropCatch)
+    {
+        // Brief release, accelerating fall, then a short eased catch at the target.
+        if (Alpha < 0.12f)
+        {
+            MovementAlpha = 0.02f * (Alpha / 0.12f);
+        }
+        else if (Alpha < 0.78f)
+        {
+            const float FallAlpha = (Alpha - 0.12f) / 0.66f;
+            MovementAlpha = 0.02f + 0.88f * FallAlpha * FallAlpha;
+        }
+        else
+        {
+            const float CatchAlpha = (Alpha - 0.78f) / 0.22f;
+            MovementAlpha = 0.90f + 0.10f * (1.0f - FMath::Square(1.0f - CatchAlpha));
+        }
+    }
 
     FVector Location = FMath::Lerp(
         TraversalStartLocation, TraversalEndLocation, MovementAlpha);
