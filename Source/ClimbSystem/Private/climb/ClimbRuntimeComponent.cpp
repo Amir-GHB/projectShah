@@ -7,6 +7,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Math/RotationMatrix.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
@@ -82,7 +83,7 @@ bool UClimbRuntimeComponent::StartClimbing()
     TargetRoute.Reset();
     TargetNodeId.Invalidate();
     ClimbInput = FVector2D::ZeroVector;
-    RuntimeState = EClimbRuntimeState::Attached;
+    SetRuntimeState(EClimbRuntimeState::Attached);
 
     Character->SetActorLocationAndRotation(TargetLocation, TargetRotation, false, nullptr,
         ETeleportType::TeleportPhysics);
@@ -113,7 +114,7 @@ void UClimbRuntimeComponent::StopClimbing()
         }
     }
 
-    RuntimeState = EClimbRuntimeState::Inactive;
+    SetRuntimeState(EClimbRuntimeState::Inactive);
     CurrentRoute.Reset();
     CurrentNodeId.Invalidate();
     TargetRoute.Reset();
@@ -388,9 +389,9 @@ void UClimbRuntimeComponent::BeginConnection(const FRuntimeConnection& Connectio
             / FMath::Max(ClimbSpeed, 1.0f), 0.05f);
 
     ActiveTraversalElapsed = 0.0f;
-    RuntimeState = Connection.bIsTraversalLink
+    SetRuntimeState(Connection.bIsTraversalLink
         ? EClimbRuntimeState::ExecutingTraversal
-        : EClimbRuntimeState::MovingAlongSection;
+        : EClimbRuntimeState::MovingAlongSection);
 }
 
 void UClimbRuntimeComponent::FinishConnection()
@@ -422,6 +423,18 @@ void UClimbRuntimeComponent::FinishConnection()
     ActiveTraversalDuration = 0.0f;
     ActiveTraversalArcHeight = 0.0f;
     RuntimeState = EClimbRuntimeState::Attached;
+}
+
+void UClimbRuntimeComponent::SetRuntimeState(const EClimbRuntimeState NewState)
+{
+    if (RuntimeState == NewState)
+    {
+        return;
+    }
+
+    const EClimbRuntimeState PreviousState = RuntimeState;
+    RuntimeState = NewState;
+    OnRuntimeStateChanged.Broadcast(PreviousState, NewState);
 }
 
 void UClimbRuntimeComponent::TickComponent(
