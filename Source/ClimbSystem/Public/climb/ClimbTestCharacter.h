@@ -5,20 +5,18 @@
 #include "GameFramework/Character.h"
 #include "ClimbTestCharacter.generated.h"
 
+class UCameraComponent;
 class UClimbRuntimeComponent;
+class USpringArmComponent;
 class UInputComponent;
 
 /**
- * Minimal development character for validating the new route-driven climbing system.
+ * Development character for validating the route-driven climbing system.
  *
  * Default test controls:
+ *   WASD: move on the ground; move along the route while climbing
  *   E: attach to / detach from a nearby authored route
- *   W/S: move up/down the surface
- *   A/D: move left/right across the surface
- *
- * This is a test harness, not the intended production player character. Create a
- * Blueprint child to assign a skeletal mesh, animation blueprint, camera, and
- * project-specific presentation without coupling those choices to the runtime.
+ *   Mouse: look around (uses the project's "Turn" and "LookUp" axis mappings)
  */
 UCLASS(Blueprintable)
 class CLIMBSYSTEM_API AClimbTestCharacter : public ACharacter
@@ -34,8 +32,11 @@ public:
         return ClimbRuntimeComponent;
     }
 
+    UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
 protected:
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+    virtual void Tick(float DeltaSeconds) override;
 
 private:
     void ToggleClimbing();
@@ -48,6 +49,15 @@ private:
     void MoveRightPressed();
     void MoveRightReleased();
     void UpdateClimbInput();
+    void UpdateGroundMovement();
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera",
+        meta=(AllowPrivateAccess="true"))
+    TObjectPtr<USpringArmComponent> CameraBoom;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Camera",
+        meta=(AllowPrivateAccess="true"))
+    TObjectPtr<UCameraComponent> FollowCamera;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Climbing|Test",
         meta=(AllowPrivateAccess="true"))
