@@ -79,8 +79,8 @@ void AClimbTestCharacter::SetupPlayerInputComponent(
         this, &AClimbTestCharacter::MoveRightReleased);
 
     // These conventional axis names work when the project has the usual mouse mappings.
-    PlayerInputComponent->BindAxis(TEXT("Turn"), this, &APawn::AddControllerYawInput);
-    PlayerInputComponent->BindAxis(TEXT("LookUp"), this, &APawn::AddControllerPitchInput);
+    PlayerInputComponent->BindAxis(TEXT("Turn"), this, &AClimbTestCharacter::TurnCamera);
+    PlayerInputComponent->BindAxis(TEXT("LookUp"), this, &AClimbTestCharacter::LookUpCamera);
 }
 
 void AClimbTestCharacter::Tick(float DeltaSeconds)
@@ -95,6 +95,16 @@ void AClimbTestCharacter::Tick(float DeltaSeconds)
     {
         UpdateGroundMovement();
     }
+}
+
+void AClimbTestCharacter::TurnCamera(float Value)
+{
+    AddControllerYawInput(Value);
+}
+
+void AClimbTestCharacter::LookUpCamera(float Value)
+{
+    AddControllerPitchInput(Value);
 }
 
 void AClimbTestCharacter::ToggleClimbing()
