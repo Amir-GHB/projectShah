@@ -22,8 +22,8 @@ namespace
         SelectNode,
         Section,
         Jump,
-        Drop,
-        Mantle
+        Mantle,
+        Exit
     };
 
     struct HClimbRouteHandleProxy : public HHitProxy
@@ -83,6 +83,7 @@ bool FClimbRouteEdMode::InputKey(
         return true;
     }
 
+    // Keyboard shortcuts remain available for quick authoring.
     if (Key == EKeys::N)
     {
         PlacementIntent = PlacementIntent == EPlacementIntent::IsolatedNode
@@ -136,11 +137,11 @@ bool FClimbRouteEdMode::HandleClick(
         case ERouteHandleAction::Jump:
             PlacementIntent = EPlacementIntent::Jump;
             break;
-        case ERouteHandleAction::Drop:
-            PlacementIntent = EPlacementIntent::Drop;
-            break;
         case ERouteHandleAction::Mantle:
             PlacementIntent = EPlacementIntent::Mantle;
+            break;
+        case ERouteHandleAction::Exit:
+            PlacementIntent = EPlacementIntent::Exit;
             break;
         default:
             PlacementIntent = EPlacementIntent::None;
@@ -162,39 +163,43 @@ bool FClimbRouteEdMode::HandleClick(
         return true;
     }
 
-    const FVector Normal = Hit.ImpactNormal.GetSafeNormal();
-    if (Normal.IsNearlyZero())
+    if (PlacementIntent == EPlacementIntent::Exit && !IsValidExitSurface(Hit))
     {
+        UE_LOG(LogTemp, Warning,
+            TEXT("Climb Route: exit points must be placed on an upward-facing, near-horizontal surface."));
         return true;
     }
 
-    FVector Up = FVector::VectorPlaneProject(FVector::UpVector, Normal).GetSafeNormal();
-    if (Up.IsNearlyZero())
+    if (PlacementIntent == EPlacementIntent::Exit && !SourceNodeId.IsValid())
     {
-        Up = FVector::VectorPlaneProject(FVector::ForwardVector, Normal).GetSafeNormal();
-    }
-    if (Up.IsNearlyZero())
-    {
-        Up = FVector::VectorPlaneProject(FVector::RightVector, Normal).GetSafeNormal();
+        UE_LOG(LogTemp, Warning,
+            TEXT("Climb Route: select a source node before placing an exit."));
+        return true;
     }
 
-    const FQuat ContactRotation = FRotationMatrix::MakeFromXZ(Normal, Up).ToQuat();
-    const FTransform ContactFrame(ContactRotation, Hit.ImpactPoint);
-
+    const FTransform ContactFrame = MakeContactFrame(Hit);
     const FText TransactionLabel = PlacementIntent == EPlacementIntent::Section
         ? LOCTEXT("AddClimbSection", "Add Climbing Path Section")
-        : LOCTEXT("AddClimbTraversal", "Add Climbing Traversal");
+        : (PlacementIntent == EPlacementIntent::Exit
+            ? LOCTEXT("AddClimbExit", "Add Climbing Exit")
+            : LOCTEXT("AddClimbTraversal", "Add Climbing Traversal"));
 
     const FScopedTransaction Transaction(TransactionLabel);
     Route->Modify();
 
-    const EClimbRouteNodeType NewNodeType =
-        PlacementIntent == EPlacementIntent::Jump
+    EClimbRouteNodeType NewNodeType = EClimbRouteNodeType::Standard;
+    if (PlacementIntent == EPlacementIntent::Exit)
+    {
+        NewNodeType = EClimbRouteNodeType::Exit;
+    }
+    else if (PlacementIntent == EPlacementIntent::Jump
         || PlacementIntent == EPlacementIntent::Drop
-        || PlacementIntent == EPlacementIntent::Mantle
-        ? EClimbRouteNodeType::TraversalAnchor
-        : EClimbRouteNodeType::Standard;
+        || PlacementIntent == EPlacementIntent::Mantle)
+    {
+        NewNodeType = EClimbRouteNodeType::TraversalAnchor;
+    }
 
+    const FGuid PreviousSourceNodeId = SourceNodeId;
     const FGuid NewNodeId = Route->AddNodeAtWorldTransform(
         ContactFrame,
         Cast<UPrimitiveComponent>(Hit.GetComponent()),
@@ -206,15 +211,18 @@ bool FClimbRouteEdMode::HandleClick(
         return true;
     }
 
-    if (SourceNodeId.IsValid())
+    if (PreviousSourceNodeId.IsValid())
     {
         if (PlacementIntent == EPlacementIntent::Section)
         {
-            Route->AddSectionBetweenNodes(SourceNodeId, NewNodeId);
+            // Sections are bidirectional by default, so the same authored path
+            // supports both climbing up and descending back down.
+            Route->AddSectionBetweenNodes(PreviousSourceNodeId, NewNodeId);
         }
         else if (PlacementIntent == EPlacementIntent::Jump
             || PlacementIntent == EPlacementIntent::Drop
-            || PlacementIntent == EPlacementIntent::Mantle)
+            || PlacementIntent == EPlacementIntent::Mantle
+            || PlacementIntent == EPlacementIntent::Exit)
         {
             const EClimbTraversalType TraversalType =
                 PlacementIntent == EPlacementIntent::Jump
@@ -222,11 +230,15 @@ bool FClimbRouteEdMode::HandleClick(
                 : (PlacementIntent == EPlacementIntent::Drop
                     ? EClimbTraversalType::Drop
                     : EClimbTraversalType::Mantle);
-            Route->AddTraversalLink(SourceNodeId, NewNodeId, TraversalType);
+            Route->AddTraversalLink(PreviousSourceNodeId, NewNodeId, TraversalType);
         }
     }
 
     SourceNodeId = NewNodeId;
+    if (PlacementIntent == EPlacementIntent::Exit)
+    {
+        PlacementIntent = EPlacementIntent::None;
+    }
     ReportModeState();
     return true;
 }
@@ -239,7 +251,7 @@ void FClimbRouteEdMode::Render(
     FEdMode::Render(View, Viewport, PDI);
     if (AClimbRouteActor* Route = GetSelectedRoute())
     {
-        DrawRoute(Route, PDI);
+        DrawRoute(Route, View, Viewport, PDI);
     }
 }
 
@@ -277,11 +289,61 @@ bool FClimbRouteEdMode::TraceSurface(
 
     const FVector Start = Click.GetOrigin();
     const FVector End = Start + Click.GetDirection() * 100000.0f;
-
     FCollisionQueryParams Params(SCENE_QUERY_STAT(ClimbRouteEditorPlacement), true);
     Params.bTraceComplex = true;
     return World->LineTraceSingleByChannel(
         OutHit, Start, End, ECC_Visibility, Params);
+}
+
+bool FClimbRouteEdMode::TraceMouseSurface(
+    const FSceneView* View,
+    FViewport* Viewport,
+    FHitResult& OutHit) const
+{
+    if (!GEditor || !View || !Viewport)
+    {
+        return false;
+    }
+
+    UWorld* World = GEditor->GetEditorWorldContext().World();
+    if (!World)
+    {
+        return false;
+    }
+
+    FVector RayOrigin;
+    FVector RayDirection;
+    View->DeprojectFVector2D(
+        FVector2D(Viewport->GetMouseX(), Viewport->GetMouseY()),
+        RayOrigin, RayDirection);
+
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(ClimbRouteEditorPreview), true);
+    Params.bTraceComplex = true;
+    return World->LineTraceSingleByChannel(
+        OutHit, RayOrigin, RayOrigin + RayDirection * 100000.0f,
+        ECC_Visibility, Params);
+}
+
+FTransform FClimbRouteEdMode::MakeContactFrame(const FHitResult& Hit) const
+{
+    const FVector Normal = Hit.ImpactNormal.GetSafeNormal();
+    FVector Up = FVector::VectorPlaneProject(FVector::UpVector, Normal).GetSafeNormal();
+    if (Up.IsNearlyZero())
+    {
+        Up = FVector::VectorPlaneProject(FVector::ForwardVector, Normal).GetSafeNormal();
+    }
+    if (Up.IsNearlyZero())
+    {
+        Up = FVector::VectorPlaneProject(FVector::RightVector, Normal).GetSafeNormal();
+    }
+
+    return FTransform(FRotationMatrix::MakeFromXZ(Normal, Up).ToQuat(), Hit.ImpactPoint);
+}
+
+bool FClimbRouteEdMode::IsValidExitSurface(const FHitResult& Hit) const
+{
+    // Only accept a walkable top surface. Side walls and undersides are rejected.
+    return Hit.ImpactNormal.GetSafeNormal().Z >= 0.65f;
 }
 
 void FClimbRouteEdMode::SelectNearestNode(
@@ -322,6 +384,8 @@ void FClimbRouteEdMode::SelectNearestNode(
 
 void FClimbRouteEdMode::DrawRoute(
     AClimbRouteActor* Route,
+    const FSceneView* View,
+    FViewport* Viewport,
     FPrimitiveDrawInterface* PDI) const
 {
     if (!IsValid(Route))
@@ -354,7 +418,7 @@ void FClimbRouteEdMode::DrawRoute(
 
         const FLinearColor LinkColor = Link.Type == EClimbTraversalType::Jump
             ? FLinearColor(1.0f, 0.55f, 0.1f)
-            : FLinearColor(0.85f, 0.3f, 0.9f);
+            : FLinearColor(0.25f, 0.85f, 0.35f);
         PDI->DrawLine(FromTransform.GetLocation(), ToTransform.GetLocation(),
             LinkColor, SDPG_World, 2.0f);
     }
@@ -375,53 +439,163 @@ void FClimbRouteEdMode::DrawRoute(
 
         PDI->SetHitProxy(new HClimbRouteHandleProxy(
             Node.NodeId, ERouteHandleAction::SelectNode));
-        PDI->DrawPoint(Origin, bIsSource ? FLinearColor::Yellow : FLinearColor::White,
+        PDI->DrawPoint(Origin, Node.Type == EClimbRouteNodeType::Exit
+            ? FLinearColor(0.1f, 0.9f, 0.75f)
+            : (bIsSource ? FLinearColor::Yellow : FLinearColor::White),
             bIsSource ? 16.0f : 12.0f, SDPG_Foreground);
         PDI->SetHitProxy(nullptr);
 
         PDI->DrawLine(Origin, Origin + AxisX * 28.0f,
             FLinearColor::Red, SDPG_World, 2.0f);
 
-        // Viewport action handles: tangent +/- create straight sections,
-        // outward creates a jump, up creates a mantle, and down creates a drop.
-        struct FHandleSpec
+        // Show a compact radial menu only for the selected source node.
+        if (!bIsSource)
+        {
+            continue;
+        }
+
+        struct FButtonSpec
         {
             FVector Offset;
             FLinearColor Color;
             ERouteHandleAction Action;
-            float Size;
         };
 
-        const FHandleSpec Handles[] =
+        const FButtonSpec Buttons[] =
         {
-            { AxisY * 42.0f, FLinearColor(0.1f, 0.7f, 1.0f), ERouteHandleAction::Section, 11.0f },
-            { AxisY * -42.0f, FLinearColor(0.1f, 0.7f, 1.0f), ERouteHandleAction::Section, 11.0f },
-            { AxisX * 42.0f, FLinearColor(1.0f, 0.55f, 0.1f), ERouteHandleAction::Jump, 12.0f },
-            { AxisZ * 42.0f, FLinearColor(0.25f, 0.9f, 0.35f), ERouteHandleAction::Mantle, 11.0f },
-            { AxisZ * -42.0f, FLinearColor(0.85f, 0.3f, 0.9f), ERouteHandleAction::Drop, 11.0f }
+            { -AxisY * 58.0f, FLinearColor(0.10f, 0.65f, 1.0f), ERouteHandleAction::Section },
+            {  AxisZ * 58.0f, FLinearColor(0.20f, 0.9f, 0.35f), ERouteHandleAction::Mantle },
+            {  AxisY * 58.0f, FLinearColor(1.0f, 0.52f, 0.08f), ERouteHandleAction::Jump },
+            { -AxisZ * 58.0f, FLinearColor(0.10f, 0.85f, 0.72f), ERouteHandleAction::Exit }
         };
 
-        for (const FHandleSpec& Handle : Handles)
+        const auto DrawButtonLine = [&](const FVector& Start, const FVector& End,
+            const FLinearColor& Color, const ERouteHandleAction Action)
         {
-            const FVector HandlePosition = Origin + Handle.Offset;
-            PDI->SetHitProxy(new HClimbRouteHandleProxy(Node.NodeId, Handle.Action));
-            PDI->DrawPoint(HandlePosition, Handle.Color, Handle.Size, SDPG_Foreground);
+            PDI->SetHitProxy(new HClimbRouteHandleProxy(Node.NodeId, Action));
+            PDI->DrawLine(Start, End, Color, SDPG_Foreground, 2.5f);
             PDI->SetHitProxy(nullptr);
-            PDI->DrawLine(Origin, HandlePosition, Handle.Color, SDPG_Foreground, 1.0f);
+        };
+
+        for (const FButtonSpec& Button : Buttons)
+        {
+            const FVector Center = Origin + Button.Offset;
+            const float Radius = 13.0f;
+            const int32 CircleSegments = 20;
+            for (int32 Segment = 0; Segment < CircleSegments; ++Segment)
+            {
+                const float A0 = 2.0f * PI * static_cast<float>(Segment)
+                    / static_cast<float>(CircleSegments);
+                const float A1 = 2.0f * PI * static_cast<float>(Segment + 1)
+                    / static_cast<float>(CircleSegments);
+                const FVector P0 = Center + AxisY * (FMath::Cos(A0) * Radius)
+                    + AxisZ * (FMath::Sin(A0) * Radius);
+                const FVector P1 = Center + AxisY * (FMath::Cos(A1) * Radius)
+                    + AxisZ * (FMath::Sin(A1) * Radius);
+                DrawButtonLine(P0, P1, Button.Color, Button.Action);
+            }
+
+            PDI->SetHitProxy(new HClimbRouteHandleProxy(Node.NodeId, Button.Action));
+            PDI->DrawPoint(Center, Button.Color, 4.0f, SDPG_Foreground);
+            PDI->SetHitProxy(nullptr);
+
+            const float IconScale = 7.0f;
+            if (Button.Action == ERouteHandleAction::Section)
+            {
+                DrawButtonLine(Center - AxisY * IconScale * 0.65f,
+                    Center + AxisY * IconScale * 0.65f, Button.Color, Button.Action);
+                DrawButtonLine(Center - AxisY * IconScale * 0.65f - AxisZ * 2.5f,
+                    Center - AxisY * IconScale * 0.65f + AxisZ * 2.5f,
+                    Button.Color, Button.Action);
+                DrawButtonLine(Center + AxisY * IconScale * 0.65f - AxisZ * 2.5f,
+                    Center + AxisY * IconScale * 0.65f + AxisZ * 2.5f,
+                    Button.Color, Button.Action);
+            }
+            else if (Button.Action == ERouteHandleAction::Mantle)
+            {
+                DrawButtonLine(Center - AxisZ * IconScale * 0.55f,
+                    Center + AxisZ * IconScale * 0.5f, Button.Color, Button.Action);
+                DrawButtonLine(Center + AxisZ * IconScale * 0.5f,
+                    Center + AxisZ * IconScale * 0.1f + AxisY * IconScale * 0.38f,
+                    Button.Color, Button.Action);
+                DrawButtonLine(Center + AxisZ * IconScale * 0.5f,
+                    Center + AxisZ * IconScale * 0.1f - AxisY * IconScale * 0.38f,
+                    Button.Color, Button.Action);
+            }
+            else if (Button.Action == ERouteHandleAction::Jump)
+            {
+                const FVector Start = Center - AxisY * IconScale * 0.42f
+                    - AxisZ * IconScale * 0.42f;
+                const FVector Tip = Center + AxisY * IconScale * 0.42f
+                    + AxisZ * IconScale * 0.42f;
+                DrawButtonLine(Start, Tip, Button.Color, Button.Action);
+                DrawButtonLine(Tip, Tip - AxisY * IconScale * 0.38f,
+                    Button.Color, Button.Action);
+                DrawButtonLine(Tip, Tip - AxisZ * IconScale * 0.38f,
+                    Button.Color, Button.Action);
+            }
+            else if (Button.Action == ERouteHandleAction::Exit)
+            {
+                DrawButtonLine(Center - AxisY * IconScale * 0.55f,
+                    Center + AxisY * IconScale * 0.25f, Button.Color, Button.Action);
+                DrawButtonLine(Center + AxisY * IconScale * 0.25f,
+                    Center + AxisY * IconScale * 0.25f - AxisZ * IconScale * 0.38f,
+                    Button.Color, Button.Action);
+                DrawButtonLine(Center + AxisY * IconScale * 0.25f,
+                    Center + AxisY * IconScale * 0.25f + AxisZ * IconScale * 0.38f,
+                    Button.Color, Button.Action);
+            }
+        }
+    }
+
+    // Live ghost placement: trace under the viewport cursor, draw a preview point,
+    // and connect it to the selected source without committing any route data.
+    if (PlacementIntent != EPlacementIntent::None && SourceNodeId.IsValid())
+    {
+        FHitResult PreviewHit;
+        if (TraceMouseSurface(View, Viewport, PreviewHit))
+        {
+            const bool bExitSurfaceValid = PlacementIntent != EPlacementIntent::Exit
+                || IsValidExitSurface(PreviewHit);
+            const FTransform GhostFrame = MakeContactFrame(PreviewHit);
+            const FVector GhostLocation = GhostFrame.GetLocation()
+                + GhostFrame.GetUnitAxis(EAxis::X) * 5.0f;
+
+            FTransform SourceTransform;
+            if (Route->GetNodeWorldTransform(SourceNodeId, SourceTransform))
+            {
+                const FLinearColor PreviewColor = !bExitSurfaceValid
+                    ? FLinearColor::Red
+                    : (PlacementIntent == EPlacementIntent::Exit
+                        ? FLinearColor(0.1f, 0.85f, 0.72f)
+                        : (PlacementIntent == EPlacementIntent::Jump
+                            ? FLinearColor(1.0f, 0.52f, 0.08f)
+                            : (PlacementIntent == EPlacementIntent::Mantle
+                                ? FLinearColor(0.2f, 0.9f, 0.35f)
+                                : FLinearColor(0.1f, 0.65f, 1.0f))));
+
+                PDI->DrawLine(SourceTransform.GetLocation(), GhostLocation,
+                    PreviewColor, SDPG_Foreground, 2.0f);
+                PDI->DrawPoint(GhostLocation, PreviewColor, 15.0f, SDPG_Foreground);
+                PDI->DrawLine(GhostLocation,
+                    GhostLocation + GhostFrame.GetUnitAxis(EAxis::X) * 24.0f,
+                    PreviewColor, SDPG_Foreground, 1.5f);
+            }
         }
     }
 }
 
 void FClimbRouteEdMode::ReportModeState() const
 {
-    const TCHAR* IntentName = TEXT("Select node or click a colored handle");
+    const TCHAR* IntentName = TEXT("Select a node to reveal radial actions");
     switch (PlacementIntent)
     {
-    case EPlacementIntent::IsolatedNode: IntentName = TEXT("Place node"); break;
-    case EPlacementIntent::Section: IntentName = TEXT("Place section endpoint (straight path)"); break;
+    case EPlacementIntent::IsolatedNode: IntentName = TEXT("Place isolated node"); break;
+    case EPlacementIntent::Section: IntentName = TEXT("Place bidirectional climb section"); break;
     case EPlacementIntent::Jump: IntentName = TEXT("Place jump destination"); break;
-    case EPlacementIntent::Drop: IntentName = TEXT("Place drop destination"); break;
+    case EPlacementIntent::Drop: IntentName = TEXT("Place explicit drop destination"); break;
     case EPlacementIntent::Mantle: IntentName = TEXT("Place mantle destination"); break;
+    case EPlacementIntent::Exit: IntentName = TEXT("Place exit on horizontal top surface"); break;
     default: break;
     }
 
