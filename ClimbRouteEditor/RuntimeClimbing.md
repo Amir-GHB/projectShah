@@ -23,8 +23,9 @@ This is a first playable foundation, not a production traversal system. It curre
 3. Add the **Climb Runtime Component** (`UClimbRuntimeComponent`).
 4. On the climbing input pressed event, call `StartClimbing`.
 5. While climbing, feed the existing 2D movement input into `SetClimbInput`. X means left/right across the surface; Y means up/down.
-6. On the climbing input released/toggle-off event, call `StopClimbing`.
-7. Ensure the Character Blueprint is actually the possessed pawn in the test map.
+6. On the movement input's Enhanced Input `Completed` and `Canceled` events, call `SetClimbInput(0, 0)`. This is important: the current segment finishes after input release, but zero input prevents starting another segment at the next node.
+7. On the climbing input released/toggle-off event, call `StopClimbing`.
+8. Ensure the Character Blueprint is actually the possessed pawn in the test map.
 
 The component does not bind project-specific input actions itself. Keeping input mapping in the character/controller avoids coupling climbing to one project's Enhanced Input assets.
 
