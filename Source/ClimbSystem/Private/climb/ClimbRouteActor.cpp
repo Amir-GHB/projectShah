@@ -4,7 +4,12 @@
 
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "UObject/ConstructorHelpers.h"
 
 AClimbRouteActor::AClimbRouteActor()
 {
@@ -12,11 +17,160 @@ AClimbRouteActor::AClimbRouteActor()
 
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
     SetRootComponent(SceneRoot);
+
+    RuntimePathVisualization = CreateDefaultSubobject<UInstancedStaticMeshComponent>(
+        TEXT("RuntimePathVisualization"));
+    RuntimePathVisualization->SetupAttachment(SceneRoot);
+    RuntimePathVisualization->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    RuntimePathVisualization->SetGenerateOverlapEvents(false);
+    RuntimePathVisualization->SetCanEverAffectNavigation(false);
+    RuntimePathVisualization->SetCastShadow(false);
+    RuntimePathVisualization->SetMobility(EComponentMobility::Movable);
+
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(
+        TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+    if (CylinderMesh.Succeeded())
+    {
+        RuntimePathVisualization->SetStaticMesh(CylinderMesh.Object);
+    }
+}
+
+void AClimbRouteActor::BeginPlay()
+{
+    Super::BeginPlay();
+    BuildRuntimePathVisualization();
 }
 
 void AClimbRouteActor::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
+}
+
+void AClimbRouteActor::BuildRuntimePathVisualization()
+{
+    if (!RuntimePathVisualization)
+    {
+        return;
+    }
+
+    RuntimePathVisualization->ClearInstances();
+    if (!bShowRuntimePathVisualization || !RuntimePathVisualization->GetStaticMesh())
+    {
+        RuntimePathVisualization->SetVisibility(false, true);
+        return;
+    }
+
+    RuntimePathVisualization->SetVisibility(true, true);
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(
+        TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
+    if (BasicMaterial.Succeeded())
+    {
+        UMaterialInstanceDynamic* DynamicMaterial =
+            UMaterialInstanceDynamic::Create(BasicMaterial.Object, this);
+        if (DynamicMaterial)
+        {
+            DynamicMaterial->SetVectorParameterValue(TEXT("Color"), RuntimePathColor);
+            DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), RuntimePathColor);
+            DynamicMaterial->SetScalarParameterValue(TEXT("Opacity"), RuntimePathColor.A);
+            RuntimePathVisualization->SetMaterial(0, DynamicMaterial);
+        }
+    }
+
+    for (const FClimbRouteSection& Section : Sections)
+    {
+        TArray<FVector> Points;
+        if (!GetSectionPolylineWorldPoints(Section, Points) || Points.Num() < 2)
+        {
+            continue;
+        }
+
+        for (int32 Index = 0; Index + 1 < Points.Num(); ++Index)
+        {
+            FVector Start = Points[Index];
+            FVector End = Points[Index + 1];
+            const FVector Direction = (End - Start).GetSafeNormal();
+            if (Direction.IsNearlyZero())
+            {
+                continue;
+            }
+
+            if (Index == 0)
+            {
+                Start += Direction * RuntimePathNodeGap;
+            }
+            if (Index == Points.Num() - 2)
+            {
+                End -= Direction * RuntimePathNodeGap;
+            }
+            AddRuntimePathLine(Start, End, RuntimePathThickness);
+        }
+    }
+
+    for (const FClimbRouteTraversalLink& Link : TraversalLinks)
+    {
+        FTransform FromTransform;
+        FTransform ToTransform;
+        if (!GetNodeWorldTransform(Link.FromNodeId, FromTransform)
+            || !GetNodeWorldTransform(Link.ToNodeId, ToTransform))
+        {
+            continue;
+        }
+
+        FVector Start = FromTransform.GetLocation();
+        FVector End = ToTransform.GetLocation();
+        const FVector Direction = (End - Start).GetSafeNormal();
+        if (Direction.IsNearlyZero())
+        {
+            continue;
+        }
+
+        Start += Direction * RuntimePathNodeGap;
+        End -= Direction * RuntimePathNodeGap;
+        AddRuntimePathLine(Start, End, RuntimePathThickness);
+    }
+
+    // Short world-vertical ticks make node positions readable without touching
+    // the gameplay collision or relying on development-only debug drawing.
+    for (const FClimbRouteNode& Node : Nodes)
+    {
+        FTransform NodeTransform;
+        if (!GetNodeWorldTransform(Node.NodeId, NodeTransform))
+        {
+            continue;
+        }
+
+        const FVector Origin = NodeTransform.GetLocation();
+        const FVector HalfTick = FVector::UpVector * (RuntimeNodeMarkerLength * 0.5f);
+        AddRuntimePathLine(Origin - HalfTick, Origin + HalfTick,
+            RuntimePathThickness * 0.85f);
+    }
+}
+
+void AClimbRouteActor::AddRuntimePathLine(
+    const FVector& Start,
+    const FVector& End,
+    const float Radius)
+{
+    if (!RuntimePathVisualization)
+    {
+        return;
+    }
+
+    const FVector Delta = End - Start;
+    const float Length = Delta.Size();
+    if (Length <= KINDA_SMALL_NUMBER || Length < RuntimePathNodeGap * 0.5f)
+    {
+        return;
+    }
+
+    const FQuat Rotation = FQuat::FindBetweenNormals(
+        FVector::UpVector, Delta / Length);
+    const FVector Scale(
+        FMath::Max(Radius, 0.25f) / 50.0f,
+        FMath::Max(Radius, 0.25f) / 50.0f,
+        Length / 100.0f);
+    RuntimePathVisualization->AddInstance(
+        FTransform(Rotation, (Start + End) * 0.5f, Scale), true);
 }
 
 FGuid AClimbRouteActor::AddNodeAtWorldTransform(
