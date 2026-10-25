@@ -17,7 +17,23 @@ enum class EClimbRuntimeState : uint8
     Inactive,
     Attached,
     MovingAlongSection,
-    ExecutingTraversal
+    ExecutingTraversal,
+    /** Descending from a ledge and catching the next authored node. */
+    DroppingToCatch
+};
+
+/** Direction/action classification exposed for animation state selection. */
+UENUM(BlueprintType)
+enum class EClimbMovementDirection : uint8
+{
+    None,
+    Up,
+    Down,
+    Left,
+    Right,
+    Jump,
+    Mantle,
+    Exit
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
@@ -60,6 +76,9 @@ public:
     EClimbRuntimeState GetRuntimeState() const { return RuntimeState; }
 
     UFUNCTION(BlueprintPure, Category="Climbing|Runtime")
+    EClimbMovementDirection GetMovementDirection() const { return MovementDirection; }
+
+    UFUNCTION(BlueprintPure, Category="Climbing|Runtime")
     FGuid GetCurrentNodeId() const { return CurrentNodeId; }
 
     UFUNCTION(BlueprintPure, Category="Climbing|Runtime")
@@ -90,6 +109,11 @@ public:
         meta=(ClampMin="0.0"))
     float InputDirectionThreshold = 0.2f;
 
+    /** Maximum outward bow while releasing a ledge and catching a lower node. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Climbing|Movement",
+        meta=(ClampMin="0.0"))
+    float DropCatchOutwardDistance = 24.0f;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Climbing|Debug")
     bool bDrawRuntimeDebug = false;
 
@@ -110,6 +134,7 @@ private:
         bool bIsTraversalLink = false;
         float Duration = 0.0f;
         float ArcHeight = 0.0f;
+        bool bDropCatch = false;
     };
 
     void TickComponent(float DeltaTime, ELevelTick TickType,
@@ -126,6 +151,10 @@ private:
     void SetRuntimeState(EClimbRuntimeState NewState);
     FVector GetSurfaceUp(const FTransform& NodeTransform) const;
     FRotator GetClimbingRotation(const FTransform& NodeTransform) const;
+    EClimbMovementDirection ClassifyMovementDirection(
+        const FTransform& FromTransform,
+        const FTransform& ToTransform,
+        EClimbTraversalType Type) const;
 
     TArray<TWeakObjectPtr<AClimbRouteActor>> AvailableRoutes;
     TWeakObjectPtr<AClimbRouteActor> CurrentRoute;
@@ -134,6 +163,8 @@ private:
     TWeakObjectPtr<AClimbRouteActor> TargetRoute;
     FGuid TargetNodeId;
     EClimbTraversalType ActiveTraversalType = EClimbTraversalType::ClimbTransition;
+    EClimbMovementDirection MovementDirection = EClimbMovementDirection::None;
+    bool bActiveDropCatch = false;
     bool bActiveConnectionIsTraversalLink = false;
     float ActiveTraversalDuration = 0.0f;
     float ActiveTraversalArcHeight = 0.0f;
