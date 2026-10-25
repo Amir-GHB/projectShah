@@ -20,6 +20,11 @@ enum class EClimbRuntimeState : uint8
     ExecutingTraversal
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+    FOnClimbRuntimeStateChanged,
+    EClimbRuntimeState, PreviousState,
+    EClimbRuntimeState, NewState);
+
 /**
  * Runtime traversal for the new AClimbRouteActor graph.
  *
@@ -92,6 +97,10 @@ public:
         Category="Climbing|Runtime")
     EClimbRuntimeState RuntimeState = EClimbRuntimeState::Inactive;
 
+    /** Broadcast when traversal starts, ends, or changes between runtime phases. */
+    UPROPERTY(BlueprintAssignable, Category="Climbing|Events")
+    FOnClimbRuntimeStateChanged OnRuntimeStateChanged;
+
 private:
     struct FRuntimeConnection
     {
@@ -114,6 +123,7 @@ private:
     bool FindBestConnection(FRuntimeConnection& OutConnection) const;
     void BeginConnection(const FRuntimeConnection& Connection);
     void FinishConnection();
+    void SetRuntimeState(EClimbRuntimeState NewState);
     FVector GetSurfaceUp(const FTransform& NodeTransform) const;
     FRotator GetClimbingRotation(const FTransform& NodeTransform) const;
 
