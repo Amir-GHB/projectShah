@@ -40,6 +40,8 @@ protected:
 
 private:
     void ToggleClimbing();
+    void TurnCamera(float Value);
+    void LookUpCamera(float Value);
     void MoveUpPressed();
     void MoveUpReleased();
     void MoveDownPressed();
