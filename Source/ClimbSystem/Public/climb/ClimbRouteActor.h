@@ -8,6 +8,7 @@
 
 class UPrimitiveComponent;
 class USceneComponent;
+class UInstancedStaticMeshComponent;
 
 /**
  * Owns one connected climbing authoring network.
@@ -48,6 +49,28 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Climbing Route")
     TObjectPtr<USceneComponent> SceneRoot = nullptr;
 
+    /** Runtime path dressing, rendered as ordinary instanced scene geometry (not debug lines). */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Climbing Route|Visualization")
+    TObjectPtr<UInstancedStaticMeshComponent> RuntimePathVisualization = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Climbing Route|Visualization")
+    bool bShowRuntimePathVisualization = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Climbing Route|Visualization")
+    FLinearColor RuntimePathColor = FLinearColor(0.34f, 0.23f, 0.055f, 0.72f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Climbing Route|Visualization",
+        meta=(ClampMin="0.25", ClampMax="8.0"))
+    float RuntimePathThickness = 1.5f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Climbing Route|Visualization",
+        meta=(ClampMin="0.0", ClampMax="50.0"))
+    float RuntimePathNodeGap = 12.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Climbing Route|Visualization",
+        meta=(ClampMin="1.0", ClampMax="50.0"))
+    float RuntimeNodeMarkerLength = 16.0f;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Climbing Route|Authoring")
     TArray<FClimbRouteNode> Nodes;
 
@@ -63,8 +86,11 @@ public:
 #endif
 
 protected:
+    virtual void BeginPlay() override;
     virtual void OnConstruction(const FTransform& Transform) override;
 
 private:
     int32 FindNodeIndex(const FGuid& NodeId) const;
+    void BuildRuntimePathVisualization();
+    void AddRuntimePathLine(const FVector& Start, const FVector& End, float Radius);
 };
