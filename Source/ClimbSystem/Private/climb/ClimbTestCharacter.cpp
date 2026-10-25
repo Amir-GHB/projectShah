@@ -8,6 +8,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputCoreTypes.h"
+#include "Math/RotationMatrix.h"
 
 AClimbTestCharacter::AClimbTestCharacter()
 {
