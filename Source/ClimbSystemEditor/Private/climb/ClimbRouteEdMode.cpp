@@ -10,6 +10,8 @@
 #include "EditorViewportClient.h"
 #include "HitProxies.h"
 #include "SceneManagement.h"
+#include "SceneView.h"
+#include "Math/RotationMatrix.h"
 #include "ScopedTransaction.h"
 #include "UnrealClient.h"
 
