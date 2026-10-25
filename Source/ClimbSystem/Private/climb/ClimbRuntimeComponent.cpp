@@ -61,7 +61,7 @@ bool UClimbRuntimeComponent::StartClimbing()
     if (!FindClosestAttachNode(Route, NodeId, NodeTransform))
     {
         UE_LOG(LogTemp, Verbose,
-            TEXT("Climbing: no authored entry node within %.1f units."), MaxAttachDistance);
+            TEXT("Climbing: no usable authored node within %.1f units."), MaxAttachDistance);
         return false;
     }
 
@@ -422,7 +422,7 @@ void UClimbRuntimeComponent::FinishConnection()
     ActiveTraversalElapsed = 0.0f;
     ActiveTraversalDuration = 0.0f;
     ActiveTraversalArcHeight = 0.0f;
-    RuntimeState = EClimbRuntimeState::Attached;
+    SetRuntimeState(EClimbRuntimeState::Attached);
 }
 
 void UClimbRuntimeComponent::SetRuntimeState(const EClimbRuntimeState NewState)
