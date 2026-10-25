@@ -18,18 +18,19 @@ This is a first playable foundation, not a production traversal system. It curre
 
 ## Fastest test setup: dedicated test character
 
-The branch now includes `AClimbTestCharacter`, a minimal character class with `UClimbRuntimeComponent` already attached and temporary keyboard controls:
+The branch now includes `AClimbTestCharacter`, a minimal test character with `UClimbRuntimeComponent`, ordinary ground movement, and a third-person follow camera.
 
+- **W / S**: move forward / backward on the ground; move up / down along the route while climbing.
+- **A / D**: strafe left / right on the ground; move left / right across the route while climbing.
 - **E**: attach to the closest usable authored node, or detach if already climbing.
-- **W / S**: up / down along the surface.
-- **A / D**: left / right across the surface.
+- **Mouse**: rotate the follow camera, provided the project has the usual `Turn` and `LookUp` axis mappings.
 
 1. Compile the project in Unreal Engine 5.8.
-2. Create a Blueprint child of `AClimbTestCharacter` (recommended) so you can assign a skeletal mesh, animation Blueprint, and camera if desired.
+2. Create a Blueprint child of `AClimbTestCharacter` (recommended) to assign a skeletal mesh and animation Blueprint. The camera boom, follow camera, and basic movement are already created in C++.
 3. In the test map, set this Blueprint as the Default Pawn Class in the active GameMode, or place it and configure the Player Controller to possess it.
 4. Build a route as described below and press Play.
 
-The C++ class intentionally contains only test controls and the runtime component. It does not hard-code a project-specific mesh, camera, or animation setup. Its direct key bindings are a temporary test harness; production input should use the project's chosen input mapping layer.
+The C++ class intentionally does not hard-code a project-specific mesh or animation setup. Its direct keyboard bindings are a temporary test harness; production input should use the project's chosen input mapping layer. If mouse look does not work in a custom project, add the conventional `Turn` and `LookUp` axis mappings in Project Settings > Input.
 
 ## Using the runtime component on another character
 
