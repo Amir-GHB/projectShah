@@ -22,18 +22,34 @@ enum class EClimbRuntimeState : uint8
     DroppingToCatch
 };
 
-/** Direction/action classification exposed for animation state selection. */
+/** High-level movement action currently being performed by the climbing system. */
 UENUM(BlueprintType)
-enum class EClimbMovementDirection : uint8
+enum class EClimbMovementType : uint8
 {
     None,
-    Up,
-    Down,
-    Left,
-    Right,
+    Enter,
+    Smooth,
     Jump,
     Mantle,
-    Exit
+    Exit,
+    Leave
+};
+
+/**
+ * Single animation-facing snapshot.
+ * Direction is a normalized projection of world displacement onto the
+ * character's world-space right axis (X) and global up axis (Y).
+ */
+USTRUCT(BlueprintType)
+struct FClimbAnimationState
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly, Category="Climbing|Animation")
+    EClimbMovementType MovementType = EClimbMovementType::None;
+
+    UPROPERTY(BlueprintReadOnly, Category="Climbing|Animation")
+    FVector2D Direction = FVector2D::ZeroVector;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
@@ -75,8 +91,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Climbing|Runtime")
     EClimbRuntimeState GetRuntimeState() const { return RuntimeState; }
 
-    UFUNCTION(BlueprintPure, Category="Climbing|Runtime")
-    EClimbMovementDirection GetMovementDirection() const { return MovementDirection; }
+    UFUNCTION(BlueprintPure, Category="Climbing|Animation")
+    FClimbAnimationState GetAnimationState() const { return AnimationState; }
 
     UFUNCTION(BlueprintPure, Category="Climbing|Runtime")
     FGuid GetCurrentNodeId() const { return CurrentNodeId; }
@@ -151,10 +167,9 @@ private:
     void SetRuntimeState(EClimbRuntimeState NewState);
     FVector GetSurfaceUp(const FTransform& NodeTransform) const;
     FRotator GetClimbingRotation(const FTransform& NodeTransform) const;
-    EClimbMovementDirection ClassifyMovementDirection(
-        const FTransform& FromTransform,
-        const FTransform& ToTransform,
-        EClimbTraversalType Type) const;
+    void SetAnimationState(EClimbMovementType MovementType,
+        const FVector& WorldDisplacement, const FVector& WorldRightAxis);
+    void ClearAnimationState();
 
     TArray<TWeakObjectPtr<AClimbRouteActor>> AvailableRoutes;
     TWeakObjectPtr<AClimbRouteActor> CurrentRoute;
@@ -163,7 +178,12 @@ private:
     TWeakObjectPtr<AClimbRouteActor> TargetRoute;
     FGuid TargetNodeId;
     EClimbTraversalType ActiveTraversalType = EClimbTraversalType::ClimbTransition;
-    EClimbMovementDirection MovementDirection = EClimbMovementDirection::None;
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient,
+        Category="Climbing|Animation")
+    FClimbAnimationState AnimationState;
+    FVector AnimationWorldRightAxis = FVector::RightVector;
+    float AnimationStateRemainingTime = 0.0f;
+    static constexpr float AnimationTransitionHoldTime = 0.20f;
     bool bActiveDropCatch = false;
     bool bActiveConnectionIsTraversalLink = false;
     float ActiveTraversalDuration = 0.0f;
