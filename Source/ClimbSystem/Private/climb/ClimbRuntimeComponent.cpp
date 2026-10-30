@@ -84,6 +84,10 @@ bool UClimbRuntimeComponent::StartClimbing()
     TargetNodeId.Invalidate();
     ClimbInput = FVector2D::ZeroVector;
 
+    SetAnimationState(EClimbMovementType::Enter,
+        TargetLocation - Character->GetActorLocation(),
+        Character->GetActorRightVector());
+
     Character->SetActorLocationAndRotation(TargetLocation, TargetRotation, false, nullptr,
         ETeleportType::TeleportPhysics);
     SetRuntimeState(EClimbRuntimeState::Attached);
@@ -114,8 +118,9 @@ void UClimbRuntimeComponent::StopClimbing()
         }
     }
 
+    SetAnimationState(EClimbMovementType::Leave, FVector::ZeroVector,
+        Character ? Character->GetActorRightVector() : FVector::RightVector);
     SetRuntimeState(EClimbRuntimeState::Inactive);
-    MovementDirection = EClimbMovementDirection::None;
     bActiveDropCatch = false;
     CurrentRoute.Reset();
     CurrentNodeId.Invalidate();
@@ -434,9 +439,17 @@ void UClimbRuntimeComponent::BeginConnection(const FRuntimeConnection& Connectio
     }
     DestinationRoute->GetNodeWorldTransform(Connection.TargetNodeId, DestinationTransform);
     const FClimbRouteNode* DestinationNode = DestinationRoute->FindNode(Connection.TargetNodeId);
-    MovementDirection = DestinationNode && DestinationNode->Type == EClimbRouteNodeType::Exit
-        ? EClimbMovementDirection::Exit
-        : ClassifyMovementDirection(SourceTransform, DestinationTransform, Connection.Type);
+    const EClimbMovementType MovementType =
+        DestinationNode && DestinationNode->Type == EClimbRouteNodeType::Exit
+            ? EClimbMovementType::Exit
+            : (Connection.Type == EClimbTraversalType::Jump
+                ? EClimbMovementType::Jump
+                : (Connection.Type == EClimbTraversalType::Mantle
+                    ? EClimbMovementType::Mantle
+                    : EClimbMovementType::Smooth));
+    const FVector WorldDisplacement = TraversalEndLocation - TraversalStartLocation;
+    AnimationWorldRightAxis = Character->GetActorRightVector();
+    SetAnimationState(MovementType, WorldDisplacement, AnimationWorldRightAxis);
 
     const float Distance = FVector::Distance(TraversalStartLocation, TraversalEndLocation);
     if (bActiveDropCatch)
@@ -497,53 +510,39 @@ void UClimbRuntimeComponent::FinishConnection()
     ActiveTraversalDuration = 0.0f;
     ActiveTraversalArcHeight = 0.0f;
     bActiveDropCatch = false;
-    MovementDirection = EClimbMovementDirection::None;
+    ClearAnimationState();
     SetRuntimeState(EClimbRuntimeState::Attached);
 }
 
-EClimbMovementDirection UClimbRuntimeComponent::ClassifyMovementDirection(
-    const FTransform& FromTransform,
-    const FTransform& ToTransform,
-    const EClimbTraversalType Type) const
+void UClimbRuntimeComponent::SetAnimationState(
+    const EClimbMovementType MovementType,
+    const FVector& WorldDisplacement,
+    const FVector& WorldRightAxis)
 {
-    if (Type == EClimbTraversalType::Jump)
+    AnimationState.MovementType = MovementType;
+    AnimationWorldRightAxis = WorldRightAxis.GetSafeNormal();
+    if (AnimationWorldRightAxis.IsNearlyZero())
     {
-        return EClimbMovementDirection::Jump;
-    }
-    if (Type == EClimbTraversalType::Mantle)
-    {
-        return EClimbMovementDirection::Mantle;
-    }
-    if (Type == EClimbTraversalType::Drop)
-    {
-        return EClimbMovementDirection::Down;
+        AnimationWorldRightAxis = FVector::RightVector;
     }
 
-    const FVector Normal = FromTransform.GetUnitAxis(EAxis::X).GetSafeNormal();
-    const FVector Up = GetSurfaceUp(FromTransform);
-    const FVector Right = FVector::CrossProduct(Up, -Normal).GetSafeNormal();
-    const FVector Delta = FVector::VectorPlaneProject(
-        ToTransform.GetLocation() - FromTransform.GetLocation(), Normal).GetSafeNormal();
-    const float VerticalAmount = FVector::DotProduct(Delta, Up);
-    const float HorizontalAmount = FVector::DotProduct(Delta, Right);
+    const FVector Direction3D = WorldDisplacement.GetSafeNormal();
+    AnimationState.Direction = FVector2D(
+        FVector::DotProduct(Direction3D, AnimationWorldRightAxis),
+        FVector::DotProduct(Direction3D, FVector::UpVector));
+    AnimationState.Direction = AnimationState.Direction.GetClampedToMaxSize(1.0f);
 
-    if (VerticalAmount > 0.45f)
-    {
-        return EClimbMovementDirection::Up;
-    }
-    if (VerticalAmount < -0.45f)
-    {
-        return EClimbMovementDirection::Down;
-    }
-    if (HorizontalAmount > 0.35f)
-    {
-        return EClimbMovementDirection::Right;
-    }
-    if (HorizontalAmount < -0.35f)
-    {
-        return EClimbMovementDirection::Left;
-    }
-    return EClimbMovementDirection::None;
+    AnimationStateRemainingTime =
+        (MovementType == EClimbMovementType::Enter
+            || MovementType == EClimbMovementType::Leave)
+        ? AnimationTransitionHoldTime : 0.0f;
+}
+
+void UClimbRuntimeComponent::ClearAnimationState()
+{
+    AnimationState.MovementType = EClimbMovementType::None;
+    AnimationState.Direction = FVector2D::ZeroVector;
+    AnimationStateRemainingTime = 0.0f;
 }
 
 void UClimbRuntimeComponent::SetRuntimeState(const EClimbRuntimeState NewState)
@@ -564,6 +563,16 @@ void UClimbRuntimeComponent::TickComponent(
     FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+    if (AnimationStateRemainingTime > 0.0f)
+    {
+        AnimationStateRemainingTime = FMath::Max(
+            0.0f, AnimationStateRemainingTime - DeltaTime);
+        if (AnimationStateRemainingTime <= 0.0f)
+        {
+            ClearAnimationState();
+        }
+    }
 
     if (!IsClimbing())
     {
