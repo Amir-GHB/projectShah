@@ -118,8 +118,17 @@ void UClimbRuntimeComponent::StopClimbing()
         }
     }
 
-    SetAnimationState(EClimbMovementType::Leave, FVector::ZeroVector,
-        Character ? Character->GetActorRightVector() : FVector::RightVector);
+    // A ledge top-out is an Exit animation, not a generic detach.
+    // Preserve it after movement mode is restored; manual detach uses Leave.
+    if (AnimationState.MovementType == EClimbMovementType::Exit)
+    {
+        AnimationStateRemainingTime = AnimationTransitionHoldTime;
+    }
+    else
+    {
+        SetAnimationState(EClimbMovementType::Leave, FVector::ZeroVector,
+            Character ? Character->GetActorRightVector() : FVector::RightVector);
+    }
     SetRuntimeState(EClimbRuntimeState::Inactive);
     bActiveDropCatch = false;
     CurrentRoute.Reset();
