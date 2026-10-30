@@ -11,13 +11,25 @@ or the legacy `UClimbingComponent`.
 - Places the character capsule outside the authored surface frame and turns the character toward the surface.
 - Uses explicit sections and traversal links as the navigation graph. It does not infer connections by proximity.
 - Moves along authored sections in either direction when `bBidirectional` is enabled (the default).
-- Exposes `EClimbMovementDirection` to Blueprint for distinct Up, Down, Left, Right, Jump, Mantle, and Exit animation selection.
+- Exposes one `FClimbAnimationState` snapshot to Blueprint/AnimBP. Its `MovementType` distinguishes Enter, Smooth, Jump, Mantle, Exit, and Leave; its `Direction` is a normalized world-displacement projection (`X` = character world-right, `Y` = global up).
 - Treats downward section travel as a ledge release, accelerating fall, and lower-node catch. The state becomes `DroppingToCatch`, distinct from ordinary section movement.
 - Executes authored jump and mantle links with a simple configurable sine arc.
 - Treats a node of type `Exit` as a top-out point and restores the character's previous movement mode after reaching it.
 - Builds muted-gold path connections and short world-vertical node ticks using instanced static-mesh geometry at runtime. These are ordinary scene components, not development-only debug lines.
 
 This is a first playable foundation, not a finished production traversal system. It currently moves the character actor directly while character movement is set to `MOVE_None`; collision-aware path following, animation montage/root-motion matching, capsule/landing validation, and robust transitions around corners remain future work.
+
+## Animation Blueprint state
+
+Read the component's **Animation State** property or call `GetAnimationState()` from the owning character. Break the returned `FClimbAnimationState` struct in the AnimBP:
+
+- `MovementType` selects the traversal animation/state.
+- `Direction.X` drives the horizontal axis of a 2D Blend Space.
+- `Direction.Y` drives the vertical axis of a 2D Blend Space.
+
+The direction is calculated from the world-space displacement, not from route node labels or whether a section was authored left-to-right/up-to-down. It is projected onto the character's world-space right axis and global world up, then normalized. This keeps the blend-space parameters stable for vertical wall climbing while allowing the same movement type to travel in different directions.
+
+`Enter` and `Leave` are brief transition states. `Smooth`, `Jump`, and `Mantle` remain active while their connection is being traversed. Reaching an authored top-out node uses `Exit` and preserves that state briefly after normal character movement is restored. When attached and idle, the state is `None`.
 
 ## Fastest test setup: dedicated test character
 
