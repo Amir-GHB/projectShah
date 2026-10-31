@@ -687,6 +687,12 @@ void UClimbRuntimeComponent::TickComponent(
 
     if (bIsEntering || bIsTraversing)
     {
+        if (bIsTraversing && (!TargetRoute.IsValid() || !TargetNodeId.IsValid()))
+        {
+            StopClimbing();
+            return;
+        }
+
         // Every authored movement animation owns its travel timing through the
         // same notify state. Before NotifyBegin, the character holds its start pose.
         if (!bAnimationMovementWindowActive)
@@ -777,19 +783,5 @@ void UClimbRuntimeComponent::TickComponent(
         return;
     }
 
-    if (RuntimeState != EClimbRuntimeState::MovingAlongSection
-        && RuntimeState != EClimbRuntimeState::ExecutingTraversal
-        && RuntimeState != EClimbRuntimeState::DroppingToCatch)
-    {
-        return;
-    }
 
-    if (!TargetRoute.IsValid() || !TargetNodeId.IsValid())
-    {
-        StopClimbing();
-        return;
-    }
-
-    // Traversal movement is updated only while its animation notify is open.
-    // NotifyEnd performs the final exact placement and completes the connection.
 }
