@@ -152,7 +152,12 @@ void UClimbRuntimeComponent::StopClimbing()
 
 void UClimbRuntimeComponent::BeginAnimationMovementWindow(const float WindowDuration)
 {
-    if (RuntimeState != EClimbRuntimeState::Entering)
+    const bool bCanOpenWindow =
+        RuntimeState == EClimbRuntimeState::Entering
+        || RuntimeState == EClimbRuntimeState::MovingAlongSection
+        || RuntimeState == EClimbRuntimeState::ExecutingTraversal
+        || RuntimeState == EClimbRuntimeState::DroppingToCatch;
+    if (!bCanOpenWindow)
     {
         return;
     }
@@ -164,26 +169,39 @@ void UClimbRuntimeComponent::BeginAnimationMovementWindow(const float WindowDura
 
 void UClimbRuntimeComponent::EndAnimationMovementWindow()
 {
-    if (RuntimeState != EClimbRuntimeState::Entering)
+    if (!bAnimationMovementWindowActive)
     {
+        return;
+    }
+
+    const bool bWasEntering = RuntimeState == EClimbRuntimeState::Entering;
+    const bool bWasTraversing =
+        RuntimeState == EClimbRuntimeState::MovingAlongSection
+        || RuntimeState == EClimbRuntimeState::ExecutingTraversal
+        || RuntimeState == EClimbRuntimeState::DroppingToCatch;
+    if (!bWasEntering && !bWasTraversing)
+    {
+        bAnimationMovementWindowActive = false;
+        AnimationMovementWindowDuration = 0.0f;
+        AnimationMovementWindowElapsed = 0.0f;
         return;
     }
 
     ACharacter* Character = Cast<ACharacter>(GetOwner());
     if (IsValid(Character))
     {
-        // The notify boundary is the authored arrival time. Report a large
-        // mismatch for tuning, then make the final attachment exact.
         const float RemainingDistance = FVector::Distance(
             Character->GetActorLocation(), TraversalEndLocation);
         if (RemainingDistance > 10.0f)
         {
             UE_LOG(LogTemp, Warning,
-                TEXT("Climbing entrance notify ended %.1f units from its target; "
+                TEXT("Climbing movement notify ended %.1f units from its target; "
                     "adjust the notify window or easing duration."),
                 RemainingDistance);
         }
 
+        // The notify boundary is the authored arrival time. Correct any small
+        // timing/tick-order discrepancy so the character lands exactly on target.
         Character->SetActorLocationAndRotation(TraversalEndLocation,
             TraversalEndRotation, false, nullptr, ETeleportType::TeleportPhysics);
     }
@@ -191,8 +209,16 @@ void UClimbRuntimeComponent::EndAnimationMovementWindow()
     bAnimationMovementWindowActive = false;
     AnimationMovementWindowDuration = 0.0f;
     AnimationMovementWindowElapsed = 0.0f;
-    AnimationStateRemainingTime = AnimationTransitionHoldTime;
-    SetRuntimeState(EClimbRuntimeState::Attached);
+
+    if (bWasEntering)
+    {
+        AnimationStateRemainingTime = AnimationTransitionHoldTime;
+        SetRuntimeState(EClimbRuntimeState::Attached);
+    }
+    else
+    {
+        FinishConnection();
+    }
 }
 
 void UClimbRuntimeComponent::SetClimbInput(const FVector2D Input)
@@ -653,27 +679,86 @@ void UClimbRuntimeComponent::TickComponent(
         return;
     }
 
-    if (RuntimeState == EClimbRuntimeState::Entering)
+    const bool bIsEntering = RuntimeState == EClimbRuntimeState::Entering;
+    const bool bIsTraversing =
+        RuntimeState == EClimbRuntimeState::MovingAlongSection
+        || RuntimeState == EClimbRuntimeState::ExecutingTraversal
+        || RuntimeState == EClimbRuntimeState::DroppingToCatch;
+
+    if (bIsEntering || bIsTraversing)
     {
+        // Every authored movement animation owns its travel timing through the
+        // same notify state. Before NotifyBegin, the character holds its start pose.
         if (!bAnimationMovementWindowActive)
         {
             return;
         }
 
         AnimationMovementWindowElapsed += DeltaTime;
-        const float Alpha = FMath::Clamp(
+        const float WindowAlpha = FMath::Clamp(
             AnimationMovementWindowElapsed
                 / FMath::Max(AnimationMovementWindowDuration, KINDA_SMALL_NUMBER),
             0.0f, 1.0f);
-        // Ease in and out to avoid an abrupt start/stop inside the authored window.
-        const float EasedAlpha = FMath::InterpEaseInOut(0.0f, 1.0f, Alpha, 2.0f);
-        const FVector Location = FMath::Lerp(
-            TraversalStartLocation, TraversalEndLocation, EasedAlpha);
+        const float Alpha = FMath::InterpEaseInOut(0.0f, 1.0f, WindowAlpha, 2.0f);
+
+        FVector Location = FMath::Lerp(
+            TraversalStartLocation, TraversalEndLocation, Alpha);
+
+        if (bIsTraversing && bActiveDropCatch)
+        {
+            // Preserve the authored release/fall/catch profile, driven by the
+            // eased notify progress so it still settles at the destination.
+            float MovementAlpha = Alpha;
+            if (Alpha < 0.12f)
+            {
+                MovementAlpha = 0.02f * (Alpha / 0.12f);
+            }
+            else if (Alpha < 0.78f)
+            {
+                const float FallAlpha = (Alpha - 0.12f) / 0.66f;
+                MovementAlpha = 0.02f + 0.88f * FallAlpha * FallAlpha;
+            }
+            else
+            {
+                const float CatchAlpha = (Alpha - 0.78f) / 0.22f;
+                MovementAlpha = 0.90f + 0.10f * (1.0f - FMath::Square(1.0f - CatchAlpha));
+            }
+
+            Location = FMath::Lerp(
+                TraversalStartLocation, TraversalEndLocation, MovementAlpha);
+
+            FTransform SourceTransform;
+            if (CurrentRoute.IsValid()
+                && CurrentRoute->GetNodeWorldTransform(CurrentNodeId, SourceTransform))
+            {
+                const FVector OutwardNormal =
+                    SourceTransform.GetUnitAxis(EAxis::X).GetSafeNormal();
+                Location += OutwardNormal * FMath::Sin(Alpha * PI)
+                    * DropCatchOutwardDistance;
+            }
+        }
+        else if (bIsTraversing && bActiveConnectionIsTraversalLink
+            && ActiveTraversalType == EClimbTraversalType::Jump)
+        {
+            Location.Z += FMath::Sin(Alpha * PI) * ActiveTraversalArcHeight;
+        }
+
         const FQuat Rotation = FQuat::Slerp(
             TraversalStartRotation.Quaternion(),
-            TraversalEndRotation.Quaternion(), EasedAlpha);
+            TraversalEndRotation.Quaternion(), Alpha);
         Character->SetActorLocationAndRotation(Location, Rotation, false, nullptr,
             ETeleportType::TeleportPhysics);
+
+        if (bDrawRuntimeDebug)
+        {
+            DrawDebugLine(GetWorld(), TraversalStartLocation, TraversalEndLocation,
+                bIsEntering ? FColor::Green
+                    : (RuntimeState == EClimbRuntimeState::ExecutingTraversal
+                        ? FColor::Orange
+                        : (RuntimeState == EClimbRuntimeState::DroppingToCatch
+                            ? FColor::Yellow : FColor::Cyan)),
+                false, 0.0f, 0, 2.0f);
+        }
         return;
     }
 
@@ -705,73 +790,6 @@ void UClimbRuntimeComponent::TickComponent(
         return;
     }
 
-    ActiveTraversalElapsed += DeltaTime;
-    const float Alpha = FMath::Clamp(
-        ActiveTraversalElapsed / FMath::Max(ActiveTraversalDuration, 0.05f), 0.0f, 1.0f);
-    float MovementAlpha = Alpha;
-    if (bActiveDropCatch)
-    {
-        // Brief release, accelerating fall, then a short eased catch at the target.
-        if (Alpha < 0.12f)
-        {
-            MovementAlpha = 0.02f * (Alpha / 0.12f);
-        }
-        else if (Alpha < 0.78f)
-        {
-            const float FallAlpha = (Alpha - 0.12f) / 0.66f;
-            MovementAlpha = 0.02f + 0.88f * FallAlpha * FallAlpha;
-        }
-        else
-        {
-            const float CatchAlpha = (Alpha - 0.78f) / 0.22f;
-            MovementAlpha = 0.90f + 0.10f * (1.0f - FMath::Square(1.0f - CatchAlpha));
-        }
-    }
-
-    FVector Location = FMath::Lerp(
-        TraversalStartLocation, TraversalEndLocation, MovementAlpha);
-    if (bActiveDropCatch)
-    {
-        FTransform SourceTransform;
-        if (CurrentRoute.IsValid()
-            && CurrentRoute->GetNodeWorldTransform(CurrentNodeId, SourceTransform))
-        {
-            const FVector OutwardNormal =
-                SourceTransform.GetUnitAxis(EAxis::X).GetSafeNormal();
-            // The body briefly peels away from the wall before accelerating down
-            // and easing into the catch pose at the lower authored node.
-            Location += OutwardNormal * FMath::Sin(Alpha * PI)
-                * DropCatchOutwardDistance;
-        }
-    }
-    else if (bActiveConnectionIsTraversalLink
-        && ActiveTraversalType == EClimbTraversalType::Jump)
-    {
-        // Jump links use an up-and-down arc. Mantles follow the direct
-        // start-to-landing trajectory so they do not dip before the ledge catch.
-        Location.Z += FMath::Sin(Alpha * PI) * ActiveTraversalArcHeight;
-    }
-
-    const FQuat Rotation = FQuat::Slerp(
-        TraversalStartRotation.Quaternion(),
-        TraversalEndRotation.Quaternion(),
-        bActiveDropCatch ? FMath::Clamp(Alpha * 1.2f, 0.0f, 1.0f) : Alpha);
-
-    Character->SetActorLocationAndRotation(Location, Rotation, false, nullptr,
-        ETeleportType::TeleportPhysics);
-
-    if (bDrawRuntimeDebug)
-    {
-        DrawDebugLine(GetWorld(), TraversalStartLocation, TraversalEndLocation,
-            RuntimeState == EClimbRuntimeState::ExecutingTraversal
-                ? FColor::Orange
-                : (RuntimeState == EClimbRuntimeState::DroppingToCatch
-                    ? FColor::Yellow : FColor::Cyan),
-            false, 0.0f, 0, 2.0f);
-    }
-
-    if (Alpha >= 1.0f)
-    {
-        FinishConnection();
-    }
+    // Traversal movement is updated only while its animation notify is open.
+    // NotifyEnd performs the final exact placement and completes the connection.
 }
