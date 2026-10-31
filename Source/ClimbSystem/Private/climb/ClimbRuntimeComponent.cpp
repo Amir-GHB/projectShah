@@ -663,9 +663,10 @@ void UClimbRuntimeComponent::TickComponent(
         }
     }
     else if (bActiveConnectionIsTraversalLink
-        && (ActiveTraversalType == EClimbTraversalType::Jump
-            || ActiveTraversalType == EClimbTraversalType::Mantle))
+        && ActiveTraversalType == EClimbTraversalType::Jump)
     {
+        // Jump links use an up-and-down arc. Mantles follow the direct
+        // start-to-landing trajectory so they do not dip before the ledge catch.
         Location.Z += FMath::Sin(Alpha * PI) * ActiveTraversalArcHeight;
     }
 
