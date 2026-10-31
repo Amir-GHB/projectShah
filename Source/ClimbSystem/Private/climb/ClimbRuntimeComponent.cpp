@@ -191,6 +191,7 @@ void UClimbRuntimeComponent::EndAnimationMovementWindow()
     bAnimationMovementWindowActive = false;
     AnimationMovementWindowDuration = 0.0f;
     AnimationMovementWindowElapsed = 0.0f;
+    AnimationStateRemainingTime = AnimationTransitionHoldTime;
     SetRuntimeState(EClimbRuntimeState::Attached);
 }
 
@@ -627,7 +628,10 @@ void UClimbRuntimeComponent::TickComponent(
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    if (AnimationStateRemainingTime > 0.0f)
+    // Keep the Enter animation state alive through its anticipation and
+    // movement window. Start the short transition hold only after NotifyEnd.
+    if (AnimationStateRemainingTime > 0.0f
+        && RuntimeState != EClimbRuntimeState::Entering)
     {
         AnimationStateRemainingTime = FMath::Max(
             0.0f, AnimationStateRemainingTime - DeltaTime);
