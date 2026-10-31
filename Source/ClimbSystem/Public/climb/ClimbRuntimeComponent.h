@@ -15,7 +15,7 @@ UENUM(BlueprintType)
 enum class EClimbRuntimeState : uint8
 {
     Inactive,
-    /** Entrance animation is playing; movement is gated by its notify window. */
+    /** A climb movement animation is playing; movement is gated by its notify window. */
     Entering,
     Attached,
     MovingAlongSection,
@@ -83,11 +83,11 @@ public:
     UFUNCTION(BlueprintCallable, Category="Climbing|Runtime")
     void StopClimbing();
 
-    /** Called by the entrance animation notify state when its movement window opens. */
+    /** Called by a climb movement animation notify state when its movement window opens. */
     UFUNCTION(BlueprintCallable, Category="Climbing|Animation")
     void BeginAnimationMovementWindow(float WindowDuration);
 
-    /** Called by the entrance animation notify state when its movement window closes. */
+    /** Called by a climb movement animation notify state when its movement window closes. */
     UFUNCTION(BlueprintCallable, Category="Climbing|Animation")
     void EndAnimationMovementWindow();
 
