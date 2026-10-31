@@ -3,7 +3,6 @@
 #include "climb/ClimbRuntimeComponent.h"
 
 #include "climb/ClimbRouteActor.h"
-#include "climb/ClimbAnimationMovementNotifyState.h"
 #include "Components/CapsuleComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
@@ -139,6 +138,9 @@ void UClimbRuntimeComponent::StopClimbing()
     }
     SetRuntimeState(EClimbRuntimeState::Inactive);
     bActiveDropCatch = false;
+    bAnimationMovementWindowActive = false;
+    AnimationMovementWindowDuration = 0.0f;
+    AnimationMovementWindowElapsed = 0.0f;
     CurrentRoute.Reset();
     CurrentNodeId.Invalidate();
     TargetRoute.Reset();
@@ -170,8 +172,18 @@ void UClimbRuntimeComponent::EndAnimationMovementWindow()
     ACharacter* Character = Cast<ACharacter>(GetOwner());
     if (IsValid(Character))
     {
-        // The notify boundary is the authored arrival time. Finish exactly at
-        // the attachment transform so the following climbing state is stable.
+        // The notify boundary is the authored arrival time. Report a large
+        // mismatch for tuning, then make the final attachment exact.
+        const float RemainingDistance = FVector::Distance(
+            Character->GetActorLocation(), TraversalEndLocation);
+        if (RemainingDistance > 10.0f)
+        {
+            UE_LOG(LogTemp, Warning,
+                TEXT("Climbing entrance notify ended %.1f units from its target; "
+                    "adjust the notify window or easing duration."),
+                RemainingDistance);
+        }
+
         Character->SetActorLocationAndRotation(TraversalEndLocation,
             TraversalEndRotation, false, nullptr, ETeleportType::TeleportPhysics);
     }
