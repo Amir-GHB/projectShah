@@ -15,6 +15,8 @@ UENUM(BlueprintType)
 enum class EClimbRuntimeState : uint8
 {
     Inactive,
+    /** Entrance animation is playing; movement is gated by its notify window. */
+    Entering,
     Attached,
     MovingAlongSection,
     ExecutingTraversal,
@@ -80,6 +82,14 @@ public:
     /** Leave the route and restore the character's previous movement mode. */
     UFUNCTION(BlueprintCallable, Category="Climbing|Runtime")
     void StopClimbing();
+
+    /** Called by the entrance animation notify state when its movement window opens. */
+    UFUNCTION(BlueprintCallable, Category="Climbing|Animation")
+    void BeginAnimationMovementWindow(float WindowDuration);
+
+    /** Called by the entrance animation notify state when its movement window closes. */
+    UFUNCTION(BlueprintCallable, Category="Climbing|Animation")
+    void EndAnimationMovementWindow();
 
     /** Surface-relative input: X = left/right, Y = up/down. Values are clamped. */
     UFUNCTION(BlueprintCallable, Category="Climbing|Runtime")
@@ -191,6 +201,9 @@ private:
     float ActiveTraversalElapsed = 0.0f;
     FVector TraversalStartLocation = FVector::ZeroVector;
     FVector TraversalEndLocation = FVector::ZeroVector;
+    bool bAnimationMovementWindowActive = false;
+    float AnimationMovementWindowDuration = 0.0f;
+    float AnimationMovementWindowElapsed = 0.0f;
     FRotator TraversalStartRotation = FRotator::ZeroRotator;
     FRotator TraversalEndRotation = FRotator::ZeroRotator;
 
