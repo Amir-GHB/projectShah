@@ -3,6 +3,7 @@
 #include "climb/ClimbRuntimeComponent.h"
 
 #include "climb/ClimbRouteActor.h"
+#include "climb/ClimbAnimationMovementNotifyState.h"
 #include "Components/CapsuleComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
@@ -84,13 +85,20 @@ bool UClimbRuntimeComponent::StartClimbing()
     TargetNodeId.Invalidate();
     ClimbInput = FVector2D::ZeroVector;
 
+    // Entrance movement is deliberately held until the animation's movement
+    // notify state opens its window. The notify duration defines the travel time.
+    TraversalStartLocation = Character->GetActorLocation();
+    TraversalEndLocation = TargetLocation;
+    TraversalStartRotation = Character->GetActorRotation();
+    TraversalEndRotation = TargetRotation;
+    bAnimationMovementWindowActive = false;
+    AnimationMovementWindowDuration = 0.0f;
+    AnimationMovementWindowElapsed = 0.0f;
+
     SetAnimationState(EClimbMovementType::Enter,
         TargetLocation - Character->GetActorLocation(),
         Character->GetActorRightVector());
-
-    Character->SetActorLocationAndRotation(TargetLocation, TargetRotation, false, nullptr,
-        ETeleportType::TeleportPhysics);
-    SetRuntimeState(EClimbRuntimeState::Attached);
+    SetRuntimeState(EClimbRuntimeState::Entering);
 
     UE_LOG(LogTemp, Log, TEXT("Climbing: attached to route '%s', node %s."),
         *GetNameSafe(Route), *NodeId.ToString());
@@ -138,6 +146,40 @@ void UClimbRuntimeComponent::StopClimbing()
     ClimbInput = FVector2D::ZeroVector;
     ActiveTraversalElapsed = 0.0f;
     ActiveTraversalDuration = 0.0f;
+}
+
+void UClimbRuntimeComponent::BeginAnimationMovementWindow(const float WindowDuration)
+{
+    if (RuntimeState != EClimbRuntimeState::Entering)
+    {
+        return;
+    }
+
+    bAnimationMovementWindowActive = true;
+    AnimationMovementWindowDuration = FMath::Max(WindowDuration, KINDA_SMALL_NUMBER);
+    AnimationMovementWindowElapsed = 0.0f;
+}
+
+void UClimbRuntimeComponent::EndAnimationMovementWindow()
+{
+    if (RuntimeState != EClimbRuntimeState::Entering)
+    {
+        return;
+    }
+
+    ACharacter* Character = Cast<ACharacter>(GetOwner());
+    if (IsValid(Character))
+    {
+        // The notify boundary is the authored arrival time. Finish exactly at
+        // the attachment transform so the following climbing state is stable.
+        Character->SetActorLocationAndRotation(TraversalEndLocation,
+            TraversalEndRotation, false, nullptr, ETeleportType::TeleportPhysics);
+    }
+
+    bAnimationMovementWindowActive = false;
+    AnimationMovementWindowDuration = 0.0f;
+    AnimationMovementWindowElapsed = 0.0f;
+    SetRuntimeState(EClimbRuntimeState::Attached);
 }
 
 void UClimbRuntimeComponent::SetClimbInput(const FVector2D Input)
@@ -592,6 +634,30 @@ void UClimbRuntimeComponent::TickComponent(
     if (!IsValid(Character) || !CurrentRoute.IsValid())
     {
         StopClimbing();
+        return;
+    }
+
+    if (RuntimeState == EClimbRuntimeState::Entering)
+    {
+        if (!bAnimationMovementWindowActive)
+        {
+            return;
+        }
+
+        AnimationMovementWindowElapsed += DeltaTime;
+        const float Alpha = FMath::Clamp(
+            AnimationMovementWindowElapsed
+                / FMath::Max(AnimationMovementWindowDuration, KINDA_SMALL_NUMBER),
+            0.0f, 1.0f);
+        // Ease in and out to avoid an abrupt start/stop inside the authored window.
+        const float EasedAlpha = FMath::InterpEaseInOut(0.0f, 1.0f, Alpha, 2.0f);
+        const FVector Location = FMath::Lerp(
+            TraversalStartLocation, TraversalEndLocation, EasedAlpha);
+        const FQuat Rotation = FQuat::Slerp(
+            TraversalStartRotation.Quaternion(),
+            TraversalEndRotation.Quaternion(), EasedAlpha);
+        Character->SetActorLocationAndRotation(Location, Rotation, false, nullptr,
+            ETeleportType::TeleportPhysics);
         return;
     }
 
