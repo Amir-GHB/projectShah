@@ -162,5 +162,12 @@ void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 	}
 
 	UAnimMontage* SelectedDeathMontage = FindBestReaction(DeathReactions, DeathDamageInfo);
-	PlayReaction(IsValid(SelectedDeathMontage) ? SelectedDeathMontage : DeathMontage, DeathBlendOutTime);
+	if (IsValid(SelectedDeathMontage))
+	{
+		PlayReaction(SelectedDeathMontage, DeathBlendOutTime);
+	}
+	else
+	{
+		PlayReaction(DeathMontage, DeathBlendOutTime);
+	}
 }

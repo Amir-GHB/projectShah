@@ -5,6 +5,7 @@
 #include "combat/DamageHandlerComponent.h"
 #include "CombatDamageable.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
