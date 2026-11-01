@@ -91,7 +91,7 @@ UAnimMontage* UDamageReactionComponent::FindBestReaction(
 	return BestMatch ? BestMatch->Montage.Get() : nullptr;
 }
 
-void UDamageReactionComponent::PlayReaction(UAnimMontage* Montage, float BlendInTime)
+void UDamageReactionComponent::PlayReaction(UAnimMontage* Montage, float PreviousMontageBlendOutTime)
 {
 	if (!IsValid(Montage))
 	{
@@ -112,7 +112,7 @@ void UDamageReactionComponent::PlayReaction(UAnimMontage* Montage, float BlendIn
 
 	if (IsValid(ActiveReactionMontage) && AnimInstance->Montage_IsPlaying(ActiveReactionMontage))
 	{
-		AnimInstance->Montage_Stop(FMath::Max(0.0f, BlendInTime), ActiveReactionMontage);
+		AnimInstance->Montage_Stop(FMath::Max(0.0f, PreviousMontageBlendOutTime), ActiveReactionMontage);
 	}
 
 	const float PlayedDuration = AnimInstance->Montage_Play(Montage, 1.0f, EMontagePlayReturnType::MontageLength, 0.0f, true);
@@ -131,7 +131,7 @@ void UDamageReactionComponent::HandleDamageTaken(
 		return;
 	}
 
-	PlayReaction(FindBestHitReaction(DamageInfo), HitReactionBlendIn);
+	PlayReaction(FindBestHitReaction(DamageInfo), HitReactionBlendOutTime);
 }
 
 void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
@@ -162,5 +162,5 @@ void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 	}
 
 	UAnimMontage* SelectedDeathMontage = FindBestReaction(DeathReactions, DeathDamageInfo);
-	PlayReaction(IsValid(SelectedDeathMontage) ? SelectedDeathMontage : DeathMontage, DeathBlendIn);
+	PlayReaction(IsValid(SelectedDeathMontage) ? SelectedDeathMontage : DeathMontage, DeathBlendOutTime);
 }
