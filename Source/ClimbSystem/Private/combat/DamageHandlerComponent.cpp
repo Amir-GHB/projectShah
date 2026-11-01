@@ -246,20 +246,27 @@ void UDamageHandlerComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
 	for (int32 Index = ActiveDamageOverTimeEffects.Num() - 1; Index >= 0; --Index)
 	{
-		if (bIsDead) break;
+		if (bIsDead || !ActiveDamageOverTimeEffects.IsValidIndex(Index)) break;
 
-		FActiveDamageOverTimeEffect& Effect = ActiveDamageOverTimeEffects[Index];
-		Effect.ElapsedTime += DeltaTime;
+		ActiveDamageOverTimeEffects[Index].ElapsedTime += DeltaTime;
 
-		while (Effect.NextTickTime <= Effect.Definition.Duration
-			&& Effect.ElapsedTime + KINDA_SMALL_NUMBER >= Effect.NextTickTime
-			&& !bIsDead)
+		// Copy the effect before broadcasting damage delegates. A listener may apply another
+		// effect and reallocate the array, so never retain an array-element reference here.
+		while (ActiveDamageOverTimeEffects.IsValidIndex(Index) && !bIsDead)
 		{
-			ApplyDamageOverTimeTick(Effect);
-			Effect.NextTickTime += Effect.Definition.TickInterval;
+			const FActiveDamageOverTimeEffect EffectSnapshot = ActiveDamageOverTimeEffects[Index];
+			if (EffectSnapshot.NextTickTime > EffectSnapshot.Definition.Duration
+				|| EffectSnapshot.ElapsedTime + KINDA_SMALL_NUMBER < EffectSnapshot.NextTickTime)
+			{
+				break;
+			}
+
+			ActiveDamageOverTimeEffects[Index].NextTickTime += EffectSnapshot.Definition.TickInterval;
+			ApplyDamageOverTimeTick(EffectSnapshot);
 		}
 
-		if (Effect.ElapsedTime >= Effect.Definition.Duration)
+		if (!bIsDead && ActiveDamageOverTimeEffects.IsValidIndex(Index)
+			&& ActiveDamageOverTimeEffects[Index].ElapsedTime >= ActiveDamageOverTimeEffects[Index].Definition.Duration)
 		{
 			ActiveDamageOverTimeEffects.RemoveAtSwap(Index);
 		}
