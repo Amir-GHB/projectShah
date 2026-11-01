@@ -39,6 +39,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage Dummy|UI", meta = (ClampMin = "0.0"))
 	FVector HealthBarOffset = FVector(0.0f, 0.0f, 150.0f);
 
+	UFUNCTION(BlueprintCallable, Category = "Damage Dummy")
+	void ResetDummy();
+
 protected:
 	virtual void BeginPlay() override;
 };
