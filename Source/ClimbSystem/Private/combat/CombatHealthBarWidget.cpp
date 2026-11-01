@@ -2,8 +2,22 @@
 
 #include "combat/CombatHealthBarWidget.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "Components/ProgressBar.h"
 #include "combat/DamageHandlerComponent.h"
+
+void UCombatHealthBarWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	// The base widget works on its own; a Widget Blueprint can replace/style this bar.
+	if (!HealthBar && WidgetTree)
+	{
+		HealthBar = WidgetTree->ConstructWidget<UProgressBar>(
+			UProgressBar::StaticClass(), TEXT("HealthBar"));
+		WidgetTree->RootWidget = HealthBar;
+	}
+}
 
 void UCombatHealthBarWidget::BindToDamageHandler(UDamageHandlerComponent* DamageHandler)
 {
