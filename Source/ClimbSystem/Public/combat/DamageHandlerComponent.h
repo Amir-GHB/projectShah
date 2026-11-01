@@ -21,6 +21,23 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	struct FActiveDamageOverTimeEffect
+	{
+		FDamageOverTimeEffect Definition;
+		TWeakObjectPtr<AActor> InstigatorActor;
+		TWeakObjectPtr<AActor> DamageCauser;
+		float ElapsedTime = 0.0f;
+		float NextTickTime = 0.0f;
+		int32 StackCount = 1;
+	};
+
+	TArray<FActiveDamageOverTimeEffect> ActiveDamageOverTimeEffects;
+
+	void AddDamageOverTimeEffects(const FDamageInfo& DamageInfo, AActor* InstigatorActor);
+	void ApplyDamageOverTimeTick(const FActiveDamageOverTimeEffect& ActiveEffect);
+	static FName GetDamageEffectKey(const FDamageOverTimeEffect& Effect);
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
