@@ -206,12 +206,13 @@ AActor* UCombatTargetingComponent::FindBestTarget() const
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
 		AActor* Candidate = Overlap.GetActor();
+		const TWeakObjectPtr<AActor> CandidatePtr(Candidate);
 		if (!IsValidTarget(Candidate) || !IsWithinFocusRange(Candidate)
-			|| ConsideredActors.Contains(Candidate))
+			|| ConsideredActors.Contains(CandidatePtr))
 		{
 			continue;
 		}
-		ConsideredActors.Add(Candidate);
+		ConsideredActors.Add(CandidatePtr);
 
 		if (bRequireLineOfSight && !HasLineOfSight(Candidate))
 		{
