@@ -42,6 +42,7 @@ float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActo
 
 	CurrentPoise = FMath::Clamp(CurrentPoise - ResolvedInfo.PoiseDamage, 0.0f, FMath::Max(0.0f, MaxPoise));
 	CurrentHealth = FMath::Clamp(CurrentHealth - FinalDamage, 0.0f, FMath::Max(0.0f, MaxHealth));
+	LastDamageInfo = ResolvedInfo;
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 	OnDamageTaken.Broadcast(FinalDamage, InstigatorActor, ResolvedInfo, HitResult);
@@ -222,6 +223,7 @@ void UDamageHandlerComponent::ApplyDamageOverTimeTick(const FActiveDamageOverTim
 	TickInfo.DamageCategory = ActiveEffect.Definition.DamageCategory;
 	TickInfo.DamageCauser = ActiveEffect.DamageCauser;
 	TickInfo.Normalize();
+	LastDamageInfo = TickInfo;
 
 	const float SafeArmor = FMath::Max(0.0f, FMath::IsFinite(Armor) ? Armor : 0.0f);
 	const float FinalDamage = TickInfo.GetCalculatedRawDamage() * (100.0f / (100.0f + SafeArmor));
