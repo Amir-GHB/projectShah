@@ -31,7 +31,7 @@ ACombatDamageDummy::ACombatDamageDummy()
 	HealthBarComponent->SetDrawSize(FVector2D(120.0f, 16.0f));
 	HealthBarComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	HealthBarComponent->SetRelativeLocation(HealthBarOffset);
-
+	HealthBarWidgetClass = UCombatHealthBarWidget::StaticClass();
 }
 
 void ACombatDamageDummy::BeginPlay()
