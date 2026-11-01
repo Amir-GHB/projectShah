@@ -11,6 +11,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Engine/DamageEvents.h"
 
 ACombatCharacterBase::ACombatCharacterBase()
 {
@@ -179,10 +180,19 @@ float ACombatCharacterBase::TakeDamage(float DamageAmount, struct FDamageEvent c
 		DamageInfo.BaseDamage = ActualDamage;
 		DamageInfo.DamageMultiplier = 1.0f;
 		DamageInfo.DamageCauser = DamageCauser;
+		if (IsValid(DamageCauser))
+		{
+			DamageInfo.DamageDirection = (GetActorLocation()
+				- DamageCauser->GetActorLocation()).GetSafeNormal();
+		}
 		DamageInfo.Normalize();
 
-		FHitResult EmptyHit;
-		DamageHandlerComponent->ApplyDamage(DamageCauser, this, DamageInfo, EmptyHit);
+		FHitResult HitResult;
+		if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+		{
+			HitResult = static_cast<const FPointDamageEvent&>(DamageEvent).HitInfo;
+		}
+		DamageHandlerComponent->ApplyDamage(DamageCauser, this, DamageInfo, HitResult);
 	}
 
 	return ActualDamage;
