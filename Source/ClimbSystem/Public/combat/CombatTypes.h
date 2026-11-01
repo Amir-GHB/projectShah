@@ -128,6 +128,76 @@ enum class EDamageCategory : uint8
 	Piercing UMETA(DisplayName = "Piercing Thrust")
 };
 
+/** Supported damage-over-time effect families. */
+UENUM(BlueprintType)
+enum class EDamageOverTimeType : uint8
+{
+	Poison,
+	Burning,
+	Bleeding,
+	Custom
+};
+
+/** Determines how a repeated effect behaves when applied again. */
+UENUM(BlueprintType)
+enum class EDamageEffectStackingPolicy : uint8
+{
+	Ignore,
+	Refresh,
+	Stack
+};
+
+/** Independent, reusable damage-over-time configuration. */
+USTRUCT(BlueprintType)
+struct FDamageOverTimeEffect
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time")
+	FName EffectId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time")
+	EDamageOverTimeType Type = EDamageOverTimeType::Poison;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time", meta = (ClampMin = "0.0"))
+	float DamagePerTick = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time", meta = (ClampMin = "0.05"))
+	float Duration = 5.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time", meta = (ClampMin = "0.05"))
+	float TickInterval = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time")
+	EDamageCategory DamageCategory = EDamageCategory::Physical;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time")
+	EDamageEffectStackingPolicy StackingPolicy = EDamageEffectStackingPolicy::Refresh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time", meta = (ClampMin = "1", ClampMax = "10"))
+	int32 MaxStacks = 5;
+};
+
+/** Damage parameters for one combo step. Missing entries use the weapon defaults. */
+USTRUCT(BlueprintType)
+struct FAttackDamageConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage", meta = (ClampMin = "0.0"))
+	float DamageMultiplier = 1.0f;
+
+	/** Probability in the inclusive range 0..1. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float CriticalChance = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage", meta = (ClampMin = "1.0"))
+	float CriticalDamageMultiplier = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage")
+	TArray<FDamageOverTimeEffect> DamageOverTimeEffects;
+};
+
 /**
  * Structured payload dispatched to DamageHandlerComponent and damage delegates.
  */
@@ -154,8 +224,18 @@ struct FDamageInfo
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage")
 	EWeaponType WeaponType = EWeaponType::Unarmed;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float CriticalChance = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage", meta = (ClampMin = "1.0"))
+	float CriticalDamageMultiplier = 2.0f;
+
+	/** Set by DamageHandlerComponent after its critical-hit roll. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
 	bool bIsCriticalHit = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time")
+	TArray<FDamageOverTimeEffect> DamageOverTimeEffects;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage")
 	TWeakObjectPtr<AActor> DamageCauser = nullptr;
@@ -189,6 +269,15 @@ struct FDamageInfo
 		DamageMultiplier = (!FMath::IsFinite(DamageMultiplier) || DamageMultiplier < 0.0f) ? 0.0f : DamageMultiplier;
 		PoiseDamage = (!FMath::IsFinite(PoiseDamage) || PoiseDamage < 0.0f) ? 0.0f : PoiseDamage;
 		KnockbackImpulse = (!FMath::IsFinite(KnockbackImpulse) || KnockbackImpulse < 0.0f) ? 0.0f : KnockbackImpulse;
+		CriticalChance = FMath::Clamp(FMath::IsFinite(CriticalChance) ? CriticalChance : 0.0f, 0.0f, 1.0f);
+		CriticalDamageMultiplier = FMath::Max(1.0f, FMath::IsFinite(CriticalDamageMultiplier) ? CriticalDamageMultiplier : 1.0f);
+		for (FDamageOverTimeEffect& Effect : DamageOverTimeEffects)
+		{
+			Effect.DamagePerTick = FMath::Max(0.0f, FMath::IsFinite(Effect.DamagePerTick) ? Effect.DamagePerTick : 0.0f);
+			Effect.Duration = FMath::Max(0.05f, FMath::IsFinite(Effect.Duration) ? Effect.Duration : 0.05f);
+			Effect.TickInterval = FMath::Max(0.05f, FMath::IsFinite(Effect.TickInterval) ? Effect.TickInterval : 0.05f);
+			Effect.MaxStacks = FMath::Clamp(Effect.MaxStacks, 1, 10);
+		}
 	}
 };
 
@@ -239,6 +328,15 @@ struct FProjectileConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Projectile|Damage")
 	EWeaponType WeaponType = EWeaponType::Bow;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Projectile|Damage", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float CriticalChance = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Projectile|Damage", meta = (ClampMin = "1.0"))
+	float CriticalDamageMultiplier = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Projectile|Damage Over Time")
+	TArray<FDamageOverTimeEffect> DamageOverTimeEffects;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Projectile|Falloff")
 	EProjectileFalloffMode FalloffMode = EProjectileFalloffMode::Linear;
@@ -302,6 +400,20 @@ struct FWeaponConfig : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage")
 	EDamageCategory DamageCategory = EDamageCategory::Slashing;
+
+	/** Optional per-combo-step overrides; array index matches combo section/attack index. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage")
+	TArray<FAttackDamageConfig> AttackDamageConfigs;
+
+	/** Weapon-wide defaults used when no per-attack override is configured. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float CriticalChance = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage", meta = (ClampMin = "1.0"))
+	float CriticalDamageMultiplier = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage Over Time")
+	TArray<FDamageOverTimeEffect> DamageOverTimeEffects;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Sockets")
 	FName HandSocketName = FName("Hand_R_Socket");
