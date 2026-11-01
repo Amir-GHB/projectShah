@@ -105,7 +105,7 @@ void UDamageReactionComponent::PlayReaction(UAnimMontage* Montage, float BlendIn
 
 	if (IsValid(ActiveReactionMontage) && AnimInstance->Montage_IsPlaying(ActiveReactionMontage))
 	{
-		AnimInstance->Montage_Stop(0.08f, ActiveReactionMontage);
+		AnimInstance->Montage_Stop(FMath::Max(0.0f, BlendInTime), ActiveReactionMontage);
 	}
 
 	const float PlayedDuration = AnimInstance->Montage_Play(Montage, 1.0f, EMontagePlayReturnType::MontageLength, 0.0f, true);
