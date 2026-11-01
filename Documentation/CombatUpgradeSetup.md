@@ -42,7 +42,7 @@ Incoming direction is classified relative to the target's local forward/right ax
 
 ## 4. Hit and death reactions
 
-`ACombatCharacterBase` now owns a `UDamageReactionComponent`.
+`ACombatCharacterBase` owns a `UDamageReactionComponent`.
 
 - Add entries to `HitReactions` and/or `DeathReactions`.
 - Each entry can optionally filter by weapon type, hit location, and incoming direction.
@@ -53,14 +53,17 @@ Reaction montages are assigned per character Blueprint because the actual animat
 
 ## 5. Training dummy
 
-Place an `ACombatDamageDummy` actor in the level, or create a Blueprint child.
+Create a Blueprint child of `ACombatDamageDummy` and assign a **Skeletal Mesh** and compatible Animation Blueprint to its inherited Character Mesh component.
 
-- Assign a static mesh to `DummyMesh`.
+- Configure the capsule size/position to fit the assigned skeletal mesh. The capsule is the Pawn collision root; the skeletal mesh handles hit traces.
 - Configure Max Health, Armor, and Max Poise on its `DamageHandlerComponent`.
+- Configure `HitReactions`, `DeathReactions`, and `DeathMontage` on its `DamageReactionComponent`. Assign montages compatible with the dummy mesh's skeleton and ensure the AnimBP has a montage slot (normally `DefaultSlot`).
 - The actor includes a world-space health bar using `UCombatHealthBarWidget`.
 - A Widget Blueprint can derive from `UCombatHealthBarWidget` and provide a styled ProgressBar named `HealthBar`; assign that class to `HealthBarWidgetClass`.
+- The dummy's CharacterMovement starts disabled so it remains stationary. Damage reactions and death montages still play through its skeletal mesh AnimInstance.
+- Call `ResetDummy` from Blueprint to restore health/poise, clear the death latch, stop the current reaction montage, and re-enable walking movement for another test.
 
-The dummy uses the same damage handler as combat characters and is therefore suitable for testing criticals, hit regions, and status effects. Call `ResetDummy` from Blueprint between test runs.
+The dummy uses the same damage handler and reaction component as combat characters, so it can test normal damage, criticals, hit regions, status effects, hit reactions, and death reactions.
 
 ## 6. Semi-lock targeting
 
@@ -81,17 +84,18 @@ Default tuning values are intentionally conservative and exposed on the componen
 
 ## 7. Suggested test order
 
-1. Place the damage dummy and verify ordinary melee hits reduce its health.
-2. Set one combo step's base damage override and confirm that step differs from the others.
-3. Set critical chance to 1.0 and verify the expected critical damage; then set it to 0.0.
-4. Apply a short poison effect and verify tick count, interval, and total health loss.
-5. Try each stacking policy by applying the same effect repeatedly.
-6. Map a head bone and a leg bone, then verify region multipliers.
-7. Add a few hit reaction entries with different filters and confirm the most specific match plays.
-8. Assign a death montage or death reaction and verify attack input is rejected after death.
-9. Place several damageable actors around the player. Confirm the most view-centered valid target is selected.
-10. Start and end an attack repeatedly. Confirm the character only turns during the attack, stops focusing afterward, and never focuses on a target outside MaxFocusRange.
-11. Assign a TargetLockAction and confirm manual preference persists between attacks without rotating the idle character.
+1. Create the dummy Blueprint, assign a skeletal mesh and AnimBP, then configure hit/death montages.
+2. Place the dummy in the level and verify ordinary melee hits reduce its health and play a hit reaction.
+3. Set one combo step's base damage override and confirm that step differs from the others.
+4. Set critical chance to 1.0 and verify the expected critical damage; then set it to 0.0.
+5. Apply a short poison effect and verify tick count, interval, and total health loss.
+6. Try each stacking policy by applying the same effect repeatedly.
+7. Map a head bone and a leg bone, then verify region multipliers and corresponding reaction filters.
+8. Assign a death montage or death reaction, lower dummy health, and verify the death montage plays and subsequent hits are ignored.
+9. Call `ResetDummy` and verify the dummy can be damaged and react again.
+10. Place several damageable actors around the player. Confirm the most view-centered valid target is selected.
+11. Start and end an attack repeatedly. Confirm the character only turns during the attack, stops focusing afterward, and never focuses on a target outside MaxFocusRange.
+12. Assign a TargetLockAction and confirm manual preference persists between attacks without rotating the idle character.
 
 ## Verification note
 
