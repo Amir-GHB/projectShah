@@ -227,6 +227,10 @@ AActor* UCombatTargetingComponent::FindBestTarget() const
 
 		const float ViewAlignment = FMath::Clamp(
 			FVector::DotProduct(ViewDirection, ToTarget / Distance), 0.0f, 1.0f);
+		if (ViewAlignment <= 0.0f)
+		{
+			continue;
+		}
 		const float DistanceScore = 1.0f - FMath::Clamp(Distance / MaxFocusRange, 0.0f, 1.0f);
 
 		float ScreenCenterScore = ViewAlignment;
@@ -294,14 +298,20 @@ void UCombatTargetingComponent::TickComponent(
 
 	TargetRefreshElapsed += DeltaTime;
 	AActor* Target = CurrentTarget.Get();
-	if (!IsValidTarget(Target) || !IsWithinFocusRange(Target)
-		|| (bRequireLineOfSight && !HasLineOfSight(Target)))
-	{
-		// Stop applying focus immediately when the current target becomes invalid or leaves
-		// the shared range. A replacement may be acquired on the next refresh interval.
-		SetCurrentTarget(nullptr);
+	const bool bTargetInvalid = !IsValidTarget(Target) || !IsWithinFocusRange(Target);
+	const bool bRefreshDue = TargetRefreshElapsed >= TargetRefreshInterval;
+	bool bNeedsReplacement = bTargetInvalid;
 
-		if (TargetRefreshElapsed >= TargetRefreshInterval)
+	// Visibility is intentionally checked at the refresh cadence, not every frame.
+	if (!bNeedsReplacement && bRefreshDue && bRequireLineOfSight && !HasLineOfSight(Target))
+	{
+		bNeedsReplacement = true;
+	}
+
+	if (bNeedsReplacement)
+	{
+		SetCurrentTarget(nullptr);
+		if (bRefreshDue)
 		{
 			TargetRefreshElapsed = 0.0f;
 			Target = IsValidTarget(ManualTarget.Get())
@@ -312,7 +322,10 @@ void UCombatTargetingComponent::TickComponent(
 			SetCurrentTarget(Target);
 		}
 	}
-
+	else if (bRefreshDue)
+	{
+		TargetRefreshElapsed = 0.0f;
+	}
 	Target = CurrentTarget.Get();
 	if (!IsValidTarget(Target) || !IsWithinFocusRange(Target))
 	{
