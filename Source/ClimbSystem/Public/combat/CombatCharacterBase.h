@@ -7,6 +7,7 @@
 #include "CombatCharacterBase.generated.h"
 
 class UCombatComponent;
+class UCombatTargetingComponent;
 class UDamageHandlerComponent;
 class UInputMappingContext;
 class UInputAction;
@@ -27,6 +28,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 	TObjectPtr<UDamageHandlerComponent> DamageHandlerComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+	TObjectPtr<UCombatTargetingComponent> CombatTargetingComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<USpringArmComponent> CameraBoom;
@@ -56,6 +60,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> NextWeaponAction;
 
+	/** Optional input action for setting/clearing the preferred semi-lock target. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> TargetLockAction;
+
 	void OnMove(const FInputActionValue& Value);
 	void OnLook(const FInputActionValue& Value);
 	void OnJumpStarted(const FInputActionValue& Value);
@@ -64,6 +72,7 @@ protected:
 	void OnAttackReleased(const FInputActionValue& Value);
 	void OnAttackCanceled(const FInputActionValue& Value);
 	void OnNextWeaponTriggered(const FInputActionValue& Value);
+	void OnTargetLockTriggered(const FInputActionValue& Value);
 
 public:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
