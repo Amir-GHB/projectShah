@@ -321,9 +321,10 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 
 	// Build structured damage payload using data-driven config and active attack multiplier
 	FDamageInfo DamageInfo;
-	DamageInfo.BaseDamage = WeaponConfig.BaseDamage;
 	const FAttackDamageConfig* AttackConfig = WeaponConfig.AttackDamageConfigs.IsValidIndex(ActiveAttackIndex)
 		? &WeaponConfig.AttackDamageConfigs[ActiveAttackIndex] : nullptr;
+	DamageInfo.BaseDamage = AttackConfig && AttackConfig->bOverrideBaseDamage
+		? AttackConfig->BaseDamage : WeaponConfig.BaseDamage;
 	DamageInfo.DamageMultiplier = CurrentDamageMultiplier * (AttackConfig ? AttackConfig->DamageMultiplier : 1.0f);
 	DamageInfo.CriticalChance = AttackConfig && AttackConfig->bOverrideCriticalSettings
 		? AttackConfig->CriticalChance : WeaponConfig.CriticalChance;
