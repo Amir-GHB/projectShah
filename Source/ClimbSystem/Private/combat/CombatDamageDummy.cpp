@@ -56,3 +56,11 @@ void ACombatDamageDummy::BeginPlay()
 		}
 	}
 }
+
+void ACombatDamageDummy::ResetDummy()
+{
+	if (DamageHandlerComponent)
+	{
+		DamageHandlerComponent->ResetStats();
+	}
+}
