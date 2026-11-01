@@ -119,7 +119,7 @@ void UDamageReactionComponent::HandleDamageTaken(
 	float ActualDamage, AActor* InstigatorActor,
 	const FDamageInfo& DamageInfo, const FHitResult& HitResult)
 {
-	if (bDeathHandled || ActualDamage <= 0.0f)
+	if (bDeathHandled || ActualDamage <= 0.0f || DamageInfo.bIsDamageOverTime)
 	{
 		return;
 	}
