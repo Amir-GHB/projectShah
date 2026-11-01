@@ -195,7 +195,35 @@ struct FAttackDamageConfig
 	float CriticalDamageMultiplier = 2.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage")
+	bool bOverrideCriticalSettings = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage")
+	bool bOverrideDamageOverTimeEffects = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage")
 	TArray<FDamageOverTimeEffect> DamageOverTimeEffects;
+};
+
+/** Coarse anatomical region resolved from a hit result. */
+UENUM(BlueprintType)
+enum class EDamageHitLocation : uint8
+{
+	Unknown,
+	Head,
+	Torso,
+	Arms,
+	Legs
+};
+
+/** Direction from which the target received the hit, in target-local space. */
+UENUM(BlueprintType)
+enum class EDamageHitDirection : uint8
+{
+	Unknown,
+	Front,
+	Back,
+	Left,
+	Right
 };
 
 /**
@@ -236,6 +264,17 @@ struct FDamageInfo
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time")
 	TArray<FDamageOverTimeEffect> DamageOverTimeEffects;
+
+	/** World-space direction of travel from attacker/projectile toward the target. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage")
+	FVector DamageDirection = FVector::ZeroVector;
+
+	/** Resolved by DamageHandlerComponent from the hit bone or impact height. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
+	EDamageHitLocation HitLocation = EDamageHitLocation::Unknown;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
+	EDamageHitDirection HitDirection = EDamageHitDirection::Unknown;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage")
 	TWeakObjectPtr<AActor> DamageCauser = nullptr;
