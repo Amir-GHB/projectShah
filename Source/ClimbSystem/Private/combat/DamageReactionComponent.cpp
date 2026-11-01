@@ -164,3 +164,24 @@ void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 	UAnimMontage* SelectedDeathMontage = FindBestReaction(DeathReactions, DeathDamageInfo);
 	PlayReaction(IsValid(SelectedDeathMontage) ? SelectedDeathMontage : DeathMontage, DeathBlendOutTime);
 }
+
+void UDamageReactionComponent::ResetReactionState()
+{
+	bDeathHandled = false;
+
+	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
+	{
+		if (Character->GetMesh())
+		{
+			if (UAnimInstance* AnimInstance = Character->GetMesh()->GetAnimInstance())
+			{
+				if (IsValid(ActiveReactionMontage))
+				{
+					AnimInstance->Montage_Stop(0.0f, ActiveReactionMontage);
+				}
+			}
+		}
+	}
+
+	ActiveReactionMontage = nullptr;
+}
