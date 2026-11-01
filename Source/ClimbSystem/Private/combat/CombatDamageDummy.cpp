@@ -2,35 +2,43 @@
 
 #include "combat/CombatDamageDummy.h"
 
-#include "Components/SceneComponent.h"
-#include "Components/StaticMeshComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/WidgetComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "combat/CombatHealthBarWidget.h"
 #include "combat/DamageHandlerComponent.h"
+#include "combat/DamageReactionComponent.h"
 
 ACombatDamageDummy::ACombatDamageDummy()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
-	SetRootComponent(SceneRoot);
+	// ACharacter supplies a Pawn root capsule and a skeletal mesh. The mesh and
+	// AnimBP are assigned on a Blueprint child so project-specific assets remain
+	// out of native code.
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	GetCapsuleComponent()->SetCollisionObjectType(ECC_Pawn);
+	GetCapsuleComponent()->SetCollisionResponseToAllChannels(ECR_Block);
 
-	DummyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DummyMesh"));
-	DummyMesh->SetupAttachment(SceneRoot);
-	DummyMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	DummyMesh->SetCollisionObjectType(ECC_WorldDynamic);
-	DummyMesh->SetCollisionResponseToAllChannels(ECR_Block);
-	DummyMesh->SetGenerateOverlapEvents(false);
-	DummyMesh->SetSimulatePhysics(false);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	GetMesh()->SetGenerateOverlapEvents(false);
+
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->bOrientRotationToMovement = false;
+		Movement->DisableMovement();
+	}
 
 	DamageHandlerComponent = CreateDefaultSubobject<UDamageHandlerComponent>(TEXT("DamageHandlerComponent"));
+	DamageReactionComponent = CreateDefaultSubobject<UDamageReactionComponent>(TEXT("DamageReactionComponent"));
 
 	HealthBarComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarComponent"));
-	HealthBarComponent->SetupAttachment(SceneRoot);
+	HealthBarComponent->SetupAttachment(GetRootComponent());
 	HealthBarComponent->SetWidgetSpace(EWidgetSpace::World);
 	HealthBarComponent->SetDrawSize(FVector2D(120.0f, 16.0f));
 	HealthBarComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	HealthBarComponent->SetRelativeLocation(HealthBarOffset);
+
 	HealthBarWidgetClass = UCombatHealthBarWidget::StaticClass();
 }
 
@@ -62,5 +70,15 @@ void ACombatDamageDummy::ResetDummy()
 	if (DamageHandlerComponent)
 	{
 		DamageHandlerComponent->ResetStats();
+	}
+
+	if (DamageReactionComponent)
+	{
+		DamageReactionComponent->ResetReactionState();
+	}
+
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->SetMovementMode(MOVE_Walking);
 	}
 }
