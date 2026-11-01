@@ -38,6 +38,9 @@ AWeapon_Bow::AWeapon_Bow()
 	ProjectileConfig.KnockbackImpulse = WeaponConfig.KnockbackImpulse;
 	ProjectileConfig.DamageCategory = WeaponConfig.DamageCategory;
 	ProjectileConfig.WeaponType = EWeaponType::Bow;
+	ProjectileConfig.CriticalChance = WeaponConfig.CriticalChance;
+	ProjectileConfig.CriticalDamageMultiplier = WeaponConfig.CriticalDamageMultiplier;
+	ProjectileConfig.DamageOverTimeEffects = WeaponConfig.DamageOverTimeEffects;
 }
 
 void AWeapon_Bow::Tick(float DeltaSeconds)
@@ -123,6 +126,9 @@ bool AWeapon_Bow::SpawnArrow(float ChargeAlpha)
 	ShotConfig.KnockbackImpulse = WeaponConfig.KnockbackImpulse;
 	ShotConfig.DamageCategory = WeaponConfig.DamageCategory;
 	ShotConfig.WeaponType = EWeaponType::Bow;
+	ShotConfig.CriticalChance = WeaponConfig.CriticalChance;
+	ShotConfig.CriticalDamageMultiplier = WeaponConfig.CriticalDamageMultiplier;
+	ShotConfig.DamageOverTimeEffects = WeaponConfig.DamageOverTimeEffects;
 	ShotConfig.DamageMultiplier *= FMath::Lerp(MinDrawDamageMultiplier, MaxDrawDamageMultiplier, ChargeAlpha);
 	ShotConfig.InitialSpeed *= FMath::Lerp(MinDrawSpeedMultiplier, MaxDrawSpeedMultiplier, ChargeAlpha);
 	ShotConfig.MaxSpeed = FMath::Max(ShotConfig.MaxSpeed, ShotConfig.InitialSpeed);
