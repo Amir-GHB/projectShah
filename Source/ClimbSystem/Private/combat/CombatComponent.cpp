@@ -352,6 +352,7 @@ bool UCombatComponent::StartNewCombo()
 	StopActiveAttack(true, true, 0.1f);
 	ActiveAttackWeapon = CurrentWeapon;
 	ActiveAttackIndex = 0;
+	ActiveAttackWeapon->SetActiveAttackIndex(0);
 	PendingAttackIndex = INDEX_NONE;
 	ActiveSectionIndex = INDEX_NONE;
 	PendingSectionIndex = INDEX_NONE;
@@ -421,6 +422,7 @@ bool UCombatComponent::PlayIndividualAttack(int32 AttackIndex)
 	if (!Anim) return false;
 
 	ActiveAttackIndex = AttackIndex;
+	ActiveAttackWeapon->SetActiveAttackIndex(AttackIndex);
 	PendingAttackIndex = INDEX_NONE;
 	ActiveAttackMontage = Montages[AttackIndex];
 	ActiveSectionIndex = AttackIndex;
@@ -487,6 +489,8 @@ bool UCombatComponent::TryQueueSectionTransition()
 void UCombatComponent::CommitSectionTransition(int32 NewSectionIndex, FName NewSectionName)
 {
 	ActiveSectionIndex = NewSectionIndex;
+	ActiveAttackIndex = NewSectionIndex;
+	if (ActiveAttackWeapon.IsValid()) ActiveAttackWeapon->SetActiveAttackIndex(NewSectionIndex);
 	PendingSectionIndex = INDEX_NONE;
 	bTransitionCommittedForWindow = false;
 	OnComboSectionChanged.Broadcast(NewSectionIndex, NewSectionName);
@@ -626,7 +630,11 @@ void UCombatComponent::StopActiveAttack(bool bInterrupted, bool bStopMontage, fl
 	TGuardValue<bool> Guard(bIsStoppingAttack, true);
 	ActiveAttackToken = 0; // Invalidate first: Montage_Stop can invoke delegates synchronously.
 
-	if (ActiveAttackWeapon.IsValid()) ActiveAttackWeapon->CancelTrace();
+	if (ActiveAttackWeapon.IsValid())
+	{
+		ActiveAttackWeapon->CancelTrace();
+		ActiveAttackWeapon->SetActiveAttackIndex(INDEX_NONE);
+	}
 	UAnimMontage* Montage = ActiveAttackMontage;
 	if (bStopMontage && Montage && OwningCharacter.IsValid() && OwningCharacter->GetMesh())
 	{
