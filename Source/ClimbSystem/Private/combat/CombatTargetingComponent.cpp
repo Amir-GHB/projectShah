@@ -297,6 +297,10 @@ void UCombatTargetingComponent::TickComponent(
 	if (!IsValidTarget(Target) || !IsWithinFocusRange(Target)
 		|| (bRequireLineOfSight && !HasLineOfSight(Target)))
 	{
+		// Stop applying focus immediately when the current target becomes invalid or leaves
+		// the shared range. A replacement may be acquired on the next refresh interval.
+		SetCurrentTarget(nullptr);
+
 		if (TargetRefreshElapsed >= TargetRefreshInterval)
 		{
 			TargetRefreshElapsed = 0.0f;
