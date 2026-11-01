@@ -687,6 +687,16 @@ void UCombatComponent::EnterDeadState()
 		Bow->CancelDraw();
 	}
 
+	// Invalidate any in-flight weapon-swap montage callbacks so they cannot restore Idle
+	// after the death transition has completed.
+	if (bWeaponSwapActive)
+	{
+		++WeaponSwapToken;
+		bWeaponSwapActive = false;
+		WeaponBeingUnequipped.Reset();
+		WeaponBeingEquipped.Reset();
+	}
+
 	StopActiveAttack(true, true, 0.12f);
 	SetCombatState(ECombatState::Dead);
 }
