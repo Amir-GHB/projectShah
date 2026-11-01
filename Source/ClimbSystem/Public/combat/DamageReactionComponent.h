@@ -65,6 +65,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions", meta = (ClampMin = "0.0"))
 	float DeathBlendOutTime = 0.12f;
 
+	/** Clears the death latch and stops the active reaction, e.g. when resetting a test dummy. */
+	UFUNCTION(BlueprintCallable, Category = "Combat|Reactions")
+	void ResetReactionState();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
