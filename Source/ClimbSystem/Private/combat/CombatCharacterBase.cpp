@@ -2,6 +2,7 @@
 
 #include "combat/CombatCharacterBase.h"
 #include "combat/CombatComponent.h"
+#include "combat/CombatTargetingComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -16,6 +17,7 @@ ACombatCharacterBase::ACombatCharacterBase()
 
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	DamageHandlerComponent = CreateDefaultSubobject<UDamageHandlerComponent>(TEXT("DamageHandlerComponent"));
+	CombatTargetingComponent = CreateDefaultSubobject<UCombatTargetingComponent>(TEXT("CombatTargetingComponent"));
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -90,6 +92,10 @@ void ACombatCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		{
 			EnhancedInput->BindAction(NextWeaponAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnNextWeaponTriggered);
 		}
+		if (TargetLockAction)
+		{
+			EnhancedInput->BindAction(TargetLockAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnTargetLockTriggered);
+		}
 	}
 }
 
@@ -150,6 +156,14 @@ void ACombatCharacterBase::OnNextWeaponTriggered(const FInputActionValue& Value)
 	if (CombatComponent)
 	{
 		CombatComponent->SwitchToNextWeapon();
+	}
+}
+
+void ACombatCharacterBase::OnTargetLockTriggered(const FInputActionValue& Value)
+{
+	if (CombatTargetingComponent)
+	{
+		CombatTargetingComponent->ToggleManualLock();
 	}
 }
 
