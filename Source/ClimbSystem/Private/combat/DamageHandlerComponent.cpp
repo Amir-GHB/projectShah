@@ -77,7 +77,9 @@ EDamageHitLocation UDamageHandlerComponent::ResolveHitLocation(
 		return EDamageHitLocation::Unknown;
 	}
 
-	const FBox Bounds = TargetActor->GetComponentsBoundingBox(true);
+	const FBox Bounds = IsValid(HitResult.Component)
+		? HitResult.Component->Bounds.GetBox()
+		: TargetActor->GetComponentsBoundingBox(true);
 	const float Height = Bounds.GetSize().Z;
 	if (Height <= KINDA_SMALL_NUMBER)
 	{
@@ -215,6 +217,7 @@ void UDamageHandlerComponent::ApplyDamageOverTimeTick(const FActiveDamageOverTim
 	if (bIsDead || !GetOwner()) return;
 
 	FDamageInfo TickInfo;
+	TickInfo.bIsDamageOverTime = true;
 	TickInfo.BaseDamage = ActiveEffect.Definition.DamagePerTick * ActiveEffect.StackCount;
 	TickInfo.DamageCategory = ActiveEffect.Definition.DamageCategory;
 	TickInfo.DamageCauser = ActiveEffect.DamageCauser;
