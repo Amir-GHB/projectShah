@@ -60,10 +60,10 @@ public:
 	TObjectPtr<UAnimMontage> DeathMontage = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions", meta = (ClampMin = "0.0"))
-	float HitReactionBlendIn = 0.08f;
+	float HitReactionBlendOutTime = 0.08f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions", meta = (ClampMin = "0.0"))
-	float DeathBlendIn = 0.12f;
+	float DeathBlendOutTime = 0.12f;
 
 protected:
 	virtual void BeginPlay() override;
@@ -88,5 +88,5 @@ private:
 	UAnimMontage* FindBestHitReaction(const FDamageInfo& DamageInfo) const;
 	UAnimMontage* FindBestReaction(const TArray<FDamageReactionMontage>& ReactionSet,
 		const FDamageInfo& DamageInfo) const;
-	void PlayReaction(UAnimMontage* Montage, float BlendInTime);
+	void PlayReaction(UAnimMontage* Montage, float PreviousMontageBlendOutTime);
 };
