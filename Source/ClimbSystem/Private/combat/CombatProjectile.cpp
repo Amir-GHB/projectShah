@@ -134,6 +134,8 @@ void ACombatProjectile::ApplyHitDamage(AActor* TargetActor, const FHitResult& Hi
 	DamageInfo.CriticalChance = ProjectileConfig.CriticalChance;
 	DamageInfo.CriticalDamageMultiplier = ProjectileConfig.CriticalDamageMultiplier;
 	DamageInfo.DamageOverTimeEffects = ProjectileConfig.DamageOverTimeEffects;
+	DamageInfo.DamageDirection = IsValid(ProjectileMovement)
+		? ProjectileMovement->Velocity.GetSafeNormal() : GetActorForwardVector();
 	DamageInfo.DamageCauser = SourceWeapon.IsValid() ? static_cast<AActor*>(SourceWeapon.Get()) : this;
 	DamageInfo.InstigatorWeapon = SourceWeapon.Get();
 	DamageInfo.Normalize();
