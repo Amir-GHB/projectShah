@@ -78,8 +78,9 @@ EDamageHitLocation UDamageHandlerComponent::ResolveHitLocation(
 		return EDamageHitLocation::Unknown;
 	}
 
-	const FBox Bounds = IsValid(HitResult.Component)
-		? HitResult.Component->Bounds.GetBox()
+	UPrimitiveComponent* HitComponent = HitResult.GetComponent();
+	const FBox Bounds = IsValid(HitComponent)
+		? HitComponent->Bounds.GetBox()
 		: TargetActor->GetComponentsBoundingBox(true);
 	const float Height = Bounds.GetSize().Z;
 	if (Height <= KINDA_SMALL_NUMBER)
@@ -171,7 +172,7 @@ void UDamageHandlerComponent::AddDamageOverTimeEffects(const FDamageInfo& Damage
 		FActiveDamageOverTimeEffect* Existing = ActiveDamageOverTimeEffects.FindByPredicate(
 			[&EffectKey](const FActiveDamageOverTimeEffect& Active)
 			{
-				return GetDamageEffectKey(Active.Definition) == EffectKey;
+				return UDamageHandlerComponent::GetDamageEffectKey(Active.Definition) == EffectKey;
 			});
 
 		if (Existing)
