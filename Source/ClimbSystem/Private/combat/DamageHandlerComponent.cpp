@@ -282,6 +282,17 @@ void UDamageHandlerComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	}
 }
 
+void UDamageHandlerComponent::ResetStats()
+{
+	ActiveDamageOverTimeEffects.Empty();
+	SetComponentTickEnabled(false);
+	bIsDead = false;
+	CurrentHealth = FMath::Max(0.0f, MaxHealth);
+	CurrentPoise = FMath::Max(0.0f, MaxPoise);
+	LastDamageInfo = FDamageInfo();
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+}
+
 void UDamageHandlerComponent::Heal(float Amount)
 {
 	if (bIsDead || !FMath::IsFinite(Amount) || Amount <= 0.0f) return;
