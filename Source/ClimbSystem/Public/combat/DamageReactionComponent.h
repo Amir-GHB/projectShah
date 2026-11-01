@@ -54,6 +54,9 @@ public:
 	TArray<FDamageReactionMontage> HitReactions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions")
+	TArray<FDamageReactionMontage> DeathReactions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions")
 	TObjectPtr<UAnimMontage> DeathMontage = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions", meta = (ClampMin = "0.0"))
@@ -83,5 +86,7 @@ private:
 	void HandleDeath(AActor* KillerActor);
 
 	UAnimMontage* FindBestHitReaction(const FDamageInfo& DamageInfo) const;
+	UAnimMontage* FindBestReaction(const TArray<FDamageReactionMontage>& ReactionSet,
+		const FDamageInfo& DamageInfo) const;
 	void PlayReaction(UAnimMontage* Montage, float BlendInTime);
 };
