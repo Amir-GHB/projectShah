@@ -102,6 +102,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|Attack")
 	void StopActiveAttack(bool bInterrupted = true, bool bStopMontage = true, float BlendOutTime = 0.2f);
 
+	/** Interrupt combat and enter the terminal Dead state. */
+	UFUNCTION(BlueprintCallable, Category = "Combat|State")
+	void EnterDeadState();
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|State")
 	ECombatState CurrentCombatState = ECombatState::Idle;
 
