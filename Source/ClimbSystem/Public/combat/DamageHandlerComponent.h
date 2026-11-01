@@ -76,6 +76,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stats")
 	bool bIsDead = false;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
+	FDamageInfo LastDamageInfo;
+
 	// BlueprintNativeEvent Damage Interface
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Combat|Damage")
 	float ApplyDamage(AActor* InstigatorActor, AActor* TargetActor, const FDamageInfo& DamageInfo, const FHitResult& HitResult);
