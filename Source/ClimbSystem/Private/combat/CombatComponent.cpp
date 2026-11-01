@@ -1,6 +1,7 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/CombatComponent.h"
+#include "combat/CombatTargetingComponent.h"
 #include "GameFramework/Character.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -404,6 +405,10 @@ bool UCombatComponent::StartNewCombo()
 	Anim->Montage_JumpToSection(FirstSection, Montage);
 	Anim->Montage_SetNextSection(FirstSection, NAME_None, Montage);
 	SetCombatState(ECombatState::Attacking);
+	if (UCombatTargetingComponent* Targeting = OwningCharacter->FindComponentByClass<UCombatTargetingComponent>())
+	{
+		Targeting->BeginAttackFocus();
+	}
 	OnComboSectionChanged.Broadcast(0, FirstSection);
 	return true;
 }
@@ -446,6 +451,10 @@ bool UCombatComponent::PlayIndividualAttack(int32 AttackIndex)
 	BlendDelegate.BindUObject(this, &UCombatComponent::OnMontageInstanceBlendingOut, Token);
 	Anim->Montage_SetBlendingOutDelegate(BlendDelegate, ActiveAttackMontage);
 	SetCombatState(ECombatState::Attacking);
+	if (UCombatTargetingComponent* Targeting = OwningCharacter->FindComponentByClass<UCombatTargetingComponent>())
+	{
+		Targeting->BeginAttackFocus();
+	}
 	OnComboSectionChanged.Broadcast(AttackIndex, FName(*FString::Printf(TEXT("Attack_%02d"), AttackIndex + 1)));
 	return true;
 }
@@ -634,6 +643,13 @@ void UCombatComponent::StopActiveAttack(bool bInterrupted, bool bStopMontage, fl
 	{
 		ActiveAttackWeapon->CancelTrace();
 		ActiveAttackWeapon->SetActiveAttackIndex(INDEX_NONE);
+	}
+	if (OwningCharacter.IsValid())
+	{
+		if (UCombatTargetingComponent* Targeting = OwningCharacter->FindComponentByClass<UCombatTargetingComponent>())
+		{
+			Targeting->EndAttackFocus();
+		}
 	}
 	UAnimMontage* Montage = ActiveAttackMontage;
 	if (bStopMontage && Montage && OwningCharacter.IsValid() && OwningCharacter->GetMesh())
