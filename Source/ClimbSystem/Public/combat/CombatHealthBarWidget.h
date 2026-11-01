@@ -11,7 +11,7 @@ class UProgressBar;
 
 /** Base widget for a world-space damage dummy health bar. Create a Widget Blueprint
  * derived from this class and add a ProgressBar named HealthBar. */
-UCLASS(Abstract, Blueprintable)
+UCLASS(Blueprintable)
 class CLIMBSYSTEM_API UCombatHealthBarWidget : public UUserWidget
 {
 	GENERATED_BODY()
@@ -21,6 +21,7 @@ public:
 	void BindToDamageHandler(UDamageHandlerComponent* DamageHandler);
 
 protected:
+	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
 	UPROPERTY(meta = (BindWidget))
