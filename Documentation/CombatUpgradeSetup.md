@@ -60,7 +60,7 @@ Place an `ACombatDamageDummy` actor in the level, or create a Blueprint child.
 - The actor includes a world-space health bar using `UCombatHealthBarWidget`.
 - A Widget Blueprint can derive from `UCombatHealthBarWidget` and provide a styled ProgressBar named `HealthBar`; assign that class to `HealthBarWidgetClass`.
 
-The dummy uses the same damage handler as combat characters and is therefore suitable for testing criticals, hit regions, and status effects.
+The dummy uses the same damage handler as combat characters and is therefore suitable for testing criticals, hit regions, and status effects. Call `ResetDummy` from Blueprint between test runs.
 
 ## 6. Semi-lock targeting
 
@@ -68,7 +68,7 @@ The dummy uses the same damage handler as combat characters and is therefore sui
 
 - The component only ticks while a melee attack montage is active.
 - It scores valid nearby actors using view alignment, screen-center alignment, distance, and a small target-retention bonus.
-- Valid targets must have a `UDamageHandlerComponent`, must not be dead, and must be within `MaxFocusRange`.
+- Valid targets can use either the new `UDamageHandlerComponent` or the repository's existing `ICombatDamageable` interface, and must be within `MaxFocusRange`. Component-backed targets are rejected when dead. The legacy Variant_Combat actors retain their existing damage/health implementation; the new critical, hit-region, and status-effect calculations apply to targets using `UDamageHandlerComponent`.
 - Visibility is checked using the Visibility channel when `bRequireLineOfSight` is enabled.
 - The character smoothly turns toward the selected target during the attack.
 - A short movement-input correction is attempted at close-to-melee distances, once per attack, while grounded and moving slowly.
