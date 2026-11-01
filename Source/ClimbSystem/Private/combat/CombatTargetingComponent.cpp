@@ -153,7 +153,6 @@ bool UCombatTargetingComponent::HasLineOfSight(const AActor* Candidate) const
 
 	const FVector TargetLocation = Candidate->GetActorLocation();
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(CombatTargetVisibility), true, OwningCharacter.Get());
-	Params.AddIgnoredActor(Candidate);
 
 	FHitResult Hit;
 	const bool bHit = GetWorld()->LineTraceSingleByChannel(
