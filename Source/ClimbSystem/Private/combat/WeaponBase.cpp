@@ -325,11 +325,14 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 	const FAttackDamageConfig* AttackConfig = WeaponConfig.AttackDamageConfigs.IsValidIndex(ActiveAttackIndex)
 		? &WeaponConfig.AttackDamageConfigs[ActiveAttackIndex] : nullptr;
 	DamageInfo.DamageMultiplier = CurrentDamageMultiplier * (AttackConfig ? AttackConfig->DamageMultiplier : 1.0f);
-	DamageInfo.CriticalChance = AttackConfig ? AttackConfig->CriticalChance : WeaponConfig.CriticalChance;
-	DamageInfo.CriticalDamageMultiplier = AttackConfig
+	DamageInfo.CriticalChance = AttackConfig && AttackConfig->bOverrideCriticalSettings
+		? AttackConfig->CriticalChance : WeaponConfig.CriticalChance;
+	DamageInfo.CriticalDamageMultiplier = AttackConfig && AttackConfig->bOverrideCriticalSettings
 		? AttackConfig->CriticalDamageMultiplier : WeaponConfig.CriticalDamageMultiplier;
-	DamageInfo.DamageOverTimeEffects = AttackConfig
+	DamageInfo.DamageOverTimeEffects = AttackConfig && AttackConfig->bOverrideDamageOverTimeEffects
 		? AttackConfig->DamageOverTimeEffects : WeaponConfig.DamageOverTimeEffects;
+	DamageInfo.DamageDirection = (TargetActor->GetActorLocation()
+		- OwningCharacter->GetActorLocation()).GetSafeNormal();
 	DamageInfo.PoiseDamage = WeaponConfig.PoiseDamage;
 	DamageInfo.KnockbackImpulse = WeaponConfig.KnockbackImpulse;
 	DamageInfo.DamageCategory = WeaponConfig.DamageCategory;
