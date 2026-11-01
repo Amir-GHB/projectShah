@@ -2,6 +2,7 @@
 
 #include "combat/DamageHandlerComponent.h"
 #include "GameFramework/Actor.h"
+#include "Components/PrimitiveComponent.h"
 
 UDamageHandlerComponent::UDamageHandlerComponent()
 {
