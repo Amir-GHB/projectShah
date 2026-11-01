@@ -47,10 +47,17 @@ void UDamageReactionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 UAnimMontage* UDamageReactionComponent::FindBestHitReaction(
 	const FDamageInfo& DamageInfo) const
 {
+	return FindBestReaction(HitReactions, DamageInfo);
+}
+
+UAnimMontage* UDamageReactionComponent::FindBestReaction(
+	const TArray<FDamageReactionMontage>& ReactionSet,
+	const FDamageInfo& DamageInfo) const
+{
 	const FDamageReactionMontage* BestMatch = nullptr;
 	int32 BestSpecificity = INDEX_NONE;
 
-	for (const FDamageReactionMontage& Candidate : HitReactions)
+	for (const FDamageReactionMontage& Candidate : ReactionSet)
 	{
 		if (!IsValid(Candidate.Montage))
 		{
@@ -148,5 +155,12 @@ void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 		}
 	}
 
-	PlayReaction(DeathMontage, DeathBlendIn);
+	FDamageInfo DeathDamageInfo;
+	if (BoundDamageHandler)
+	{
+		DeathDamageInfo = BoundDamageHandler->LastDamageInfo;
+	}
+
+	UAnimMontage* SelectedDeathMontage = FindBestReaction(DeathReactions, DeathDamageInfo);
+	PlayReaction(IsValid(SelectedDeathMontage) ? SelectedDeathMontage : DeathMontage, DeathBlendIn);
 }
