@@ -63,7 +63,7 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void UCombatComponent::EquipWeapon(EWeaponType NewWeaponType)
 {
-	if (!OwningCharacter.IsValid()) return;
+	if (!OwningCharacter.IsValid() || CurrentCombatState == ECombatState::Dead) return;
 
 	// A weapon change interrupts an in-progress bow draw without releasing a shot.
 	if (CurrentCombatState == ECombatState::DrawingBow)
@@ -294,7 +294,8 @@ AWeaponBase* UCombatComponent::GetWeapon(EWeaponType Type) const
 
 void UCombatComponent::HandleAttackInput()
 {
-	if (!OwningCharacter.IsValid() || !IsValid(CurrentWeapon) || bWeaponSwapActive) return;
+	if (!OwningCharacter.IsValid() || !IsValid(CurrentWeapon) || bWeaponSwapActive
+		|| CurrentCombatState == ECombatState::Dead) return;
 
 	// Ranged weapons use Started/Completed input events so holding and releasing are distinct.
 	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon))
@@ -671,6 +672,23 @@ void UCombatComponent::StopActiveAttack(bool bInterrupted, bool bStopMontage, fl
 	bTransitionCommittedForWindow = false;
 	ClearInputBuffer();
 	if (!bWeaponSwapActive) SetCombatState(ECombatState::Idle);
+}
+
+void UCombatComponent::EnterDeadState()
+{
+	if (CurrentCombatState == ECombatState::Dead)
+	{
+		return;
+	}
+
+	QueuedWeaponSwitch.Reset();
+	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon))
+	{
+		Bow->CancelDraw();
+	}
+
+	StopActiveAttack(true, true, 0.12f);
+	SetCombatState(ECombatState::Dead);
 }
 
 void UCombatComponent::SetCombatState(ECombatState NewState)
