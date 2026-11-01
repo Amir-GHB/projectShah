@@ -38,6 +38,9 @@ protected:
 	void AddDamageOverTimeEffects(const FDamageInfo& DamageInfo, AActor* InstigatorActor);
 	void ApplyDamageOverTimeTick(const FActiveDamageOverTimeEffect& ActiveEffect);
 	static FName GetDamageEffectKey(const FDamageOverTimeEffect& Effect);
+	EDamageHitLocation ResolveHitLocation(const FHitResult& HitResult, AActor* TargetActor) const;
+	EDamageHitDirection ResolveHitDirection(const FDamageInfo& DamageInfo, AActor* TargetActor) const;
+	float GetHitLocationMultiplier(EDamageHitLocation HitLocation) const;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
@@ -51,6 +54,21 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
 	float MaxPoise = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Hit Location")
+	TMap<FName, EDamageHitLocation> BoneHitLocationMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Hit Location", meta = (ClampMin = "0.0"))
+	float HeadDamageMultiplier = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Hit Location", meta = (ClampMin = "0.0"))
+	float TorsoDamageMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Hit Location", meta = (ClampMin = "0.0"))
+	float ArmDamageMultiplier = 0.75f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Hit Location", meta = (ClampMin = "0.0"))
+	float LegDamageMultiplier = 0.85f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stats")
 	float CurrentPoise = 100.0f;
