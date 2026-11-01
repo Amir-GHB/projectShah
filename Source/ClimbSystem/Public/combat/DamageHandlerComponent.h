@@ -87,6 +87,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|Health")
 	void Heal(float Amount);
 
+	UFUNCTION(BlueprintCallable, Category = "Combat|Health")
+	void ResetStats();
+
 	UFUNCTION(BlueprintPure, Category = "Combat|Health")
 	float GetHealthPercent() const { return (MaxHealth > 0.0f) ? (CurrentHealth / MaxHealth) : 0.0f; }
 
