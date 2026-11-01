@@ -23,8 +23,11 @@ float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActo
 
 	FDamageInfo ResolvedInfo = DamageInfo;
 	ResolvedInfo.Normalize();
+	ResolvedInfo.HitLocation = ResolveHitLocation(HitResult, TargetActor);
+	ResolvedInfo.HitDirection = ResolveHitDirection(ResolvedInfo, TargetActor);
 
-	float RawDamage = ResolvedInfo.GetCalculatedRawDamage();
+	float RawDamage = ResolvedInfo.GetCalculatedRawDamage()
+		* GetHitLocationMultiplier(ResolvedInfo.HitLocation);
 	ResolvedInfo.bIsCriticalHit = ResolvedInfo.CriticalChance > 0.0f
 		&& FMath::FRand() < ResolvedInfo.CriticalChance;
 
@@ -56,6 +59,88 @@ float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActo
 	}
 
 	return FinalDamage;
+}
+
+EDamageHitLocation UDamageHandlerComponent::ResolveHitLocation(
+	const FHitResult& HitResult, AActor* TargetActor) const
+{
+	if (!HitResult.BoneName.IsNone())
+	{
+		if (const EDamageHitLocation* MappedLocation = BoneHitLocationMap.Find(HitResult.BoneName))
+		{
+			return *MappedLocation;
+		}
+	}
+
+	if (!IsValid(TargetActor))
+	{
+		return EDamageHitLocation::Unknown;
+	}
+
+	const FBox Bounds = TargetActor->GetComponentsBoundingBox(true);
+	const float Height = Bounds.GetSize().Z;
+	if (Height <= KINDA_SMALL_NUMBER)
+	{
+		return EDamageHitLocation::Unknown;
+	}
+
+	const float HitHeight = HitResult.ImpactPoint.IsNearlyZero()
+		? TargetActor->GetActorLocation().Z : HitResult.ImpactPoint.Z;
+	const float HeightAlpha = FMath::Clamp(
+		(HitHeight - Bounds.Min.Z) / Height, 0.0f, 1.0f);
+
+	if (HeightAlpha >= 0.82f) return EDamageHitLocation::Head;
+	if (HeightAlpha <= 0.35f) return EDamageHitLocation::Legs;
+	return EDamageHitLocation::Torso;
+}
+
+EDamageHitDirection UDamageHandlerComponent::ResolveHitDirection(
+	const FDamageInfo& DamageInfo, AActor* TargetActor) const
+{
+	if (!IsValid(TargetActor))
+	{
+		return EDamageHitDirection::Unknown;
+	}
+
+	FVector DirectionToTarget = DamageInfo.DamageDirection.GetSafeNormal();
+	if (DirectionToTarget.IsNearlyZero())
+	{
+		if (AActor* Source = DamageInfo.DamageCauser.Get())
+		{
+			DirectionToTarget = (TargetActor->GetActorLocation()
+				- Source->GetActorLocation()).GetSafeNormal();
+		}
+	}
+
+	if (DirectionToTarget.IsNearlyZero())
+	{
+		return EDamageHitDirection::Unknown;
+	}
+
+	const FVector ToAttackerLocal = TargetActor->GetActorTransform()
+		.InverseTransformVectorNoScale(-DirectionToTarget).GetSafeNormal();
+
+	if (FMath::Abs(ToAttackerLocal.X) >= FMath::Abs(ToAttackerLocal.Y))
+	{
+		return ToAttackerLocal.X >= 0.0f
+			? EDamageHitDirection::Front : EDamageHitDirection::Back;
+	}
+
+	return ToAttackerLocal.Y >= 0.0f
+		? EDamageHitDirection::Right : EDamageHitDirection::Left;
+}
+
+float UDamageHandlerComponent::GetHitLocationMultiplier(
+	EDamageHitLocation HitLocation) const
+{
+	switch (HitLocation)
+	{
+	case EDamageHitLocation::Head: return FMath::Max(0.0f, HeadDamageMultiplier);
+	case EDamageHitLocation::Torso: return FMath::Max(0.0f, TorsoDamageMultiplier);
+	case EDamageHitLocation::Arms: return FMath::Max(0.0f, ArmDamageMultiplier);
+	case EDamageHitLocation::Legs: return FMath::Max(0.0f, LegDamageMultiplier);
+	default: return 1.0f;
+	}
 }
 
 FName UDamageHandlerComponent::GetDamageEffectKey(const FDamageOverTimeEffect& Effect)
