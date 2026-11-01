@@ -150,6 +150,10 @@ public:
     /** Broadcast when traversal starts, ends, or changes between runtime phases. */
     UPROPERTY(BlueprintAssignable, Category="Climbing|Events")
     FOnClimbRuntimeStateChanged OnRuntimeStateChanged;
+    
+    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient,
+        Category="Climbing|Animation")
+    FClimbAnimationState AnimationState;
 
 private:
     struct FRuntimeConnection
@@ -188,9 +192,7 @@ private:
     TWeakObjectPtr<AClimbRouteActor> TargetRoute;
     FGuid TargetNodeId;
     EClimbTraversalType ActiveTraversalType = EClimbTraversalType::ClimbTransition;
-    UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient,
-        Category="Climbing|Animation")
-    FClimbAnimationState AnimationState;
+    
     FVector AnimationWorldRightAxis = FVector::RightVector;
     float AnimationStateRemainingTime = 0.0f;
     static constexpr float AnimationTransitionHoldTime = 0.20f;

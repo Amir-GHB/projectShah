@@ -513,7 +513,16 @@ void UClimbRuntimeComponent::BeginConnection(const FRuntimeConnection& Connectio
     TraversalStartLocation = Character->GetActorLocation();
     TraversalEndLocation = DestinationLocation;
     TraversalStartRotation = Character->GetActorRotation();
-    TraversalEndRotation = DestinationRotation;
+
+    // Preserve the character's facing direction when climbing onto an exit.
+    const FClimbRouteNode* DestinationNode =
+        DestinationRoute->FindNode(Connection.TargetNodeId);
+
+    TraversalEndRotation =
+        (DestinationNode && DestinationNode->Type == EClimbRouteNodeType::Exit)
+            ? TraversalStartRotation
+            : DestinationRotation;
+
     TargetRoute = DestinationRoute;
     TargetNodeId = Connection.TargetNodeId;
     ActiveTraversalType = Connection.Type;
@@ -528,9 +537,9 @@ void UClimbRuntimeComponent::BeginConnection(const FRuntimeConnection& Connectio
         CurrentRoute->GetNodeWorldTransform(CurrentNodeId, SourceTransform);
     }
     DestinationRoute->GetNodeWorldTransform(Connection.TargetNodeId, DestinationTransform);
-    const FClimbRouteNode* DestinationNode = DestinationRoute->FindNode(Connection.TargetNodeId);
+    const FClimbRouteNode* TempDestinationNode = DestinationRoute->FindNode(Connection.TargetNodeId);
     const EClimbMovementType MovementType =
-        DestinationNode && DestinationNode->Type == EClimbRouteNodeType::Exit
+        TempDestinationNode && TempDestinationNode->Type == EClimbRouteNodeType::Exit
             ? EClimbMovementType::Exit
             : (Connection.Type == EClimbTraversalType::Jump
                 ? EClimbMovementType::Jump
@@ -579,10 +588,19 @@ void UClimbRuntimeComponent::FinishConnection()
     FVector DestinationLocation;
     FRotator DestinationRotation;
     if (GetCharacterLocationAtNode(DestinationRoute, TargetNodeId,
-        DestinationLocation, DestinationRotation))
+    DestinationLocation, DestinationRotation))
     {
-        Character->SetActorLocationAndRotation(DestinationLocation,
-            DestinationRotation, false, nullptr, ETeleportType::TeleportPhysics);
+        if (DestinationNode->Type == EClimbRouteNodeType::Exit)
+        {
+            // Preserve the rotation established during the exit animation.
+            Character->SetActorLocation(DestinationLocation, false, nullptr,
+                ETeleportType::TeleportPhysics);
+        }
+        else
+        {
+            Character->SetActorLocationAndRotation(DestinationLocation,
+                DestinationRotation, false, nullptr, ETeleportType::TeleportPhysics);
+        }
     }
 
     if (DestinationNode->Type == EClimbRouteNodeType::Exit)

@@ -9,9 +9,10 @@
 void UClimbAnimationMovementNotifyState::NotifyBegin(
     USkeletalMeshComponent* MeshComp,
     UAnimSequenceBase* Animation,
-    const float TotalDuration)
+    const float TotalDuration,
+     const FAnimNotifyEventReference& EventReference)
 {
-    Super::NotifyBegin(MeshComp, Animation, TotalDuration);
+    Super::NotifyBegin(MeshComp, Animation, TotalDuration, EventReference);
 
     AActor* Owner = MeshComp ? MeshComp->GetOwner() : nullptr;
     UClimbRuntimeComponent* ClimbComponent = IsValid(Owner)
@@ -26,9 +27,10 @@ void UClimbAnimationMovementNotifyState::NotifyBegin(
 
 void UClimbAnimationMovementNotifyState::NotifyEnd(
     USkeletalMeshComponent* MeshComp,
-    UAnimSequenceBase* Animation)
+    UAnimSequenceBase* Animation,
+    const FAnimNotifyEventReference& EventReference)
 {
-    Super::NotifyEnd(MeshComp, Animation);
+    Super::NotifyEnd(MeshComp, Animation, EventReference);
 
     AActor* Owner = MeshComp ? MeshComp->GetOwner() : nullptr;
     UClimbRuntimeComponent* ClimbComponent = IsValid(Owner)
