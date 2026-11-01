@@ -3,6 +3,7 @@
 #include "combat/CombatTargetingComponent.h"
 
 #include "combat/DamageHandlerComponent.h"
+#include "CombatDamageable.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
@@ -126,8 +127,14 @@ bool UCombatTargetingComponent::IsValidTarget(AActor* Candidate) const
 
 	const UDamageHandlerComponent* DamageHandler =
 		Candidate->FindComponentByClass<UDamageHandlerComponent>();
+	if (DamageHandler)
+	{
+		return !DamageHandler->bIsDead;
+	}
 
-	return DamageHandler && !DamageHandler->bIsDead;
+	// The repository also contains the original Variant_Combat actors, which expose
+	// ICombatDamageable and route hits through TakeDamage rather than this component.
+	return Cast<ICombatDamageable>(Candidate) != nullptr;
 }
 
 bool UCombatTargetingComponent::IsWithinFocusRange(const AActor* Candidate) const
