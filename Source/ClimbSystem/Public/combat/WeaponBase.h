@@ -86,7 +86,7 @@ public:
 
 	/** Selects the per-combo-step damage profile. INDEX_NONE restores weapon-wide defaults. */
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Damage")
-	void SetActiveAttackIndex(int32 InAttackIndex) { ActiveAttackIndex = InAttackIndex; }
+	void SetActiveAttackIndex(int32 InAttackIndex) { ActiveAttackIndex = InAttackIndex; CurrentDamageMultiplier = 1.0f; }
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|Damage")
 	float GetCurrentDamageMultiplier() const { return CurrentDamageMultiplier; }
