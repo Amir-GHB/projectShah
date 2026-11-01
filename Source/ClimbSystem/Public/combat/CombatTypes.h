@@ -184,6 +184,12 @@ struct FAttackDamageConfig
 {
 	GENERATED_BODY()
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage")
+	bool bOverrideBaseDamage = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage", meta = (EditCondition = "bOverrideBaseDamage", ClampMin = "0.0"))
+	float BaseDamage = 35.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage", meta = (ClampMin = "0.0"))
 	float DamageMultiplier = 1.0f;
 
@@ -268,6 +274,10 @@ struct FDamageInfo
 	/** World-space direction of travel from attacker/projectile toward the target. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage")
 	FVector DamageDirection = FVector::ZeroVector;
+
+	/** True for periodic effect ticks, which should not trigger ordinary hit reactions. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
+	bool bIsDamageOverTime = false;
 
 	/** Resolved by DamageHandlerComponent from the hit bone or impact height. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
