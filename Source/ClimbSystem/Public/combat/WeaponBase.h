@@ -82,7 +82,11 @@ public:
 
 	// Active Section Multiplier
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Damage")
-	void SetCurrentDamageMultiplier(float InMultiplier) { CurrentDamageMultiplier = InMultiplier; }
+	void SetCurrentDamageMultiplier(float InMultiplier) { CurrentDamageMultiplier = FMath::Max(0.0f, InMultiplier); }
+
+	/** Selects the per-combo-step damage profile. INDEX_NONE restores weapon-wide defaults. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon|Damage")
+	void SetActiveAttackIndex(int32 InAttackIndex) { ActiveAttackIndex = InAttackIndex; }
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|Damage")
 	float GetCurrentDamageMultiplier() const { return CurrentDamageMultiplier; }
@@ -111,8 +115,11 @@ protected:
 	UPROPERTY(Transient)
 	TSet<TWeakObjectPtr<AActor>> DamagedActorsThisSwing;
 
-	/** Active section damage multiplier set by CombatComponent */
+	/** Active section damage multiplier set by CombatComponent or Blueprint. */
 	float CurrentDamageMultiplier = 1.0f;
+
+	/** Combo step whose optional damage profile is currently active. */
+	int32 ActiveAttackIndex = INDEX_NONE;
 
 	/** Processes a validated hit and dispatches damage to the target */
 	virtual void ProcessHit(const FHitResult& HitResult);
