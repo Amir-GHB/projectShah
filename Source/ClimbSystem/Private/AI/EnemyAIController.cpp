@@ -58,6 +58,8 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 		ControlledEnemy->LoseSightRadius, ControlledEnemy->SightRadius);
 	SightConfig->PeripheralVisionAngleDegrees = ControlledEnemy->SightPeripheralAngle;
 	HearingConfig->HearingRange = ControlledEnemy->HearingRange;
+	AIPerception->ConfigureSense(*SightConfig);
+	AIPerception->ConfigureSense(*HearingConfig);
 	AIPerception->RequestStimuliListenerUpdate();
 
 	AIPerception->OnTargetPerceptionUpdated.AddUniqueDynamic(
