@@ -177,6 +177,13 @@ void AEnemyAIController::UpdateAI()
 		else
 		{
 			StopMovement();
+			const FVector ToTarget = Target->GetActorLocation() - Enemy->GetActorLocation();
+			if (!ToTarget.IsNearlyZero())
+			{
+				const FRotator DesiredRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
+				Enemy->SetActorRotation(FMath::RInterpTo(
+					Enemy->GetActorRotation(), DesiredRotation, 0.25f, 8.0f));
+			}
 			if (Enemy->CombatComponent
 				&& Enemy->CombatComponent->CurrentCombatState == ECombatState::Idle
 				&& AttackCooldownRemaining <= 0.0f)
