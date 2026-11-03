@@ -51,7 +51,42 @@ Incoming direction is classified relative to the target's local forward/right ax
 
 Reaction montages are assigned per character Blueprint because the actual animation assets and skeletons are character-specific.
 
-## 5. Training dummy
+## 5. Last-enemy finishers (initial implementation)
+
+Finishers are coordinated by the attacker's existing `UDamageReactionComponent`; no additional actor component is required. The player's existing `UCombatComponent` owns a deliberately small list of enemies registered for the current test encounter.
+
+### Player setup
+
+On the player Blueprint:
+
+- Add entries to `DamageReactionComponent.FinisherMontages`.
+- Each entry pairs an `AttackerMontage` and a `VictimMontage` for one `WeaponType`.
+- Add three entries for a weapon to get three randomly selected variations. The attacker and victim montage in each entry are a matched pair.
+- The camera distance, height, and blend time are configurable on the same component.
+
+### Registering test enemies
+
+For now, register the enemies manually from Blueprint. For example, from the Level Blueprint's BeginPlay:
+
+1. Get the player and its `CombatComponent`.
+2. Get the enemy actors you want to include in this test fight.
+3. Call `RegisterEncounterEnemy` on the player's CombatComponent for each enemy.
+
+An enemy must have `UDamageHandlerComponent` and `UDamageReactionComponent`. When a registered enemy dies, it is removed from the attacker's encounter list. The last remaining registered enemy is eligible for a finisher.
+
+This is intentionally a test harness, not the final AI encounter lifecycle. Enemy AI can call the same register/unregister functions later when it detects or leaves combat.
+
+### Current rules and limitations
+
+- Only a direct player melee killing blow can trigger a finisher. Bow/projectile and damage-over-time kills use the normal death reaction.
+- The victim must be registered in the player's encounter list and be the last living registered enemy.
+- A valid montage pair must exist for the killing weapon type. If not, the ordinary death reaction plays.
+- The victim's ordinary death montage is suppressed only when both finisher montages successfully start.
+- A temporary camera actor frames the two characters and blends back when both montages finish. If either montage is interrupted, the other is stopped and the camera/control state is restored.
+- Motion Warping and automatic attacker/victim positioning are not included yet. For this first test, position the characters close enough for the authored paired animations to line up, and make sure both montages are compatible with their respective skeletons and AnimBP montage slots.
+- The attacker enters the temporary `Finishing` combat state, which blocks normal attack and weapon-switch input until the paired montages finish.
+
+## 6. Training dummy
 
 Create a Blueprint child of `ACombatDamageDummy` and assign a **Skeletal Mesh** and compatible Animation Blueprint to its inherited Character Mesh component.
 
@@ -65,7 +100,7 @@ Create a Blueprint child of `ACombatDamageDummy` and assign a **Skeletal Mesh** 
 
 The dummy uses the same damage handler and reaction component as combat characters, so it can test normal damage, criticals, hit regions, status effects, hit reactions, and death reactions.
 
-## 6. Semi-lock targeting
+## 7. Semi-lock targeting
 
 `ACombatCharacterBase` owns a `UCombatTargetingComponent`.
 
@@ -82,9 +117,12 @@ Assign an Enhanced Input Action to `TargetLockAction` on the character Blueprint
 
 Default tuning values are intentionally conservative and exposed on the component: maximum focus range 700 cm, correction window 160-300 cm, correction duration 0.12 seconds.
 
-## 7. Suggested test order
+## 8. Suggested test order
 
 1. Create the dummy Blueprint, assign a skeletal mesh and AnimBP, then configure hit/death montages.
+2. Configure three paired finisher montage entries for the player's weapon on its DamageReactionComponent.
+3. Register two or more test enemies with the player's CombatComponent, then kill them one by one. Verify only the final registered living enemy triggers a paired finisher.
+4. Verify an unregistered enemy, a bow kill, a DoT kill, or a missing weapon montage pair uses the normal death reaction.
 2. Place the dummy in the level and verify ordinary melee hits reduce its health and play a hit reaction.
 3. Set one combo step's base damage override and confirm that step differs from the others.
 4. Set critical chance to 1.0 and verify the expected critical damage; then set it to 0.0.
