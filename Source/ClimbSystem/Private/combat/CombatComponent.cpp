@@ -707,10 +707,8 @@ void UCombatComponent::RegisterEncounterEnemy(AActor* Enemy)
 {
 	if (!IsValid(Enemy) || Enemy == GetOwner()) return;
 
-	if (UDamageHandlerComponent* Handler = Enemy->FindComponentByClass<UDamageHandlerComponent>())
-	{
-		if (Handler->bIsDead) return;
-	}
+	UDamageHandlerComponent* Handler = Enemy->FindComponentByClass<UDamageHandlerComponent>();
+	if (!Handler || Handler->bIsDead) return;
 
 	EncounterEnemies.RemoveAll([](const TWeakObjectPtr<AActor>& Entry) { return !Entry.IsValid(); });
 	EncounterEnemies.AddUnique(Enemy);
@@ -735,7 +733,7 @@ int32 UCombatComponent::GetAliveEncounterEnemyCount() const
 		if (!IsValid(Enemy)) continue;
 
 		const UDamageHandlerComponent* Handler = Enemy->FindComponentByClass<UDamageHandlerComponent>();
-		if (!Handler || !Handler->bIsDead) ++AliveCount;
+		if (Handler && !Handler->bIsDead) ++AliveCount;
 	}
 	return AliveCount;
 }
@@ -756,7 +754,7 @@ bool UCombatComponent::IsLastLivingEncounterEnemy(AActor* Enemy) const
 		}
 
 		const UDamageHandlerComponent* Handler = Candidate->FindComponentByClass<UDamageHandlerComponent>();
-		if (!Handler || !Handler->bIsDead) return false;
+		if (Handler && !Handler->bIsDead) return false;
 	}
 	return bVictimRegistered;
 }
