@@ -9,6 +9,9 @@
 
 class UAnimMontage;
 class UDamageHandlerComponent;
+class ACharacter;
+class ACameraActor;
+class APlayerController;
 
 /** A data-driven hit reaction with optional weapon, body-region, and direction filters. */
 USTRUCT(BlueprintType)
@@ -38,6 +41,22 @@ struct FDamageReactionMontage
 	TObjectPtr<UAnimMontage> Montage = nullptr;
 };
 
+/** A paired execution animation. Add up to three entries per weapon for variation. */
+USTRUCT(BlueprintType)
+struct FFinisherMontagePair
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
+	EWeaponType WeaponType = EWeaponType::Sword;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
+	TObjectPtr<UAnimMontage> AttackerMontage = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
+	TObjectPtr<UAnimMontage> VictimMontage = nullptr;
+};
+
 /**
  * Plays character-specific hit and death montages in response to DamageHandlerComponent.
  * Configure the reaction table on the character Blueprint; exact matches outrank broad fallbacks.
@@ -50,6 +69,9 @@ class CLIMBSYSTEM_API UDamageReactionComponent : public UActorComponent
 public:
 	UDamageReactionComponent();
 
+	/** Tries to execute a paired finisher against Victim. Called by the victim's death reaction. */
+	bool TryPlayFinisher(AActor* Victim, const FDamageInfo& KillingBlow);
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions")
 	TArray<FDamageReactionMontage> HitReactions;
 
@@ -58,6 +80,18 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions")
 	TObjectPtr<UAnimMontage> DeathMontage = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
+	TArray<FFinisherMontagePair> FinisherMontages;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers", meta = (ClampMin = "0.0"))
+	float FinisherCameraBlendTime = 0.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers", meta = (ClampMin = "100.0"))
+	float FinisherCameraDistance = 360.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers", meta = (ClampMin = "0.0"))
+	float FinisherCameraHeight = 130.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions", meta = (ClampMin = "0.0"))
 	float HitReactionBlendOutTime = 0.08f;
@@ -80,6 +114,28 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveReactionMontage = nullptr;
 
+	UPROPERTY(Transient)
+	TWeakObjectPtr<ACharacter> FinisherVictim;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<APlayerController> FinisherController;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AActor> PreviousViewTarget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ACameraActor> FinisherCameraActor = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveFinisherAttackerMontage = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveFinisherVictimMontage = nullptr;
+
+	bool bFinisherActive = false;
+	bool bAttackerFinisherEnded = false;
+	bool bVictimFinisherEnded = false;
+
 	bool bDeathHandled = false;
 
 	UFUNCTION()
@@ -93,4 +149,7 @@ private:
 	UAnimMontage* FindBestReaction(const TArray<FDamageReactionMontage>& ReactionSet,
 		const FDamageInfo& DamageInfo) const;
 	void PlayReaction(UAnimMontage* Montage, float PreviousMontageBlendOutTime);
+
+	void HandleFinisherMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void EndFinisher(bool bStopMontages);
 };
