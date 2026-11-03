@@ -289,6 +289,11 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 		// Flying mode keeps CharacterMovement active for root-motion montages without gravity.
 		VictimMovement->SetMovementMode(MOVE_Flying);
 	}
+	if (AController* VictimController = VictimCharacter->GetController())
+	{
+		VictimController->StopMovement();
+		VictimController->SetIgnoreMoveInput(true);
+	}
 
 	// Temporary camera actor for a simple two-character execution shot. Motion Warping is intentionally separate.
 	if (UWorld* World = GetWorld())
