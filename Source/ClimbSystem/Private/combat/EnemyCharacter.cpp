@@ -37,11 +37,6 @@ void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (DamageHandlerComponent)
-	{
-		DamageHandlerComponent->OnDeath.AddUniqueDynamic(
-			this, &AEnemyCharacter::OnEnemyDeath);
-	}
 }
 
 float AEnemyCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
