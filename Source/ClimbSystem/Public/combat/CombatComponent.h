@@ -8,6 +8,7 @@
 #include "CombatComponent.generated.h"
 
 class AWeaponBase;
+class UDamageHandlerComponent;
 class UAnimMontage;
 class ACharacter;
 class UAnimSequenceBase;
@@ -106,8 +107,35 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|State")
 	void EnterDeadState();
 
+	/** Registers an enemy for the lightweight player encounter/last-enemy check. */
+	UFUNCTION(BlueprintCallable, Category = "Combat|Encounter")
+	void RegisterEncounterEnemy(AActor* Enemy);
+
+	/** Removes an enemy from the lightweight encounter list. */
+	UFUNCTION(BlueprintCallable, Category = "Combat|Encounter")
+	void UnregisterEncounterEnemy(AActor* Enemy);
+
+	UFUNCTION(BlueprintPure, Category = "Combat|Encounter")
+	int32 GetAliveEncounterEnemyCount() const;
+
+	UFUNCTION(BlueprintPure, Category = "Combat|Encounter")
+	bool IsLastLivingEncounterEnemy(AActor* Enemy) const;
+
+	UFUNCTION(BlueprintPure, Category = "Combat|Encounter")
+	bool IsEncounterActive() const { return bEncounterActive; }
+
+	/** Temporarily blocks normal combat input while this character performs a finisher. */
+	void EnterFinisherState();
+	void ExitFinisherState();
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|State")
 	ECombatState CurrentCombatState = ECombatState::Idle;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Encounter")
+	bool bEncounterActive = false;
+
+	UPROPERTY(Transient)
+	TArray<TWeakObjectPtr<AActor>> EncounterEnemies;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|State")
 	int32 ActiveSectionIndex = INDEX_NONE;
