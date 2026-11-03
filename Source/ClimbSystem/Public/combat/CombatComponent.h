@@ -122,7 +122,7 @@ public:
 	bool IsLastLivingEncounterEnemy(AActor* Enemy) const;
 
 	UFUNCTION(BlueprintPure, Category = "Combat|Encounter")
-	bool IsEncounterActive() const { return bEncounterActive; }
+	bool IsEncounterActive() const;
 
 	/** Temporarily blocks normal combat input while this character performs a finisher. */
 	void EnterFinisherState();
@@ -130,9 +130,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|State")
 	ECombatState CurrentCombatState = ECombatState::Idle;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Encounter")
-	bool bEncounterActive = false;
 
 	UPROPERTY(Transient)
 	TArray<TWeakObjectPtr<AActor>> EncounterEnemies;
