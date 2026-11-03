@@ -712,7 +712,6 @@ void UCombatComponent::RegisterEncounterEnemy(AActor* Enemy)
 
 	EncounterEnemies.RemoveAll([](const TWeakObjectPtr<AActor>& Entry) { return !Entry.IsValid(); });
 	EncounterEnemies.AddUnique(Enemy);
-	bEncounterActive = GetAliveEncounterEnemyCount() > 0;
 }
 
 void UCombatComponent::UnregisterEncounterEnemy(AActor* Enemy)
@@ -736,6 +735,11 @@ int32 UCombatComponent::GetAliveEncounterEnemyCount() const
 		if (Handler && !Handler->bIsDead) ++AliveCount;
 	}
 	return AliveCount;
+}
+
+bool UCombatComponent::IsEncounterActive() const
+{
+	return GetAliveEncounterEnemyCount() > 0;
 }
 
 bool UCombatComponent::IsLastLivingEncounterEnemy(AActor* Enemy) const
