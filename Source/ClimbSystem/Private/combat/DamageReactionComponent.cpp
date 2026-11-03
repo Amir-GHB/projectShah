@@ -298,8 +298,12 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 		{
 			const FVector Midpoint = (AttackerCharacter->GetActorLocation()
 				+ VictimCharacter->GetActorLocation()) * 0.5f;
-			const FVector AwayFromPair = (AttackerCharacter->GetActorLocation()
+			FVector AwayFromPair = (AttackerCharacter->GetActorLocation()
 				- VictimCharacter->GetActorLocation()).GetSafeNormal();
+			if (AwayFromPair.IsNearlyZero())
+			{
+				AwayFromPair = -AttackerCharacter->GetActorForwardVector();
+			}
 			const FVector CameraLocation = Midpoint + AwayFromPair * FinisherCameraDistance
 				+ FVector::UpVector * FinisherCameraHeight;
 			FinisherCameraActor->SetActorLocationAndRotation(
