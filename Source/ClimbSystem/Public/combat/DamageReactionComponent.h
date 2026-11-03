@@ -135,6 +135,7 @@ private:
 	bool bFinisherActive = false;
 	bool bAttackerFinisherEnded = false;
 	bool bVictimFinisherEnded = false;
+	FTimerHandle FinisherCameraDestroyTimer;
 
 	bool bDeathHandled = false;
 
@@ -152,4 +153,5 @@ private:
 
 	void HandleFinisherMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	void EndFinisher(bool bStopMontages);
+	void DestroyFinisherCamera();
 };
