@@ -9,6 +9,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
 #include "combat/CombatComponent.h"
 #include "combat/DamageHandlerComponent.h"
 
@@ -45,6 +46,8 @@ void UDamageReactionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			this, &UDamageReactionComponent::HandleDeath);
 	}
 	EndFinisher(true);
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(FinisherCameraDestroyTimer);
+	DestroyFinisherCamera();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -295,6 +298,13 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 		VictimController->SetIgnoreMoveInput(true);
 	}
 
+	// Replace any camera left over from a previous blend before starting a new execution.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(FinisherCameraDestroyTimer);
+		DestroyFinisherCamera();
+	}
+
 	// Temporary camera actor for a simple two-character execution shot. Motion Warping is intentionally separate.
 	if (UWorld* World = GetWorld())
 	{
@@ -389,9 +399,17 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 
 	if (IsValid(FinisherCameraActor))
 	{
-		FinisherCameraActor->Destroy();
+		if (GetWorld() && FinisherCameraBlendTime > 0.0f && FinisherController.IsValid())
+		{
+			GetWorld()->GetTimerManager().SetTimer(
+				FinisherCameraDestroyTimer, this, &UDamageReactionComponent::DestroyFinisherCamera,
+				FinisherCameraBlendTime, false);
+		}
+		else
+		{
+			DestroyFinisherCamera();
+		}
 	}
-	FinisherCameraActor = nullptr;
 
 	if (AttackerCharacter)
 	{
@@ -408,6 +426,15 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 	ActiveFinisherVictimMontage = nullptr;
 	bAttackerFinisherEnded = false;
 	bVictimFinisherEnded = false;
+}
+
+void UDamageReactionComponent::DestroyFinisherCamera()
+{
+	if (IsValid(FinisherCameraActor))
+	{
+		FinisherCameraActor->Destroy();
+	}
+	FinisherCameraActor = nullptr;
 }
 
 void UDamageReactionComponent::ResetReactionState()
