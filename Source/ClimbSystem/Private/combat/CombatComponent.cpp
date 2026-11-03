@@ -2,6 +2,7 @@
 
 #include "combat/CombatComponent.h"
 #include "combat/CombatTargetingComponent.h"
+#include "combat/DamageHandlerComponent.h"
 #include "GameFramework/Character.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -63,7 +64,7 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void UCombatComponent::EquipWeapon(EWeaponType NewWeaponType)
 {
-	if (!OwningCharacter.IsValid() || CurrentCombatState == ECombatState::Dead) return;
+	if (!OwningCharacter.IsValid() || CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing) return;
 
 	// A weapon change interrupts an in-progress bow draw without releasing a shot.
 	if (CurrentCombatState == ECombatState::DrawingBow)
@@ -701,6 +702,80 @@ void UCombatComponent::EnterDeadState()
 	SetCombatState(ECombatState::Dead);
 }
 
+
+void UCombatComponent::RegisterEncounterEnemy(AActor* Enemy)
+{
+	if (!IsValid(Enemy) || Enemy == GetOwner()) return;
+
+	if (UDamageHandlerComponent* Handler = Enemy->FindComponentByClass<UDamageHandlerComponent>())
+	{
+		if (Handler->bIsDead) return;
+	}
+
+	EncounterEnemies.RemoveAll([](const TWeakObjectPtr<AActor>& Entry) { return !Entry.IsValid(); });
+	EncounterEnemies.AddUnique(Enemy);
+	bEncounterActive = GetAliveEncounterEnemyCount() > 0;
+}
+
+void UCombatComponent::UnregisterEncounterEnemy(AActor* Enemy)
+{
+	EncounterEnemies.RemoveAll([Enemy](const TWeakObjectPtr<AActor>& Entry)
+	{
+		return !Entry.IsValid() || Entry.Get() == Enemy;
+	});
+	bEncounterActive = GetAliveEncounterEnemyCount() > 0;
+}
+
+int32 UCombatComponent::GetAliveEncounterEnemyCount() const
+{
+	int32 AliveCount = 0;
+	for (const TWeakObjectPtr<AActor>& Entry : EncounterEnemies)
+	{
+		AActor* Enemy = Entry.Get();
+		if (!IsValid(Enemy)) continue;
+
+		const UDamageHandlerComponent* Handler = Enemy->FindComponentByClass<UDamageHandlerComponent>();
+		if (!Handler || !Handler->bIsDead) ++AliveCount;
+	}
+	return AliveCount;
+}
+
+bool UCombatComponent::IsLastLivingEncounterEnemy(AActor* Enemy) const
+{
+	if (!IsValid(Enemy)) return false;
+
+	bool bVictimRegistered = false;
+	for (const TWeakObjectPtr<AActor>& Entry : EncounterEnemies)
+	{
+		AActor* Candidate = Entry.Get();
+		if (!IsValid(Candidate)) continue;
+		if (Candidate == Enemy)
+		{
+			bVictimRegistered = true;
+			continue;
+		}
+
+		const UDamageHandlerComponent* Handler = Candidate->FindComponentByClass<UDamageHandlerComponent>();
+		if (!Handler || !Handler->bIsDead) return false;
+	}
+	return bVictimRegistered;
+}
+
+void UCombatComponent::EnterFinisherState()
+{
+	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing) return;
+	StopActiveAttack(true, true, 0.08f);
+	SetCombatState(ECombatState::Finishing);
+}
+
+void UCombatComponent::ExitFinisherState()
+{
+	if (CurrentCombatState == ECombatState::Finishing)
+	{
+		SetCombatState(ECombatState::Idle);
+	}
+}
+
 void UCombatComponent::SetCombatState(ECombatState NewState)
 {
 	const bool bChanged = CurrentCombatState != NewState;
@@ -774,6 +849,9 @@ void UCombatComponent::RefreshAnimationState()
 		break;
 	case ECombatState::Dead:
 		AnimationState.Action = ECombatAnimationAction::Dead;
+		break;
+	case ECombatState::Finishing:
+		AnimationState.Action = ECombatAnimationAction::Attacking;
 		break;
 	case ECombatState::SwappingWeapon:
 		AnimationState.Action = bPlayingUnequipMontage ? ECombatAnimationAction::Unequipping : ECombatAnimationAction::Equipping;
