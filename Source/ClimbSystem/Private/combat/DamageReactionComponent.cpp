@@ -201,7 +201,8 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 	ACharacter* AttackerCharacter = Cast<ACharacter>(GetOwner());
 	ACharacter* VictimCharacter = Cast<ACharacter>(Victim);
 	if (bFinisherActive || !IsValid(AttackerCharacter) || !IsValid(VictimCharacter)
-		|| KillingBlow.bIsDamageOverTime || KillingBlow.WeaponType == EWeaponType::Bow)
+		|| KillingBlow.bIsDamageOverTime || KillingBlow.WeaponType == EWeaponType::Bow
+		|| !KillingBlow.InstigatorWeapon.IsValid())
 	{
 		return false;
 	}
@@ -246,6 +247,8 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 	FinisherVictim = VictimCharacter;
 	FinisherController = PlayerController;
 	PreviousViewTarget = PlayerController->GetViewTarget();
+	PlayerController->SetIgnoreMoveInput(true);
+	PlayerController->SetIgnoreLookInput(true);
 	ActiveFinisherAttackerMontage = SelectedPair->AttackerMontage;
 	ActiveFinisherVictimMontage = SelectedPair->VictimMontage;
 	bAttackerFinisherEnded = false;
@@ -282,7 +285,9 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 	}
 	if (UCharacterMovementComponent* VictimMovement = VictimCharacter->GetCharacterMovement())
 	{
-		VictimMovement->DisableMovement();
+		VictimMovement->StopMovementImmediately();
+		// Flying mode keeps CharacterMovement active for root-motion montages without gravity.
+		VictimMovement->SetMovementMode(MOVE_Flying);
 	}
 
 	// Temporary camera actor for a simple two-character execution shot. Motion Warping is intentionally separate.
@@ -369,6 +374,8 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 		{
 			Controller->SetViewTargetWithBlend(RestoreTarget, FinisherCameraBlendTime);
 		}
+		Controller->SetIgnoreMoveInput(false);
+		Controller->SetIgnoreLookInput(false);
 	}
 
 	if (IsValid(FinisherCameraActor))
