@@ -37,6 +37,7 @@ enum class ECombatState : uint8
 	Recovering     UMETA(DisplayName = "Recovering / Blend Out"),
 	SwappingWeapon UMETA(DisplayName = "Swapping Weapon"),
 	Staggered      UMETA(DisplayName = "Staggered / Hit Stun"),
+	Finishing      UMETA(DisplayName = "Executing Finisher"),
 	Dead           UMETA(DisplayName = "Dead"),
 	DrawingBow     UMETA(DisplayName = "Drawing Bow")
 };
