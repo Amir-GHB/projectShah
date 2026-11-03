@@ -121,6 +121,8 @@ void ACombatCharacterBase::OnLook(const FInputActionValue& Value)
 
 void ACombatCharacterBase::OnJumpStarted(const FInputActionValue& Value)
 {
+	if (CombatComponent && (CombatComponent->CurrentCombatState == ECombatState::Finishing
+		|| CombatComponent->CurrentCombatState == ECombatState::Dead)) return;
 	Jump();
 }
 
