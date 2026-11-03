@@ -6,6 +6,7 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISenseConfig_Hearing.h"
+#include "Perception/AISense.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISense_Hearing.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -89,9 +90,10 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 		return;
 	}
 
-	const TSubclassOf<UAISense> SenseClass = UAIPerception::GetSenseClassForStimulus(this, Stimulus);
+	const FAISenseID SightSenseID = UAISense::GetSenseID(UAISense_Sight::StaticClass());
+	const FAISenseID HearingSenseID = UAISense::GetSenseID(UAISense_Hearing::StaticClass());
 
-	if (SenseClass == UAISense_Sight::StaticClass())
+	if (Stimulus.Type == SightSenseID)
 	{
 		if (Stimulus.WasSuccessfullySensed() && IsValidCombatTarget(Actor))
 		{
@@ -107,7 +109,7 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 			ClearTarget();
 		}
 	}
-	else if (SenseClass == UAISense_Hearing::StaticClass() && Stimulus.WasSuccessfullySensed())
+	else if (Stimulus.Type == HearingSenseID && Stimulus.WasSuccessfullySensed())
 	{
 		if (!CurrentTarget.IsValid())
 		{
