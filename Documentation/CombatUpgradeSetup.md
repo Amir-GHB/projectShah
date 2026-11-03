@@ -123,17 +123,16 @@ Default tuning values are intentionally conservative and exposed on the componen
 2. Configure three paired finisher montage entries for the player's weapon on its DamageReactionComponent.
 3. Register two or more test enemies with the player's CombatComponent, then kill them one by one. Verify only the final registered living enemy triggers a paired finisher.
 4. Verify an unregistered enemy, a bow kill, a DoT kill, or a missing weapon montage pair uses the normal death reaction.
-2. Place the dummy in the level and verify ordinary melee hits reduce its health and play a hit reaction.
-3. Set one combo step's base damage override and confirm that step differs from the others.
-4. Set critical chance to 1.0 and verify the expected critical damage; then set it to 0.0.
-5. Apply a short poison effect and verify tick count, interval, and total health loss.
-6. Try each stacking policy by applying the same effect repeatedly.
-7. Map a head bone and a leg bone, then verify region multipliers and corresponding reaction filters.
-8. Assign a death montage or death reaction, lower dummy health, and verify the death montage plays and subsequent hits are ignored.
-9. Call `ResetDummy` and verify the dummy can be damaged and react again.
-10. Place several damageable actors around the player. Confirm the most view-centered valid target is selected.
-11. Start and end an attack repeatedly. Confirm the character only turns during the attack, stops focusing afterward, and never focuses on a target outside MaxFocusRange.
-12. Assign a TargetLockAction and confirm manual preference persists between attacks without rotating the idle character.
+5. Set one combo step's base damage override and confirm that step differs from the others.
+6. Set critical chance to 1.0 and verify the expected critical damage; then set it to 0.0.
+7. Apply a short poison effect and verify tick count, interval, and total health loss.
+8. Try each stacking policy by applying the same effect repeatedly.
+9. Map a head bone and a leg bone, then verify region multipliers and corresponding reaction filters.
+10. Assign a death montage or death reaction, lower dummy health, and verify the death montage plays and subsequent hits are ignored.
+11. Call ResetDummy and verify the dummy can be damaged and react again.
+12. Place several damageable actors around the player. Confirm the most view-centered valid target is selected.
+13. Start and end an attack repeatedly. Confirm the character only turns during the attack, stops focusing afterward, and never focuses on a target outside MaxFocusRange.
+14. Assign a TargetLockAction and confirm manual preference persists between attacks without rotating the idle character.
 
 ## Verification note
 
