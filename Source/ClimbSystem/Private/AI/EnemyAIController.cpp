@@ -10,6 +10,7 @@
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISense_Hearing.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "NavigationSystem.h"
 #include "combat/CombatComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -222,9 +223,32 @@ void AEnemyAIController::UpdateAI()
 void AEnemyAIController::UpdatePatrol()
 {
 	AEnemyCharacter* Enemy = ControlledEnemy.Get();
-	if (!IsValid(Enemy) || Enemy->PatrolPoints.IsEmpty())
+	if (!IsValid(Enemy))
 	{
 		StopMovement();
+		return;
+	}
+	if (Enemy->PatrolPoints.IsEmpty())
+	{
+		if (!Enemy->bUseRandomPatrolWhenNoPoints) { StopMovement(); return; }
+		if (!bHasRandomPatrolDestination)
+		{
+			UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+			FNavLocation RandomLocation;
+			if (Nav && Nav->GetRandomReachablePointInRadius(Enemy->GetActorLocation(), Enemy->RandomPatrolRadius, RandomLocation))
+			{
+				RandomPatrolDestination = RandomLocation.Location;
+				bHasRandomPatrolDestination = true;
+			}
+			else return;
+		}
+		if (FVector::Dist2D(Enemy->GetActorLocation(), RandomPatrolDestination) <= Enemy->PatrolAcceptanceRadius)
+		{
+			StopMovement();
+			bWaitingAtPatrolPoint = true;
+			GetWorldTimerManager().SetTimer(PatrolWaitTimer, this, &AEnemyAIController::FinishPatrolWait, Enemy->PatrolWaitTime, false);
+		}
+		else MoveToLocation(RandomPatrolDestination, Enemy->PatrolAcceptanceRadius);
 		return;
 	}
 
@@ -258,6 +282,13 @@ void AEnemyAIController::UpdatePatrol()
 void AEnemyAIController::FinishPatrolWait()
 {
 	bWaitingAtPatrolPoint = false;
+	AEnemyCharacter* Enemy = ControlledEnemy.Get();
+	if (IsValid(Enemy) && Enemy->PatrolPoints.IsEmpty())
+	{
+		bHasRandomPatrolDestination = false;
+		UpdatePatrol();
+		return;
+	}
 	MoveToNextPatrolPoint();
 }
 
