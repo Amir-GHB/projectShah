@@ -42,6 +42,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol", meta = (ClampMin = "0.0"))
 	float PatrolWaitTime = 2.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol")
+	bool bUseRandomPatrolWhenNoPoints = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol", meta = (ClampMin = "100.0"))
+	float RandomPatrolRadius = 900.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Perception", meta = (ClampMin = "100.0"))
 	float SightRadius = 1800.0f;
 
