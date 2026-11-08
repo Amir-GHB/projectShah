@@ -17,6 +17,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponSwitchedSignature, EWeapon
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnComboSectionChangedSignature, int32, SectionIndex, FName, SectionName);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCombatStateChangedSignature, ECombatState, NewState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAttackEndedSignature);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnComboWindowOpenedSignature);
 
 UCLASS(ClassGroup=(Combat), meta=(BlueprintSpawnableComponent))
 class CLIMBSYSTEM_API UCombatComponent : public UActorComponent
@@ -166,6 +167,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Combat|Events")
 	FOnAttackEndedSignature OnAttackEnded;
+
+	/** Broadcast after the combo window opens, allowing AI to request the next combo step. */
+	UPROPERTY(BlueprintAssignable, Category = "Combat|Events")
+	FOnComboWindowOpenedSignature OnComboWindowOpened;
 
 protected:
 	UPROPERTY(Transient)
