@@ -233,6 +233,17 @@ enum class EDamageHitDirection : uint8
 	Right
 };
 
+/** Direction from which an attacker approached the victim for a finisher. All is a universal fallback. */
+UENUM(BlueprintType)
+enum class EFinisherDirection : uint8
+{
+    All UMETA(DisplayName = "All Directions"),
+    Front UMETA(DisplayName = "Front"),
+    Back UMETA(DisplayName = "Back"),
+    Left UMETA(DisplayName = "Left"),
+    Right UMETA(DisplayName = "Right")
+};
+
 /**
  * Structured payload dispatched to DamageHandlerComponent and damage delegates.
  */
