@@ -154,7 +154,7 @@ Add `Weapon Swing Effects` to attack animation frames where the blade passes thr
 
 ## 8. Parry
 
-Add `Parry Window` notify state over the active frames of the defender's parry animation. Set the default defender and attacker-parried montages on the character's `DamageReactionComponent`. A defender's equipped weapon-specific parry montages override those defaults. The defender's weapon `ParryDamage` is applied to the attacker when a weapon trace intersects the active parry window.
+Trigger `BeginParryWindow` from the player's parry input, or add `Parry Window` notify state over the active frames of the defensive animation (the notify state automatically uses its authored duration). Set the default defender and attacker-parried montages on the character's `DamageReactionComponent`. A defender's equipped weapon-specific parry montages override those defaults. The defender's weapon `ParryDamage` is applied to the attacker when a weapon trace intersects the active parry window.
 
 ## 9. Death ragdoll
 
