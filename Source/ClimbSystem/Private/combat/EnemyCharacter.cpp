@@ -8,6 +8,8 @@
 #include "AI/EnemyAIController.h"
 #include "Engine/DamageEvents.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Engine/World.h"
+#include "Components/SkeletalMeshComponent.h"
 
 AEnemyCharacter::AEnemyCharacter()
 {
@@ -31,6 +33,29 @@ AEnemyCharacter::AEnemyCharacter()
 		Movement->MaxWalkSpeed = 300.0f;
 		Movement->NavAgentProps.bCanCrouch = true;
 	}
+}
+
+void AEnemyCharacter::PerformAICombatAction(AActor* Target)
+{
+	if (CombatComponent) CombatComponent->HandleAttackInput();
+}
+
+void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
+{
+	if (!IsValid(Target) || !IsValid(MagicProjectileClass) || !GetWorld()) return;
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now < NextMagicAttackTime) return;
+	const FVector SpawnLocation = GetMesh() && GetMesh()->DoesSocketExist(ProjectileSpawnSocket)
+		? GetMesh()->GetSocketLocation(ProjectileSpawnSocket)
+		: GetActorLocation() + GetActorTransform().TransformVectorNoScale(ProjectileSpawnOffset);
+	const FVector AimLocation = Target->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
+	const FRotator AimRotation = (AimLocation - SpawnLocation).Rotation();
+	FActorSpawnParameters Params;
+	Params.Owner = this;
+	Params.Instigator = this;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	GetWorld()->SpawnActor<AActor>(MagicProjectileClass, SpawnLocation, AimRotation, Params);
+	NextMagicAttackTime = Now + FMath::Max(0.1f, MagicAttackCooldown);
 }
 
 float AEnemyCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
