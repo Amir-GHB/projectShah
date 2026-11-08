@@ -338,6 +338,11 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 {
 	AActor* TargetActor = HitResult.GetActor();
 	if (!TargetActor || !OwningCharacter.IsValid()) return;
+
+	if (UDamageReactionComponent* TargetReactions = TargetActor->FindComponentByClass<UDamageReactionComponent>())
+	{
+		if (TargetReactions->TryParry(OwningCharacter.Get(), this, HitResult)) return;
+	}
 	const FVector ImpactLocation = HitResult.ImpactPoint.IsNearlyZero() ? HitResult.Location : HitResult.ImpactPoint;
 	const FRotator ImpactRotation = HitResult.ImpactNormal.IsNearlyZero() ? FRotator::ZeroRotator : HitResult.ImpactNormal.Rotation();
 	if (IsValid(WeaponConfig.HitNiagara))
