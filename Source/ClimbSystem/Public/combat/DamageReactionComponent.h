@@ -146,7 +146,7 @@ public:
 	float ParryWindowDuration = 0.35f;
 
 	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
-	void BeginParryWindow();
+	void BeginParryWindow(float Duration = -1.0f);
 	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
 	void EndParryWindow();
 	bool TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult);
