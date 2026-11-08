@@ -155,13 +155,13 @@ void UDamageReactionComponent::HandleDamageTaken(
 	PlayReaction(FindBestHitReaction(DamageInfo), HitReactionBlendOutTime);
 }
 
-void UDamageReactionComponent::BeginParryWindow()
+void UDamageReactionComponent::BeginParryWindow(float Duration)
 {
 	if (!GetWorld()) return;
 	bParryWindowActive = true;
 	GetWorld()->GetTimerManager().ClearTimer(ParryWindowTimer);
 	GetWorld()->GetTimerManager().SetTimer(ParryWindowTimer, this,
-		&UDamageReactionComponent::EndParryWindow, FMath::Max(0.05f, ParryWindowDuration), false);
+		&UDamageReactionComponent::EndParryWindow, FMath::Max(0.05f, Duration > 0.0f ? Duration : ParryWindowDuration), false);
 }
 
 void UDamageReactionComponent::EndParryWindow()
