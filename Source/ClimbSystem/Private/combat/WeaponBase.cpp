@@ -7,6 +7,8 @@
 #include "Engine/DamageEvents.h"
 #include "DrawDebugHelpers.h"
 #include "combat/DamageHandlerComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Kismet/GameplayStatics.h"
 
 AWeaponBase::AWeaponBase()
 {
@@ -286,6 +288,23 @@ void AWeaponBase::TickTrace()
 	PreviousSocketLocations = CurrentSocketLocations;
 }
 
+void AWeaponBase::PlaySwingEffects(bool bPlaySound, bool bPlayNiagara)
+{
+	if (!IsValid(OwningCharacter.Get())) return;
+	const FTransform EffectTransform = WeaponMesh
+		? WeaponMesh->GetComponentTransform() * WeaponConfig.SwingEffectRelativeTransform
+		: GetActorTransform() * WeaponConfig.SwingEffectRelativeTransform;
+	if (bPlayNiagara && IsValid(WeaponConfig.SwingNiagara))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), WeaponConfig.SwingNiagara,
+			EffectTransform.GetLocation(), EffectTransform.Rotator(), EffectTransform.GetScale3D());
+	}
+	if (bPlaySound && IsValid(WeaponConfig.SwingSound))
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, WeaponConfig.SwingSound, EffectTransform.GetLocation());
+	}
+}
+
 void AWeaponBase::EndTrace()
 {
 	bIsTracing = false;
@@ -318,6 +337,16 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 {
 	AActor* TargetActor = HitResult.GetActor();
 	if (!TargetActor || !OwningCharacter.IsValid()) return;
+	const FVector ImpactLocation = HitResult.ImpactPoint.IsNearlyZero() ? HitResult.Location : HitResult.ImpactPoint;
+	const FRotator ImpactRotation = HitResult.ImpactNormal.IsNearlyZero() ? FRotator::ZeroRotator : HitResult.ImpactNormal.Rotation();
+	if (IsValid(WeaponConfig.HitNiagara))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), WeaponConfig.HitNiagara, ImpactLocation, ImpactRotation);
+	}
+	if (IsValid(WeaponConfig.HitSound))
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, WeaponConfig.HitSound, ImpactLocation);
+	}
 
 	// Build structured damage payload using data-driven config and active attack multiplier
 	FDamageInfo DamageInfo;
