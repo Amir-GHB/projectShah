@@ -15,6 +15,8 @@ public class ClimbSystem : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"AIModule",
+			"Niagara",
+			"NavigationSystem",
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
