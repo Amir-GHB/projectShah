@@ -174,7 +174,13 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 {
 	if (!bParryWindowActive || bDeathHandled || !IsValid(Attacker) || !IsValid(AttackingWeapon)) return false;
 	EndParryWindow();
-	const FWeaponConfig& Config = AttackingWeapon->GetConfig();
+	AWeaponBase* DefenderWeapon = nullptr;
+	if (UCombatComponent* DefenderCombat = GetOwner()->FindComponentByClass<UCombatComponent>())
+	{
+		DefenderWeapon = DefenderCombat->CurrentWeapon;
+	}
+	const FWeaponConfig& Config = IsValid(DefenderWeapon)
+		? DefenderWeapon->GetConfig() : AttackingWeapon->GetConfig();
 	UAnimMontage* DefenderMontage = IsValid(Config.DefenderParryMontage)
 		? Config.DefenderParryMontage.Get() : DefaultDefenderParryMontage.Get();
 	UAnimMontage* AttackerMontage = IsValid(Config.AttackerParriedMontage)
@@ -188,15 +194,20 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	ParryDamage.BaseDamage = Config.ParryDamage;
 	ParryDamage.DamageCategory = EDamageCategory::Physical;
 	ParryDamage.DamageCauser = GetOwner();
+	ParryDamage.InstigatorWeapon = DefenderWeapon;
+	ParryDamage.WeaponType = IsValid(DefenderWeapon) ? DefenderWeapon->GetWeaponType() : EWeaponType::Unarmed;
 	ParryDamage.DamageDirection = (Attacker->GetActorLocation() - GetOwner()->GetActorLocation()).GetSafeNormal();
 	ParryDamage.Normalize();
+	FHitResult ParryHit;
+	ParryHit.Location = Attacker->GetActorLocation();
+	ParryHit.ImpactPoint = Attacker->GetActorLocation();
 	if (UDamageHandlerComponent* AttackerDamage = Attacker->FindComponentByClass<UDamageHandlerComponent>())
 	{
-		AttackerDamage->ApplyDamage(GetOwner(), Attacker, ParryDamage, HitResult);
+		AttackerDamage->ApplyDamage(GetOwner(), Attacker, ParryDamage, ParryHit);
 	}
 	else
 	{
-		FPointDamageEvent Event(ParryDamage.GetCalculatedRawDamage(), HitResult, HitResult.ImpactNormal, nullptr);
+		FPointDamageEvent Event(ParryDamage.GetCalculatedRawDamage(), ParryHit, FVector::UpVector, nullptr);
 		Attacker->TakeDamage(ParryDamage.GetCalculatedRawDamage(), Event, GetOwner()->GetInstigatorController(), GetOwner());
 	}
 	return true;
