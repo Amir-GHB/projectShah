@@ -13,6 +13,9 @@
 #include "TimerManager.h"
 #include "combat/CombatComponent.h"
 #include "combat/DamageHandlerComponent.h"
+#include "combat/WeaponBase.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/DamageEvents.h"
 
 UDamageReactionComponent::UDamageReactionComponent()
 {
@@ -152,6 +155,53 @@ void UDamageReactionComponent::HandleDamageTaken(
 	PlayReaction(FindBestHitReaction(DamageInfo), HitReactionBlendOutTime);
 }
 
+void UDamageReactionComponent::BeginParryWindow()
+{
+	if (!GetWorld()) return;
+	bParryWindowActive = true;
+	GetWorld()->GetTimerManager().ClearTimer(ParryWindowTimer);
+	GetWorld()->GetTimerManager().SetTimer(ParryWindowTimer, this,
+		&UDamageReactionComponent::EndParryWindow, FMath::Max(0.05f, ParryWindowDuration), false);
+}
+
+void UDamageReactionComponent::EndParryWindow()
+{
+	bParryWindowActive = false;
+	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ParryWindowTimer);
+}
+
+bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult)
+{
+	if (!bParryWindowActive || bDeathHandled || !IsValid(Attacker) || !IsValid(AttackingWeapon)) return false;
+	EndParryWindow();
+	const FWeaponConfig& Config = AttackingWeapon->GetConfig();
+	UAnimMontage* DefenderMontage = IsValid(Config.DefenderParryMontage)
+		? Config.DefenderParryMontage.Get() : DefaultDefenderParryMontage.Get();
+	UAnimMontage* AttackerMontage = IsValid(Config.AttackerParriedMontage)
+		? Config.AttackerParriedMontage.Get() : DefaultAttackerParriedMontage.Get();
+	PlayReaction(DefenderMontage, HitReactionBlendOutTime);
+	if (UDamageReactionComponent* AttackerReaction = Attacker->FindComponentByClass<UDamageReactionComponent>())
+	{
+		AttackerReaction->PlayReaction(AttackerMontage, HitReactionBlendOutTime);
+	}
+	FDamageInfo ParryDamage;
+	ParryDamage.BaseDamage = Config.ParryDamage;
+	ParryDamage.DamageCategory = EDamageCategory::Physical;
+	ParryDamage.DamageCauser = GetOwner();
+	ParryDamage.DamageDirection = (Attacker->GetActorLocation() - GetOwner()->GetActorLocation()).GetSafeNormal();
+	ParryDamage.Normalize();
+	if (UDamageHandlerComponent* AttackerDamage = Attacker->FindComponentByClass<UDamageHandlerComponent>())
+	{
+		AttackerDamage->ApplyDamage(GetOwner(), Attacker, ParryDamage, HitResult);
+	}
+	else
+	{
+		FPointDamageEvent Event(ParryDamage.GetCalculatedRawDamage(), HitResult, HitResult.ImpactNormal, nullptr);
+		Attacker->TakeDamage(ParryDamage.GetCalculatedRawDamage(), Event, GetOwner()->GetInstigatorController(), GetOwner());
+	}
+	return true;
+}
+
 void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 {
 	if (bDeathHandled)
@@ -207,7 +257,23 @@ void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 	}
 
 	UAnimMontage* SelectedDeathMontage = FindBestReaction(DeathReactions, DeathDamageInfo);
-	PlayReaction(IsValid(SelectedDeathMontage) ? SelectedDeathMontage : DeathMontage, DeathBlendOutTime);
+	UAnimMontage* FinalDeathMontage = IsValid(SelectedDeathMontage) ? SelectedDeathMontage.Get() : DeathMontage.Get();
+	PlayReaction(FinalDeathMontage, DeathBlendOutTime);
+	if (bRagdollOnDeath)
+	{
+		ACharacter* Character = Cast<ACharacter>(GetOwner());
+		UAnimInstance* Anim = Character && Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr;
+		if (IsValid(FinalDeathMontage) && Anim && Anim->Montage_IsPlaying(FinalDeathMontage))
+		{
+			FOnMontageEnded EndDelegate;
+			EndDelegate.BindLambda([this](UAnimMontage*, bool) { ActivateRagdoll(); });
+			Anim->Montage_SetEndDelegate(EndDelegate, FinalDeathMontage);
+		}
+		else
+		{
+			ActivateRagdoll();
+		}
+	}
 }
 
 bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo& KillingBlow)
@@ -500,6 +566,25 @@ void UDamageReactionComponent::DestroyFinisherCamera()
 		FinisherCameraActor->Destroy();
 	}
 	FinisherCameraActor = nullptr;
+}
+
+void UDamageReactionComponent::ActivateRagdoll()
+{
+	ACharacter* Character = Cast<ACharacter>(GetOwner());
+	if (!IsValid(Character) || !Character->GetMesh()) return;
+	Character->GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+	Character->GetMesh()->SetAllBodiesSimulatePhysics(true);
+	Character->GetMesh()->SetSimulatePhysics(true);
+	Character->GetMesh()->WakeAllRigidBodies();
+	if (UCapsuleComponent* Capsule = Character->GetCapsuleComponent())
+	{
+		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+	if (UCharacterMovementComponent* Movement = Character->GetCharacterMovement())
+	{
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+	}
 }
 
 void UDamageReactionComponent::ResetReactionState()
