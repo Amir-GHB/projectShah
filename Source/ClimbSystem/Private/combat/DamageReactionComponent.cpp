@@ -206,9 +206,14 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 		FPointDamageEvent Event(ParryDamage.GetCalculatedRawDamage(), ParryHit, FVector::UpVector, nullptr);
 		Attacker->TakeDamage(ParryDamage.GetCalculatedRawDamage(), Event, GetOwner()->GetInstigatorController(), GetOwner());
 	}
-	if (UDamageReactionComponent* AttackerReaction = Attacker->FindComponentByClass<UDamageReactionComponent>())
+	const UDamageHandlerComponent* AttackerDamageState =
+		Attacker->FindComponentByClass<UDamageHandlerComponent>();
+	if ((!AttackerDamageState || !AttackerDamageState->bIsDead))
 	{
-		AttackerReaction->PlayReaction(AttackerMontage, HitReactionBlendOutTime);
+		if (UDamageReactionComponent* AttackerReaction = Attacker->FindComponentByClass<UDamageReactionComponent>())
+		{
+			AttackerReaction->PlayReaction(AttackerMontage, HitReactionBlendOutTime);
+		}
 	}
 	return true;
 }
