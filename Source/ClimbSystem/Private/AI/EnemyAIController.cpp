@@ -65,6 +65,11 @@ void AEnemyAIController::OnPossess(APawn* InPawn)
 
 	AIPerception->OnTargetPerceptionUpdated.AddUniqueDynamic(
 		this, &AEnemyAIController::HandleTargetPerceptionUpdated);
+	if (ControlledEnemy->CombatComponent)
+	{
+		ControlledEnemy->CombatComponent->OnComboWindowOpened.AddUniqueDynamic(
+			this, &AEnemyAIController::HandleComboWindowOpened);
+	}
 
 	PatrolPointIndex = 0;
 	GetWorldTimerManager().SetTimer(UpdateTimer, this,
@@ -81,9 +86,34 @@ void AEnemyAIController::OnUnPossess()
 		AIPerception->OnTargetPerceptionUpdated.RemoveDynamic(
 			this, &AEnemyAIController::HandleTargetPerceptionUpdated);
 	}
+	if (ControlledEnemy.IsValid() && ControlledEnemy->CombatComponent)
+	{
+		ControlledEnemy->CombatComponent->OnComboWindowOpened.RemoveDynamic(
+			this, &AEnemyAIController::HandleComboWindowOpened);
+	}
 	ControlledEnemy.Reset();
 	CurrentTarget.Reset();
 	Super::OnUnPossess();
+}
+
+void AEnemyAIController::HandleComboWindowOpened()
+{
+	AEnemyCharacter* Enemy = ControlledEnemy.Get();
+	AActor* Target = CurrentTarget.Get();
+	if (!IsValid(Enemy) || !Enemy->CombatComponent || !IsValidCombatTarget(Target))
+	{
+		return;
+	}
+
+	const float Distance = FVector::Dist2D(Enemy->GetActorLocation(), Target->GetActorLocation());
+	if (Distance > Enemy->AttackRange || Enemy->CombatComponent->CurrentCombatState != ECombatState::ComboWindow)
+	{
+		return;
+	}
+
+	// HandleAttackInput uses the same combo buffer/transition rules as player input.
+	// It can only queue one step per authored combo window.
+	Enemy->CombatComponent->HandleAttackInput();
 }
 
 void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
