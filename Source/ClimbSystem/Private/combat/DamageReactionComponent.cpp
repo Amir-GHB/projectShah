@@ -5,6 +5,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -15,7 +16,8 @@
 
 UDamageReactionComponent::UDamageReactionComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
 void UDamageReactionComponent::BeginPlay()
@@ -33,6 +35,15 @@ void UDamageReactionComponent::BeginPlay()
 			this, &UDamageReactionComponent::HandleDamageTaken);
 		BoundDamageHandler->OnDeath.AddDynamic(
 			this, &UDamageReactionComponent::HandleDeath);
+	}
+}
+
+void UDamageReactionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (bFinisherActive && IsValid(FinisherCameraActor) && ActiveFinisherCameraShot.bFollowCharacters)
+	{
+		UpdateFinisherCamera();
 	}
 }
 
@@ -221,15 +232,37 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 		return false;
 	}
 
-	TArray<const FFinisherMontagePair*> MatchingPairs;
+	EFinisherDirection IncomingDirection = EFinisherDirection::All;
+	switch (KillingBlow.HitDirection)
+	{
+	case EDamageHitDirection::Front: IncomingDirection = EFinisherDirection::Front; break;
+	case EDamageHitDirection::Back: IncomingDirection = EFinisherDirection::Back; break;
+	case EDamageHitDirection::Left: IncomingDirection = EFinisherDirection::Left; break;
+	case EDamageHitDirection::Right: IncomingDirection = EFinisherDirection::Right; break;
+	default: break;
+	}
+
+	TArray<const FFinisherMontagePair*> ExactDirectionPairs;
+	TArray<const FFinisherMontagePair*> UniversalPairs;
 	for (const FFinisherMontagePair& Pair : FinisherMontages)
 	{
-		if (Pair.WeaponType == KillingBlow.WeaponType
-			&& IsValid(Pair.AttackerMontage) && IsValid(Pair.VictimMontage))
+		if (Pair.WeaponType != KillingBlow.WeaponType
+			|| !IsValid(Pair.AttackerMontage) || !IsValid(Pair.VictimMontage))
 		{
-			MatchingPairs.Add(&Pair);
+			continue;
+		}
+		if (Pair.Direction == IncomingDirection && IncomingDirection != EFinisherDirection::All)
+		{
+			ExactDirectionPairs.Add(&Pair);
+		}
+		else if (Pair.Direction == EFinisherDirection::All)
+		{
+			UniversalPairs.Add(&Pair);
 		}
 	}
+
+	const TArray<const FFinisherMontagePair*>& MatchingPairs =
+		ExactDirectionPairs.IsEmpty() ? UniversalPairs : ExactDirectionPairs;
 	if (MatchingPairs.IsEmpty())
 	{
 		return false;
@@ -298,32 +331,27 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 		VictimController->SetIgnoreMoveInput(true);
 	}
 
-	// Replace any camera left over from a previous blend before starting a new execution.
-	if (UWorld* World = GetWorld())
+	// Cinematic presentation is opt-in per montage pair. Otherwise the gameplay camera is untouched.
+	if (SelectedPair->bUseCinematicCamera)
 	{
-		World->GetTimerManager().ClearTimer(FinisherCameraDestroyTimer);
-		DestroyFinisherCamera();
-	}
-
-	// Temporary camera actor for a simple two-character execution shot. Motion Warping is intentionally separate.
-	if (UWorld* World = GetWorld())
-	{
-		FinisherCameraActor = World->SpawnActor<ACameraActor>();
-		if (FinisherCameraActor)
+		if (UWorld* World = GetWorld())
 		{
-			const FVector Midpoint = (AttackerCharacter->GetActorLocation()
-				+ VictimCharacter->GetActorLocation()) * 0.5f;
-			FVector AwayFromPair = (AttackerCharacter->GetActorLocation()
-				- VictimCharacter->GetActorLocation()).GetSafeNormal();
-			if (AwayFromPair.IsNearlyZero())
+			World->GetTimerManager().ClearTimer(FinisherCameraDestroyTimer);
+			DestroyFinisherCamera();
+			ActiveFinisherCameraShot = SelectedPair->CameraShot;
+			ActiveFinisherCameraBlendOutTime = ActiveFinisherCameraShot.BlendOutTime;
+			FinisherCameraActor = World->SpawnActor<ACameraActor>();
+			if (FinisherCameraActor)
 			{
-				AwayFromPair = -AttackerCharacter->GetActorForwardVector();
+				if (UCameraComponent* Camera = FinisherCameraActor->GetCameraComponent())
+				{
+					Camera->SetFieldOfView(FMath::Clamp(ActiveFinisherCameraShot.FieldOfView, 5.0f, 150.0f));
+				}
+				UpdateFinisherCamera();
+				SetComponentTickEnabled(ActiveFinisherCameraShot.bFollowCharacters);
+				PlayerController->SetViewTargetWithBlend(FinisherCameraActor,
+					FMath::Max(0.0f, ActiveFinisherCameraShot.BlendInTime));
 			}
-			const FVector CameraLocation = Midpoint + AwayFromPair * FinisherCameraDistance
-				+ FVector::UpVector * FinisherCameraHeight;
-			FinisherCameraActor->SetActorLocationAndRotation(
-				CameraLocation, (Midpoint - CameraLocation).Rotation());
-			PlayerController->SetViewTargetWithBlend(FinisherCameraActor, FinisherCameraBlendTime);
 		}
 	}
 
@@ -387,11 +415,16 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 		}
 	}
 
+	SetComponentTickEnabled(false);
 	if (APlayerController* Controller = FinisherController.Get())
 	{
-		if (AActor* RestoreTarget = PreviousViewTarget.Get())
+		// Only request a camera blend when this finisher actually switched to a cinematic camera.
+		if (IsValid(FinisherCameraActor))
 		{
-			Controller->SetViewTargetWithBlend(RestoreTarget, FinisherCameraBlendTime);
+			if (AActor* RestoreTarget = PreviousViewTarget.Get())
+			{
+				Controller->SetViewTargetWithBlend(RestoreTarget, ActiveFinisherCameraBlendOutTime);
+			}
 		}
 		Controller->SetIgnoreMoveInput(false);
 		Controller->SetIgnoreLookInput(false);
@@ -399,11 +432,11 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 
 	if (IsValid(FinisherCameraActor))
 	{
-		if (GetWorld() && FinisherCameraBlendTime > 0.0f && FinisherController.IsValid())
+		if (GetWorld() && ActiveFinisherCameraBlendOutTime > 0.0f && FinisherController.IsValid())
 		{
 			GetWorld()->GetTimerManager().SetTimer(
 				FinisherCameraDestroyTimer, this, &UDamageReactionComponent::DestroyFinisherCamera,
-				FinisherCameraBlendTime, false);
+				ActiveFinisherCameraBlendOutTime, false);
 		}
 		else
 		{
@@ -426,6 +459,38 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 	ActiveFinisherVictimMontage = nullptr;
 	bAttackerFinisherEnded = false;
 	bVictimFinisherEnded = false;
+}
+
+void UDamageReactionComponent::UpdateFinisherCamera()
+{
+	ACharacter* AttackerCharacter = Cast<ACharacter>(GetOwner());
+	ACharacter* VictimCharacter = FinisherVictim.Get();
+	if (!IsValid(FinisherCameraActor) || !IsValid(AttackerCharacter) || !IsValid(VictimCharacter))
+	{
+		return;
+	}
+
+	const FVector Midpoint = (AttackerCharacter->GetActorLocation()
+		+ VictimCharacter->GetActorLocation()) * 0.5f;
+	const FVector Offset = VictimCharacter->GetActorTransform().TransformVectorNoScale(
+		ActiveFinisherCameraShot.RelativeOffset);
+	const FVector CameraLocation = Midpoint + Offset;
+
+	FVector LookAtLocation = Midpoint;
+	switch (ActiveFinisherCameraShot.LookAt)
+	{
+	case EFinisherCameraLookAt::Attacker:
+		LookAtLocation = AttackerCharacter->GetActorLocation();
+		break;
+	case EFinisherCameraLookAt::Victim:
+		LookAtLocation = VictimCharacter->GetActorLocation();
+		break;
+	default:
+		break;
+	}
+	LookAtLocation += ActiveFinisherCameraShot.LookAtOffset;
+	FinisherCameraActor->SetActorLocationAndRotation(
+		CameraLocation, (LookAtLocation - CameraLocation).Rotation());
 }
 
 void UDamageReactionComponent::DestroyFinisherCamera()
