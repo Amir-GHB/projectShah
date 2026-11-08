@@ -75,11 +75,6 @@ public:
 
 	virtual void PerformAICombatAction(AActor* Target);
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol")
-	bool bUseRandomPatrolWhenNoPoints = true;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol", meta = (ClampMin = "100.0"))
-	float RandomPatrolRadius = 900.0f;
-
 };
 /** Basic ranged caster. Configure its projectile Blueprint and its ProjectileMovement component in the editor. */
 UCLASS()
