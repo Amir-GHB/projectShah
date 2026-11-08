@@ -60,6 +60,7 @@ void UDamageReactionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			this, &UDamageReactionComponent::HandleDeath);
 	}
 	EndFinisher(true);
+	EndParryWindow();
 	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(FinisherCameraDestroyTimer);
 	DestroyFinisherCamera();
 	Super::EndPlay(EndPlayReason);
@@ -614,6 +615,7 @@ void UDamageReactionComponent::ActivateRagdoll()
 void UDamageReactionComponent::ResetReactionState()
 {
 	EndFinisher(true);
+	EndParryWindow();
 	bDeathHandled = false;
 
 	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
