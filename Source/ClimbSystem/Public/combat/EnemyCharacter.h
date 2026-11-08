@@ -73,4 +73,31 @@ public:
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 		AController* EventInstigator, AActor* DamageCauser) override;
 
+	virtual void PerformAICombatAction(AActor* Target);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol")
+	bool bUseRandomPatrolWhenNoPoints = true;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol", meta = (ClampMin = "100.0"))
+	float RandomPatrolRadius = 900.0f;
+
 };
+/** Basic ranged caster. Configure its projectile Blueprint and its ProjectileMovement component in the editor. */
+UCLASS()
+class CLIMBSYSTEM_API AMagicEnemyCharacter : public AEnemyCharacter
+{
+	GENERATED_BODY()
+public:
+	virtual void PerformAICombatAction(AActor* Target) override;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic")
+	TSubclassOf<AActor> MagicProjectileClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic")
+	FName ProjectileSpawnSocket = FName("hand_r");
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic")
+	FVector ProjectileSpawnOffset = FVector(35.0f, 0.0f, 20.0f);
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic", meta = (ClampMin = "0.1"))
+	float MagicAttackCooldown = 1.8f;
+private:
+	float NextMagicAttackTime = 0.0f;
+};
+
