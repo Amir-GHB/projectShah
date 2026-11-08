@@ -7,6 +7,7 @@
 #include "Engine/DamageEvents.h"
 #include "DrawDebugHelpers.h"
 #include "combat/DamageHandlerComponent.h"
+#include "combat/DamageReactionComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 
