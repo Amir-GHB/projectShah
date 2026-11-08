@@ -186,10 +186,6 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	UAnimMontage* AttackerMontage = IsValid(Config.AttackerParriedMontage)
 		? Config.AttackerParriedMontage.Get() : DefaultAttackerParriedMontage.Get();
 	PlayReaction(DefenderMontage, HitReactionBlendOutTime);
-	if (UDamageReactionComponent* AttackerReaction = Attacker->FindComponentByClass<UDamageReactionComponent>())
-	{
-		AttackerReaction->PlayReaction(AttackerMontage, HitReactionBlendOutTime);
-	}
 	FDamageInfo ParryDamage;
 	ParryDamage.BaseDamage = Config.ParryDamage;
 	ParryDamage.DamageCategory = EDamageCategory::Physical;
@@ -209,6 +205,10 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	{
 		FPointDamageEvent Event(ParryDamage.GetCalculatedRawDamage(), ParryHit, FVector::UpVector, nullptr);
 		Attacker->TakeDamage(ParryDamage.GetCalculatedRawDamage(), Event, GetOwner()->GetInstigatorController(), GetOwner());
+	}
+	if (UDamageReactionComponent* AttackerReaction = Attacker->FindComponentByClass<UDamageReactionComponent>())
+	{
+		AttackerReaction->PlayReaction(AttackerMontage, HitReactionBlendOutTime);
 	}
 	return true;
 }
