@@ -228,6 +228,7 @@ void AEnemyAIController::UpdatePatrol()
 		StopMovement();
 		return;
 	}
+	if (bWaitingAtPatrolPoint) return;
 	if (Enemy->PatrolPoints.IsEmpty())
 	{
 		if (!Enemy->bUseRandomPatrolWhenNoPoints) { StopMovement(); return; }
@@ -249,11 +250,6 @@ void AEnemyAIController::UpdatePatrol()
 			GetWorldTimerManager().SetTimer(PatrolWaitTimer, this, &AEnemyAIController::FinishPatrolWait, Enemy->PatrolWaitTime, false);
 		}
 		else MoveToLocation(RandomPatrolDestination, Enemy->PatrolAcceptanceRadius);
-		return;
-	}
-
-	if (bWaitingAtPatrolPoint)
-	{
 		return;
 	}
 
