@@ -75,6 +75,7 @@ public:
 	virtual void EndTrace();
 	UFUNCTION(BlueprintCallable, Category = "Weapon|VFX")
 	void PlaySwingEffects(bool bPlaySound = true, bool bPlayNiagara = true);
+	void PlayHitEffects(const FHitResult& HitResult);
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Trace")
 	virtual void CancelTrace();
