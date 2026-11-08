@@ -10,6 +10,8 @@
 class AWeaponBase;
 class UAnimMontage;
 class UCurveFloat;
+class UNiagaraSystem;
+class USoundBase;
 
 /**
  * Supported weapon classifications. Extensible for project-specific weapons.
@@ -475,6 +477,22 @@ struct FWeaponConfig : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage Over Time")
 	TArray<FDamageOverTimeEffect> DamageOverTimeEffects;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|VFX")
+	TObjectPtr<UNiagaraSystem> HitNiagara = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|VFX")
+	TObjectPtr<USoundBase> HitSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|VFX")
+	TObjectPtr<UNiagaraSystem> SwingNiagara = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|VFX")
+	TObjectPtr<USoundBase> SwingSound = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|VFX")
+	FTransform SwingEffectRelativeTransform = FTransform::Identity;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry")
+	TObjectPtr<UAnimMontage> DefenderParryMontage = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry")
+	TObjectPtr<UAnimMontage> AttackerParriedMontage = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry", meta = (ClampMin = "0.0"))
+	float ParryDamage = 20.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Sockets")
 	FName HandSocketName = FName("Hand_R_Socket");
