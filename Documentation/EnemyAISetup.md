@@ -66,3 +66,8 @@ Create a child Blueprint of `AMagicEnemyCharacter`, assign `MagicProjectileClass
 ## Random patrol
 
 With no patrol points assigned, `bUseRandomPatrolWhenNoPoints` makes the controller request a random reachable NavMesh point inside `RandomPatrolRadius`, wait for `PatrolWaitTime`, and choose another. A NavMeshBoundsVolume is still required.
+
+
+## Enemy combo chaining
+
+Enemy melee combos advance through the same `UCombatComponent` combo system used by the player. The AI listens for the authored combo-window event and requests the next attack only while its target remains valid and inside `AttackRange`. Add the existing combo-window and transition notifies to each attack montage as required by the selected montage mode; the AI does not use a fixed-rate attack-input spam timer. If no next combo step is queued, the montage finishes normally and the AI retries after `AttackRetryInterval`.
