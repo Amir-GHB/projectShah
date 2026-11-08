@@ -5,7 +5,8 @@ This branch adds a native enemy foundation using the existing combat and damage 
 ## Included native classes
 
 - `AEnemyCharacter`: character base with `UCombatComponent`, `UDamageHandlerComponent`, and `UDamageReactionComponent`.
-- `AEnemyAIController`: native patrol, sight/hearing perception, investigation, pursuit, and basic weapon attacks.
+- `AEnemyAIController`: native random/point patrol, sight/hearing perception, investigation, and pursuit.
+- `AMagicEnemyCharacter`: optional ranged enemy that launches a configurable projectile Blueprint.
 - Unreal AI Perception is configured in C++; no Behavior Tree or Blackboard asset is required for this first implementation.
 
 ## Minimal Blueprint setup
@@ -33,7 +34,7 @@ For sound detection, gameplay systems should report noise with Unreal's `UAISens
 
 ## Combat component decision
 
-The existing `UCombatComponent` is reused because its weapon spawning, equip flow, montage handling, combo logic, and weapon trace integration are character-agnostic enough for an AI Pawn. The AI invokes `HandleAttackInput()` when its target is in range and the component is idle. Player input and camera targeting are not added to the enemy.
+The existing `UCombatComponent` is reused because its weapon spawning, equip flow, montage handling, combo logic, and weapon trace integration are character-agnostic enough for an AI Pawn. The AI invokes the enemy's virtual `PerformAICombatAction(Target)` when the target is in range. The base enemy requests a melee attack through `UCombatComponent`; `AMagicEnemyCharacter` spawns its configured projectile instead. Player input and camera targeting are not added to the enemy.
 
 Configure the enemy's weapon classes in its child Blueprint. Do not add `UCombatTargetingComponent`; it is player-camera/attack-focus oriented.
 
