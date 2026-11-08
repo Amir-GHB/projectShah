@@ -46,6 +46,8 @@ private:
 	float AttackCooldownRemaining = 0.0f;
 	int32 PatrolPointIndex = 0;
 	bool bWaitingAtPatrolPoint = false;
+	FVector RandomPatrolDestination = FVector::ZeroVector;
+	bool bHasRandomPatrolDestination = false;
 	FTimerHandle UpdateTimer;
 	FTimerHandle PatrolWaitTimer;
 
