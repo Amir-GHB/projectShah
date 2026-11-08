@@ -418,9 +418,13 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 	SetComponentTickEnabled(false);
 	if (APlayerController* Controller = FinisherController.Get())
 	{
-		if (AActor* RestoreTarget = PreviousViewTarget.Get())
+		// Only request a camera blend when this finisher actually switched to a cinematic camera.
+		if (IsValid(FinisherCameraActor))
 		{
-			Controller->SetViewTargetWithBlend(RestoreTarget, ActiveFinisherCameraBlendOutTime);
+			if (AActor* RestoreTarget = PreviousViewTarget.Get())
+			{
+				Controller->SetViewTargetWithBlend(RestoreTarget, ActiveFinisherCameraBlendOutTime);
+			}
 		}
 		Controller->SetIgnoreMoveInput(false);
 		Controller->SetIgnoreLookInput(false);
