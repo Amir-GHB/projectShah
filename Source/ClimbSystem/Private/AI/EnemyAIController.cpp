@@ -189,7 +189,7 @@ void AEnemyAIController::UpdateAI()
 				&& Enemy->CombatComponent->CurrentCombatState == ECombatState::Idle
 				&& AttackCooldownRemaining <= 0.0f)
 			{
-				Enemy->CombatComponent->HandleAttackInput();
+				Enemy->PerformAICombatAction(Target);
 				AttackCooldownRemaining = Enemy->AttackRetryInterval;
 			}
 		}
