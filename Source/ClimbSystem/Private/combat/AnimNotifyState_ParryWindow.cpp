@@ -10,7 +10,7 @@ void UAnimNotifyState_ParryWindow::NotifyBegin(USkeletalMeshComponent* MeshComp,
 	AActor* Owner = MeshComp ? MeshComp->GetOwner() : nullptr;
 	if (UDamageReactionComponent* Reactions = Owner ? Owner->FindComponentByClass<UDamageReactionComponent>() : nullptr)
 	{
-		Reactions->BeginParryWindow();
+		Reactions->BeginParryWindow(TotalDuration);
 	}
 }
 
