@@ -54,6 +54,9 @@ private:
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
+	UFUNCTION()
+	void HandleComboWindowOpened();
+
 	void UpdateAI();
 	void UpdatePatrol();
 	void MoveToNextPatrolPoint();
