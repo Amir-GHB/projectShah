@@ -536,6 +536,10 @@ void UCombatComponent::NotifyComboWindowBegin(const UAnimSequenceBase* Animation
 	SetCombatState(ECombatState::ComboWindow);
 	if (bHasBufferedAttackInput && IsInputBufferValid()) TryQueueComboTransition();
 	else ClearInputBuffer();
+
+	// AI listens for this event and requests the next step only when the authored
+	// combo window is open. This keeps progression synchronized with animation timing.
+	OnComboWindowOpened.Broadcast();
 }
 
 void UCombatComponent::NotifyComboWindowEnd(const UAnimSequenceBase* Animation)
