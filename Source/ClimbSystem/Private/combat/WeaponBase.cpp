@@ -353,11 +353,11 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 	AActor* TargetActor = HitResult.GetActor();
 	if (!TargetActor || !OwningCharacter.IsValid()) return;
 
+	PlayHitEffects(HitResult);
 	if (UDamageReactionComponent* TargetReactions = TargetActor->FindComponentByClass<UDamageReactionComponent>())
 	{
 		if (TargetReactions->TryParry(OwningCharacter.Get(), this, HitResult)) return;
 	}
-	PlayHitEffects(HitResult);
 
 	// Build structured damage payload using data-driven config and active attack multiplier
 	FDamageInfo DamageInfo;
