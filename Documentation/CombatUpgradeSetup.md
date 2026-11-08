@@ -140,3 +140,22 @@ Default tuning values are intentionally conservative and exposed on the componen
 ## Verification note
 
 The source changes are committed to this feature branch, but they have not been compiled or run in Unreal Editor from this environment. Treat the first local build as the compile verification step before gameplay testing.
+
+
+## 7. Weapon hit and swing feedback
+
+Configure these fields in each weapon Blueprint's `WeaponConfig`:
+
+- `HitNiagara` and `HitSound` play at the confirmed impact point, with Niagara aligned to the impact normal.
+- `SwingNiagara` and `SwingSound` play when the swing notify is reached, whether or not the trace hits anything.
+- `SwingEffectRelativeTransform` is relative to the weapon mesh and controls location, rotation, and scale.
+
+Add `Weapon Swing Effects` to attack animation frames where the blade passes through the swing. Its notify properties independently enable sound and Niagara (both enabled by default).
+
+## 8. Parry
+
+Add `Parry Window` notify state over the active frames of the defender's parry animation. Set the default defender and attacker-parried montages on the character's `DamageReactionComponent`. A defender's equipped weapon-specific parry montages override those defaults. The defender's weapon `ParryDamage` is applied to the attacker when a weapon trace intersects the active parry window.
+
+## 9. Death ragdoll
+
+`DamageReactionComponent.bRagdollOnDeath` enables shared ragdoll behavior for player and enemy characters. The configured death montage is allowed to finish first; then the skeletal mesh switches to the Ragdoll collision profile and simulates physics. Ensure the skeleton has a valid Physics Asset and the project has a Ragdoll collision profile.
