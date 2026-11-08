@@ -1,6 +1,7 @@
 #include "combat/AnimNotify_WeaponSwingEffects.h"
 
 #include "GameFramework/Character.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "combat/CombatComponent.h"
 #include "combat/WeaponBase.h"
 
