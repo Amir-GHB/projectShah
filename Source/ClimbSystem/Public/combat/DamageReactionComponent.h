@@ -137,6 +137,23 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions", meta = (ClampMin = "0.0"))
 	float DeathBlendOutTime = 0.12f;
 
+	/** Weapon parry montages override these shared fallbacks. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
+	TObjectPtr<UAnimMontage> DefaultDefenderParryMontage = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
+	TObjectPtr<UAnimMontage> DefaultAttackerParriedMontage = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry", meta = (ClampMin = "0.05"))
+	float ParryWindowDuration = 0.35f;
+
+	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
+	void BeginParryWindow();
+	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
+	void EndParryWindow();
+	bool TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Death")
+	bool bRagdollOnDeath = true;
+
 	/** Clears the death latch and stops the active reaction, e.g. when resetting a test dummy. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Reactions")
 	void ResetReactionState();
@@ -180,6 +197,8 @@ private:
 	FTimerHandle FinisherCameraDestroyTimer;
 
 	bool bDeathHandled = false;
+	bool bParryWindowActive = false;
+	FTimerHandle ParryWindowTimer;
 
 	UFUNCTION()
 	void HandleDamageTaken(float ActualDamage, AActor* InstigatorActor,
@@ -196,5 +215,6 @@ private:
 	void HandleFinisherMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	void EndFinisher(bool bStopMontages);
 	void DestroyFinisherCamera();
+	void ActivateRagdoll();
 	void UpdateFinisherCamera();
 };
