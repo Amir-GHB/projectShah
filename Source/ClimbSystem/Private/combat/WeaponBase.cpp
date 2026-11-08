@@ -289,6 +289,20 @@ void AWeaponBase::TickTrace()
 	PreviousSocketLocations = CurrentSocketLocations;
 }
 
+void AWeaponBase::PlayHitEffects(const FHitResult& HitResult)
+{
+	const FVector ImpactLocation = HitResult.ImpactPoint.IsNearlyZero() ? HitResult.Location : HitResult.ImpactPoint;
+	const FRotator ImpactRotation = HitResult.ImpactNormal.IsNearlyZero() ? FRotator::ZeroRotator : HitResult.ImpactNormal.Rotation();
+	if (IsValid(WeaponConfig.HitNiagara))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), WeaponConfig.HitNiagara, ImpactLocation, ImpactRotation);
+	}
+	if (IsValid(WeaponConfig.HitSound))
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, WeaponConfig.HitSound, ImpactLocation);
+	}
+}
+
 void AWeaponBase::PlaySwingEffects(bool bPlaySound, bool bPlayNiagara)
 {
 	if (!IsValid(OwningCharacter.Get())) return;
@@ -343,16 +357,7 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 	{
 		if (TargetReactions->TryParry(OwningCharacter.Get(), this, HitResult)) return;
 	}
-	const FVector ImpactLocation = HitResult.ImpactPoint.IsNearlyZero() ? HitResult.Location : HitResult.ImpactPoint;
-	const FRotator ImpactRotation = HitResult.ImpactNormal.IsNearlyZero() ? FRotator::ZeroRotator : HitResult.ImpactNormal.Rotation();
-	if (IsValid(WeaponConfig.HitNiagara))
-	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), WeaponConfig.HitNiagara, ImpactLocation, ImpactRotation);
-	}
-	if (IsValid(WeaponConfig.HitSound))
-	{
-		UGameplayStatics::PlaySoundAtLocation(this, WeaponConfig.HitSound, ImpactLocation);
-	}
+	PlayHitEffects(HitResult);
 
 	// Build structured damage payload using data-driven config and active attack multiplier
 	FDamageInfo DamageInfo;
