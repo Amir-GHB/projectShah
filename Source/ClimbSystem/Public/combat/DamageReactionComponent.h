@@ -131,12 +131,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
 	TArray<FFinisherMontagePair> FinisherMontages;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers", meta = (ClampMin = "100.0"))
-	float FinisherCameraDistance = 360.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers", meta = (ClampMin = "0.0"))
-	float FinisherCameraHeight = 130.0f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions", meta = (ClampMin = "0.0"))
 	float HitReactionBlendOutTime = 0.08f;
 
