@@ -42,20 +42,66 @@ struct FDamageReactionMontage
 	TObjectPtr<UAnimMontage> Montage = nullptr;
 };
 
-/** A paired execution animation. Add up to three entries per weapon for variation. */
+/** Camera aim target for an optional authored finisher shot. */
+UENUM(BlueprintType)
+enum class EFinisherCameraLookAt : uint8
+{
+    Midpoint UMETA(DisplayName = "Between Characters"),
+    Attacker UMETA(DisplayName = "Attacker"),
+    Victim UMETA(DisplayName = "Victim")
+};
+
+/** Per-finisher camera shot. Offset is relative to the victim: X forward, Y right, Z up. */
+USTRUCT(BlueprintType)
+struct FFinisherCameraShot
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera")
+    FVector RelativeOffset = FVector(-320.0f, 0.0f, 145.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera")
+    EFinisherCameraLookAt LookAt = EFinisherCameraLookAt::Midpoint;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera")
+    FVector LookAtOffset = FVector(0.0f, 0.0f, 85.0f);
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera", meta = (ClampMin = "5.0", ClampMax = "150.0"))
+    float FieldOfView = 55.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera", meta = (ClampMin = "0.0"))
+    float BlendInTime = 0.3f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera", meta = (ClampMin = "0.0"))
+    float BlendOutTime = 0.45f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera")
+    bool bFollowCharacters = true;
+};
+
+/** A paired execution animation with optional direction filtering and an optional custom camera shot. */
 USTRUCT(BlueprintType)
 struct FFinisherMontagePair
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
-	EWeaponType WeaponType = EWeaponType::Sword;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
+    EWeaponType WeaponType = EWeaponType::Sword;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
-	TObjectPtr<UAnimMontage> AttackerMontage = nullptr;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
+    EFinisherDirection Direction = EFinisherDirection::All;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
-	TObjectPtr<UAnimMontage> VictimMontage = nullptr;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
+    TObjectPtr<UAnimMontage> AttackerMontage = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
+    TObjectPtr<UAnimMontage> VictimMontage = nullptr;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera")
+    bool bUseCinematicCamera = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera", meta = (EditCondition = "bUseCinematicCamera"))
+    FFinisherCameraShot CameraShot;
 };
 
 /**
@@ -85,15 +131,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
 	TArray<FFinisherMontagePair> FinisherMontages;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers", meta = (ClampMin = "0.0"))
-	float FinisherCameraBlendTime = 0.25f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers", meta = (ClampMin = "100.0"))
-	float FinisherCameraDistance = 360.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers", meta = (ClampMin = "0.0"))
-	float FinisherCameraHeight = 130.0f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions", meta = (ClampMin = "0.0"))
 	float HitReactionBlendOutTime = 0.08f;
 
@@ -107,6 +144,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
 	UPROPERTY(Transient)
@@ -126,6 +164,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ACameraActor> FinisherCameraActor = nullptr;
+
+	FFinisherCameraShot ActiveFinisherCameraShot;
+	float ActiveFinisherCameraBlendOutTime = 0.45f;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveFinisherAttackerMontage = nullptr;
@@ -155,4 +196,5 @@ private:
 	void HandleFinisherMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	void EndFinisher(bool bStopMontages);
 	void DestroyFinisherCamera();
+	void UpdateFinisherCamera();
 };
