@@ -32,7 +32,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat")
 	TObjectPtr<UDamageReactionComponent> DamageReactionComponent;
 
-	/** Ordered patrol route. Leave empty for a stationary guard. */
+	/** Optional ordered patrol route. If empty, random reachable patrol is used when enabled. */
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol")
 	TArray<TObjectPtr<AActor>> PatrolPoints;
 
