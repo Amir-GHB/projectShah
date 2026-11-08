@@ -457,6 +457,14 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 	ACharacter* AttackerCharacter = Cast<ACharacter>(GetOwner());
 	ACharacter* VictimCharacter = FinisherVictim.Get();
 
+	if (!bStopMontages && IsValid(VictimCharacter))
+	{
+		if (UDamageReactionComponent* VictimReactions = VictimCharacter->FindComponentByClass<UDamageReactionComponent>())
+		{
+			if (VictimReactions->bRagdollOnDeath) VictimReactions->ActivateRagdoll();
+		}
+	}
+
 	if (bStopMontages)
 	{
 		if (AttackerCharacter && AttackerCharacter->GetMesh())
