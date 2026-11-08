@@ -1,5 +1,6 @@
 #include "combat/AnimNotifyState_ParryWindow.h"
 #include "GameFramework/Actor.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "combat/DamageReactionComponent.h"
 
 void UAnimNotifyState_ParryWindow::NotifyBegin(USkeletalMeshComponent* MeshComp,
