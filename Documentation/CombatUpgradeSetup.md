@@ -61,8 +61,11 @@ On the player Blueprint:
 
 - Add entries to `DamageReactionComponent.FinisherMontages`.
 - Each entry pairs an `AttackerMontage` and a `VictimMontage` for one `WeaponType`.
-- Add three entries for a weapon to get three randomly selected variations. The attacker and victim montage in each entry are a matched pair.
-- The camera distance, height, and blend time are configurable on the same component.
+- Set `Direction` to Front, Back, Left, or Right to restrict the pair to that incoming hit direction. Set it to All for a universal fallback.
+- Direction comes from the killing blow's existing target-relative `HitDirection`. Left and Right are from the victim's perspective.
+- Add multiple entries for the same weapon and direction to get random variations. Exact directional entries always take priority over All entries.
+- Cinematic camera is disabled by default for every pair. Enable `bUseCinematicCamera` only on entries that need a custom shot.
+- Configure `CameraShot.RelativeOffset` in the victim's local axes (X forward, Y right, Z up), choose whether to look at the midpoint, attacker, or victim, and tune FOV and blend times. Enable `bFollowCharacters` to keep the camera framed as the paired animations move.
 
 ### Registering test enemies
 
@@ -82,7 +85,7 @@ This is intentionally a test harness, not the final AI encounter lifecycle. Enem
 - The victim must be registered in the player's encounter list and be the last living registered enemy.
 - A valid montage pair must exist for the killing weapon type. If not, the ordinary death reaction plays.
 - The victim's ordinary death montage is suppressed only when both finisher montages successfully start.
-- A temporary camera actor frames the two characters and blends back when both montages finish. If either montage is interrupted, the other is stopped and the camera/control state is restored.
+- The gameplay camera remains active unless the selected pair explicitly enables its cinematic shot. An enabled shot uses its own relative offset, look-at target, FOV, blend times, and optional character-follow behavior. If either montage is interrupted, the other is stopped and camera/control state is restored.
 - Motion Warping and automatic attacker/victim positioning are not included yet. For this first test, position the characters close enough for the authored paired animations to line up, and make sure both montages are compatible with their respective skeletons and AnimBP montage slots.
 - The attacker enters the temporary `Finishing` combat state, which blocks normal attack and weapon-switch input until the paired montages finish.
 
