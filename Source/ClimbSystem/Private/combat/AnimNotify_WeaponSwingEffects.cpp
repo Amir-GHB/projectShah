@@ -14,6 +14,7 @@ void UAnimNotify_WeaponSwingEffects::Notify(USkeletalMeshComponent* MeshComp,
 	AWeaponBase* Weapon = Combat ? Combat->CurrentWeapon : nullptr;
 	if (IsValid(Weapon))
 	{
-		Weapon->PlaySwingEffects(bPlaySound, bPlayNiagara);
+		// Legacy one-shot notify intentionally plays sound only. Use Weapon Swing Effects notify state for Niagara.
+		Weapon->PlaySwingEffects(bPlaySound, false);
 	}
 }
