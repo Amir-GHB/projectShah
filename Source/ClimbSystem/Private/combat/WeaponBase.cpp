@@ -361,11 +361,14 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 	AActor* TargetActor = HitResult.GetActor();
 	if (!TargetActor || !OwningCharacter.IsValid()) return;
 
-	PlayHitEffects(HitResult);
+	// Resolve defense before ordinary hit presentation. A parry or guard break consumes
+	// this hit completely: no hit Niagara, sound, health damage, or normal hit reaction.
 	if (UDamageReactionComponent* TargetReactions = TargetActor->FindComponentByClass<UDamageReactionComponent>())
 	{
-		if (TargetReactions->TryParry(OwningCharacter.Get(), this, HitResult)) return;
+		if (TargetReactions->ResolveIncomingMeleeHit(OwningCharacter.Get(), this, HitResult)) return;
 	}
+
+	PlayHitEffects(HitResult);
 
 	// Build structured damage payload using data-driven config and active attack multiplier
 	FDamageInfo DamageInfo;
