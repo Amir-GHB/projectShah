@@ -9,6 +9,7 @@
 #include "combat/DamageHandlerComponent.h"
 #include "combat/DamageReactionComponent.h"
 #include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
 #include "Kismet/GameplayStatics.h"
 
 AWeaponBase::AWeaponBase()
@@ -309,10 +310,31 @@ void AWeaponBase::PlaySwingEffects(bool bPlaySound, bool bPlayNiagara)
 	const FTransform EffectTransform = WeaponMesh
 		? WeaponMesh->GetComponentTransform() * WeaponConfig.SwingEffectRelativeTransform
 		: GetActorTransform() * WeaponConfig.SwingEffectRelativeTransform;
-	if (bPlayNiagara && IsValid(WeaponConfig.SwingNiagara) && IsValid(WeaponMesh))
+
+	if (bPlayNiagara) SetSwingEffectsActive(true);
+
+	if (bPlaySound && IsValid(WeaponConfig.SwingSound))
 	{
-		// Attach to the weapon mesh/socket so the trail follows the blade throughout the swing.
-		UNiagaraFunctionLibrary::SpawnSystemAttached(
+		UGameplayStatics::PlaySoundAtLocation(this, WeaponConfig.SwingSound, EffectTransform.GetLocation());
+	}
+}
+
+void AWeaponBase::SetSwingEffectsActive(bool bActive)
+{
+	if (!bActive)
+	{
+		if (IsValid(ActiveSwingEffect))
+		{
+			ActiveSwingEffect->Deactivate();
+		}
+		return;
+	}
+
+	if (!IsValid(WeaponMesh) || !IsValid(WeaponConfig.SwingNiagara)) return;
+
+	if (!IsValid(ActiveSwingEffect))
+	{
+		ActiveSwingEffect = UNiagaraFunctionLibrary::SpawnSystemAttached(
 			WeaponConfig.SwingNiagara,
 			WeaponMesh,
 			WeaponConfig.SwingEffectSocketName,
@@ -320,11 +342,13 @@ void AWeaponBase::PlaySwingEffects(bool bPlaySound, bool bPlayNiagara)
 			WeaponConfig.SwingEffectRelativeTransform.Rotator(),
 			WeaponConfig.SwingEffectRelativeTransform.GetScale3D(),
 			EAttachLocation::KeepRelativeOffset,
-			true);
+			false,
+			ENCPoolMethod::None);
 	}
-	if (bPlaySound && IsValid(WeaponConfig.SwingSound))
+
+	if (IsValid(ActiveSwingEffect))
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, WeaponConfig.SwingSound, EffectTransform.GetLocation());
+		ActiveSwingEffect->Activate(true);
 	}
 }
 
