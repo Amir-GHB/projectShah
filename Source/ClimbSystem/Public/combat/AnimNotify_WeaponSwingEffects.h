@@ -5,7 +5,7 @@
 #include "AnimNotify_WeaponSwingEffects.generated.h"
 
 /** Plays the currently equipped weapon's configured swing effects, including on a missed attack. */
-UCLASS(meta=(DisplayName="Weapon Swing Effects"))
+UCLASS(meta=(DisplayName="Legacy Weapon Swing Sound"))
 class CLIMBSYSTEM_API UAnimNotify_WeaponSwingEffects : public UAnimNotify
 {
 	GENERATED_BODY()
@@ -15,7 +15,7 @@ public:
 	bool bPlaySound = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon|VFX")
-	bool bPlayNiagara = true;
+	bool bPlayNiagara = false;
 
 	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
 		const FAnimNotifyEventReference& EventReference) override;
