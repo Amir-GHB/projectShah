@@ -230,6 +230,10 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 		{
 			AttackerCombat->StopActiveAttack(true, true, 0.04f);
 		}
+		if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Attacker))
+		{
+			Mage->CancelPendingMagicAttack();
+		}
 		if (UDamageReactionComponent* AttackerReaction = Attacker->FindComponentByClass<UDamageReactionComponent>())
 		{
 			AttackerReaction->PlayReaction(AttackerMontage, 0.04f);
