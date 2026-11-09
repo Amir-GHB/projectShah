@@ -3,6 +3,7 @@
 #include "AI/EnemyAIController.h"
 
 #include "AI/EnemyCharacter.h"
+#include "combat/EnemyCharacter.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISenseConfig_Hearing.h"
@@ -201,27 +202,81 @@ void AEnemyAIController::UpdateAI()
 		SetFocus(Target);
 		const float Distance = FVector::Dist2D(Enemy->GetActorLocation(), Target->GetActorLocation());
 
-		if (Distance > Enemy->AttackRange)
+		const FVector ToTarget = Target->GetActorLocation() - Enemy->GetActorLocation();
+		if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
+		{
+			const float PreferredDistance = Enemy->AttackRange * FMath::Max(1.0f, Mage->PreferredCombatDistanceMultiplier);
+			const float Tolerance = FMath::Max(100.0f, Enemy->AttackRange * 0.55f);
+
+			if (Mage->bNeedsRelocationAfterAttack)
+			{
+				if (!bMageRelocationIssued)
+				{
+					UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+					FNavLocation Candidate;
+					bool bFound = false;
+					for (int32 Attempt = 0; Nav && Attempt < 10; ++Attempt)
+					{
+						if (Nav->GetRandomReachablePointInRadius(Enemy->GetActorLocation(), 420.0f, Candidate))
+						{
+							const float CandidateDistance = FVector::Dist2D(Candidate.Location, Target->GetActorLocation());
+							if (CandidateDistance >= PreferredDistance - Tolerance
+								&& CandidateDistance <= PreferredDistance + Tolerance)
+							{
+								bFound = true;
+								break;
+							}
+						}
+					}
+					if (!bFound)
+					{
+						const FVector Away = (Enemy->GetActorLocation() - Target->GetActorLocation()).GetSafeNormal2D();
+					Candidate.Location = Enemy->GetActorLocation() + (Away.IsNearlyZero() ? -ToTarget.GetSafeNormal2D() : Away) * 300.0f;
+					if (Nav) Nav->ProjectPointToNavigation(Candidate.Location, Candidate);
+				}
+					MageRelocationDestination = Candidate.Location;
+					bMageRelocationIssued = true;
+					MoveToLocation(MageRelocationDestination, 80.0f);
+				}
+				if (FVector::Dist2D(Enemy->GetActorLocation(), MageRelocationDestination) <= 100.0f
+					|| GetMoveStatus() == EPathFollowingStatus::Idle)
+				{
+					Mage->bNeedsRelocationAfterAttack = false;
+					bMageRelocationIssued = false;
+				}
+				return;
+			}
+
+			if (Distance > PreferredDistance + Tolerance)
+			{
+				MoveToActor(Target, PreferredDistance, true, true, true);
+				return;
+			}
+			if (Distance < PreferredDistance - Tolerance)
+			{
+				const FVector Away = (Enemy->GetActorLocation() - Target->GetActorLocation()).GetSafeNormal2D();
+				const FVector RetreatPoint = Enemy->GetActorLocation() + (Away.IsNearlyZero() ? -ToTarget.GetSafeNormal2D() : Away) * (PreferredDistance - Distance + 100.0f);
+				MoveToLocation(RetreatPoint, 80.0f);
+				return;
+			}
+		}
+		else if (Distance > Enemy->AttackRange)
 		{
 			MoveToActor(Target, Enemy->AttackRange * 0.8f, true, true, true);
+			return;
 		}
-		else
+
+		StopMovement();
+		if (!ToTarget.IsNearlyZero())
 		{
-			StopMovement();
-			const FVector ToTarget = Target->GetActorLocation() - Enemy->GetActorLocation();
-			if (!ToTarget.IsNearlyZero())
-			{
-				const FRotator DesiredRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
-				Enemy->SetActorRotation(FMath::RInterpTo(
-					Enemy->GetActorRotation(), DesiredRotation, 0.25f, 8.0f));
-			}
-			if (Enemy->CombatComponent
-				&& Enemy->CombatComponent->CurrentCombatState == ECombatState::Idle
-				&& AttackCooldownRemaining <= 0.0f)
-			{
-				Enemy->PerformAICombatAction(Target);
-				AttackCooldownRemaining = Enemy->AttackRetryInterval;
-			}
+			const FRotator DesiredRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
+			Enemy->SetActorRotation(FMath::RInterpTo(Enemy->GetActorRotation(), DesiredRotation, 0.25f, 8.0f));
+		}
+		if (Enemy->CombatComponent && Enemy->CombatComponent->CurrentCombatState == ECombatState::Idle
+			&& AttackCooldownRemaining <= 0.0f)
+		{
+			Enemy->PerformAICombatAction(Target);
+			AttackCooldownRemaining = Enemy->AttackRetryInterval;
 		}
 		return;
 	}
