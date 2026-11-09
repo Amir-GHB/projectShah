@@ -12,6 +12,7 @@ class UStaticMeshComponent;
 class UPrimitiveComponent;
 class UProjectileMovementComponent;
 class AWeaponBase;
+class UAnimMontage;
 
 /** Generic projectile shared by bows and future ranged weapons. */
 UCLASS(Blueprintable)
@@ -36,7 +37,11 @@ public:
 	FProjectileConfig ProjectileConfig;
 
 	/** Called before FinishSpawningActor so config and direction are ready in BeginPlay. */
-	void InitializeProjectile(const FProjectileConfig& InConfig, const FVector& Direction, AActor* InDamageInstigator, AWeaponBase* InSourceWeapon);
+	void InitializeProjectile(const FProjectileConfig& InConfig, const FVector& Direction, AActor* InDamageInstigator, AWeaponBase* InSourceWeapon, AActor* InTargetActor = nullptr);
+
+	/** Demo-only override for a target hit montage; normal production reactions remain data-driven on the target. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Projectile|Demo")
+	TObjectPtr<UAnimMontage> DemoHitMontage = nullptr;
 
 protected:
 	virtual void BeginPlay() override;
@@ -50,6 +55,7 @@ protected:
 
 	TWeakObjectPtr<AActor> DamageInstigator;
 	TWeakObjectPtr<AWeaponBase> SourceWeapon;
+	TWeakObjectPtr<AActor> TargetActor;
 	FVector InitialDirection = FVector::ForwardVector;
 	FVector PreviousLocation = FVector::ZeroVector;
 	float DistanceTravelled = 0.0f;
