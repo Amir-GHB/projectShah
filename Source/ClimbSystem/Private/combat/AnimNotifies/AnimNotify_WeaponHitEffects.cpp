@@ -4,6 +4,7 @@
 #include "combat/CombatComponent.h"
 #include "combat/WeaponBase.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameFramework/Character.h"
 
 void UAnimNotify_WeaponHitEffects::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
