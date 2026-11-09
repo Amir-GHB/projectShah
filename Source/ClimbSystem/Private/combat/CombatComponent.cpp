@@ -648,6 +648,7 @@ void UCombatComponent::StopActiveAttack(bool bInterrupted, bool bStopMontage, fl
 	if (ActiveAttackWeapon.IsValid())
 	{
 		ActiveAttackWeapon->CancelTrace();
+		ActiveAttackWeapon->SetSwingEffectsActive(false);
 		ActiveAttackWeapon->SetActiveAttackIndex(INDEX_NONE);
 	}
 	if (OwningCharacter.IsValid())
