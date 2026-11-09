@@ -10,6 +10,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/World.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "combat/CombatProjectile.h"
 #include "Kismet/GameplayStatics.h"
 
 AEnemyCharacter::AEnemyCharacter()
@@ -72,7 +75,25 @@ void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
 {
 	if (!IsValid(Target) || !IsValid(MagicProjectileClass) || !GetWorld()) return;
 	const float Now = GetWorld()->GetTimeSeconds();
-	if (Now < NextMagicAttackTime) return;
+	if (Now < NextMagicAttackTime || PendingMagicTarget.IsValid()) return;
+	PendingMagicTarget = Target;
+	bNeedsRelocationAfterAttack = false;
+
+	UAnimInstance* Anim = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (IsValid(MagicAttackMontage) && Anim)
+	{
+		if (Anim->Montage_Play(MagicAttackMontage) > 0.0f) return;
+	}
+	// Fallback for prototypes without an authored attack montage.
+	ReleaseMagicProjectile();
+}
+
+void AMagicEnemyCharacter::ReleaseMagicProjectile()
+{
+	AActor* Target = PendingMagicTarget.Get();
+	PendingMagicTarget.Reset();
+	if (!IsValid(Target) || !IsValid(MagicProjectileClass) || !GetWorld()) return;
+
 	const FVector SpawnLocation = GetMesh() && GetMesh()->DoesSocketExist(ProjectileSpawnSocket)
 		? GetMesh()->GetSocketLocation(ProjectileSpawnSocket)
 		: GetActorLocation() + GetActorTransform().TransformVectorNoScale(ProjectileSpawnOffset);
@@ -82,8 +103,15 @@ void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
 	Params.Owner = this;
 	Params.Instigator = this;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	GetWorld()->SpawnActor<AActor>(MagicProjectileClass, SpawnLocation, AimRotation, Params);
-	NextMagicAttackTime = Now + FMath::Max(0.1f, MagicAttackCooldown);
+	ACombatProjectile* Projectile = GetWorld()->SpawnActor<ACombatProjectile>(MagicProjectileClass, SpawnLocation, AimRotation, Params);
+	if (Projectile)
+	{
+		FProjectileConfig Config = MagicProjectileConfig;
+		Config.GravityScale = 0.0f;
+		Projectile->InitializeProjectile(Config, (AimLocation - SpawnLocation).GetSafeNormal(), this, nullptr, Target);
+	}
+	NextMagicAttackTime = GetWorld()->GetTimeSeconds() + FMath::Max(0.1f, MagicAttackCooldown);
+	bNeedsRelocationAfterAttack = true;
 }
 
 float AEnemyCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
