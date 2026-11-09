@@ -34,6 +34,7 @@ void AWeaponBase::BeginPlay()
 
 void AWeaponBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	SetSwingEffectsActive(false);
 	CancelTrace();
 	Super::EndPlay(EndPlayReason);
 }
