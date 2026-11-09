@@ -39,12 +39,13 @@ ACombatProjectile::ACombatProjectile()
 	ProjectileMovement->bShouldBounce = false;
 }
 
-void ACombatProjectile::InitializeProjectile(const FProjectileConfig& InConfig, const FVector& Direction, AActor* InDamageInstigator, AWeaponBase* InSourceWeapon)
+void ACombatProjectile::InitializeProjectile(const FProjectileConfig& InConfig, const FVector& Direction, AActor* InDamageInstigator, AWeaponBase* InSourceWeapon, AActor* InTargetActor)
 {
 	ProjectileConfig = InConfig;
 	InitialDirection = Direction.GetSafeNormal();
 	DamageInstigator = InDamageInstigator;
 	SourceWeapon = InSourceWeapon;
+	TargetActor = InTargetActor;
 }
 
 void ACombatProjectile::BeginPlay()
@@ -74,6 +75,14 @@ void ACombatProjectile::BeginPlay()
 	ProjectileMovement->InitialSpeed = ProjectileConfig.InitialSpeed;
 	ProjectileMovement->MaxSpeed = ProjectileConfig.MaxSpeed;
 	ProjectileMovement->ProjectileGravityScale = ProjectileConfig.GravityScale;
+	if (TargetActor.IsValid())
+	{
+		// Mage demo shots use a straight, gravity-free trajectory aimed at the target's
+		// location at release time. This guarantees an idle target is on the flight path.
+		const FVector AimPoint = TargetActor->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
+		InitialDirection = (AimPoint - GetActorLocation()).GetSafeNormal();
+		ProjectileMovement->ProjectileGravityScale = 0.0f;
+	}
 	ProjectileMovement->Velocity = InitialDirection * ProjectileConfig.InitialSpeed;
 	PreviousLocation = GetActorLocation();
 	SetLifeSpan(ProjectileConfig.LifeSeconds);
