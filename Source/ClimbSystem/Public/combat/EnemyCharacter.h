@@ -4,12 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "combat/CombatTypes.h"
 #include "EnemyCharacter.generated.h"
 
 class UCombatComponent;
 class UDamageHandlerComponent;
 class UDamageReactionComponent;
 class AEnemyAIController;
+class ACombatProjectile;
+class UAnimMontage;
 
 /**
  * Reusable AI-controlled combatant.
@@ -90,15 +93,33 @@ class CLIMBSYSTEM_API AMagicEnemyCharacter : public AEnemyCharacter
 public:
 	virtual void PerformAICombatAction(AActor* Target) override;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic")
-	TSubclassOf<AActor> MagicProjectileClass;
+	/** Called by the authored montage notify at the exact projectile-release frame. */
+	UFUNCTION(BlueprintCallable, Category = "Enemy|Magic")
+	void ReleaseMagicProjectile();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic|Animation")
+	TObjectPtr<UAnimMontage> MagicAttackMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic|Projectile")
+	TSubclassOf<ACombatProjectile> MagicProjectileClass;
+
+	/** Temporary demo damage profile. Production weaponized ranged damage belongs in CombatComponent. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic|Projectile")
+	FProjectileConfig MagicProjectileConfig;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic")
 	FName ProjectileSpawnSocket = FName("hand_r");
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic")
 	FVector ProjectileSpawnOffset = FVector(35.0f, 0.0f, 20.0f);
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic", meta = (ClampMin = "0.1"))
 	float MagicAttackCooldown = 1.8f;
+UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic|Movement", meta = (ClampMin = "1.0"))
+	float PreferredCombatDistanceMultiplier = 2.5f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Magic|Movement")
+	bool bNeedsRelocationAfterAttack = false;
+
 private:
+	TWeakObjectPtr<AActor> PendingMagicTarget;
 	float NextMagicAttackTime = 0.0f;
 };
 
