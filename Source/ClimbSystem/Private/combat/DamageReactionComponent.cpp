@@ -144,6 +144,14 @@ void UDamageReactionComponent::PlayReaction(UAnimMontage* Montage, float Previou
 	}
 }
 
+void UDamageReactionComponent::PlayHitReactionOverride(UAnimMontage* Montage)
+{
+	if (!bDeathHandled && IsValid(Montage))
+	{
+		PlayReaction(Montage, HitReactionBlendOutTime);
+	}
+}
+
 void UDamageReactionComponent::HandleDamageTaken(
 	float ActualDamage, AActor* InstigatorActor,
 	const FDamageInfo& DamageInfo, const FHitResult& HitResult)
