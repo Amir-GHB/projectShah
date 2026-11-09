@@ -100,16 +100,17 @@ void AMagicEnemyCharacter::ReleaseMagicProjectile()
 		: GetActorLocation() + GetActorTransform().TransformVectorNoScale(ProjectileSpawnOffset);
 	const FVector AimLocation = Target->GetActorLocation() + FVector(0.0f, 0.0f, 55.0f);
 	const FRotator AimRotation = (AimLocation - SpawnLocation).Rotation();
-	FActorSpawnParameters Params;
-	Params.Owner = this;
-	Params.Instigator = this;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	ACombatProjectile* Projectile = GetWorld()->SpawnActor<ACombatProjectile>(MagicProjectileClass, SpawnLocation, AimRotation, Params);
+	const FTransform SpawnTransform(AimRotation, SpawnLocation);
+	ACombatProjectile* Projectile = GetWorld()->SpawnActorDeferred<ACombatProjectile>(
+		MagicProjectileClass, SpawnTransform, this, this,
+		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 	if (Projectile)
 	{
 		FProjectileConfig Config = MagicProjectileConfig;
 		Config.GravityScale = 0.0f;
 		Projectile->InitializeProjectile(Config, (AimLocation - SpawnLocation).GetSafeNormal(), this, nullptr, Target);
+		// Initialize before BeginPlay so target-directed velocity and damage config are applied.
+		Projectile->FinishSpawning(SpawnTransform);
 	}
 	NextMagicAttackTime = GetWorld()->GetTimeSeconds() + FMath::Max(0.1f, MagicAttackCooldown);
 	bNeedsRelocationAfterAttack = true;
