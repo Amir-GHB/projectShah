@@ -815,6 +815,66 @@ void UCombatComponent::SetNonCombatAnimation(bool bEnableNonCombatAnimation)
 	RefreshAnimationState();
 }
 
+void UCombatComponent::SetGuardMode(bool bEnableGuard)
+{
+	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing ||
+		CurrentCombatState == ECombatState::Staggered || bWeaponSwapActive)
+	{
+		return;
+	}
+
+	if (bEnableGuard)
+	{
+		if (AnimationState.DefenseState == ECombatDefenseState::None)
+		{
+			AnimationState.DefenseState = ECombatDefenseState::Guarding;
+			RefreshAnimationState();
+		}
+	}
+	else if (AnimationState.DefenseState == ECombatDefenseState::Guarding ||
+		AnimationState.DefenseState == ECombatDefenseState::Parrying)
+	{
+		AnimationState.DefenseState = ECombatDefenseState::None;
+		RefreshAnimationState();
+	}
+}
+
+void UCombatComponent::TriggerGuardBreak()
+{
+	if (AnimationState.DefenseState != ECombatDefenseState::Guarding &&
+		AnimationState.DefenseState != ECombatDefenseState::Parrying)
+	{
+		return;
+	}
+
+	AnimationState.DefenseState = ECombatDefenseState::GuardBroken;
+	RefreshAnimationState();
+}
+
+void UCombatComponent::EndGuardBreak()
+{
+	if (AnimationState.DefenseState != ECombatDefenseState::GuardBroken) return;
+	AnimationState.DefenseState = ECombatDefenseState::None;
+	RefreshAnimationState();
+}
+
+void UCombatComponent::SetParryAnimationState(bool bIsParrying)
+{
+	if (bIsParrying)
+	{
+		if (AnimationState.DefenseState == ECombatDefenseState::Guarding)
+		{
+			AnimationState.DefenseState = ECombatDefenseState::Parrying;
+			RefreshAnimationState();
+		}
+	}
+	else if (AnimationState.DefenseState == ECombatDefenseState::Parrying)
+	{
+		AnimationState.DefenseState = ECombatDefenseState::Guarding;
+		RefreshAnimationState();
+	}
+}
+
 void UCombatComponent::RefreshAnimationState()
 {
 	const EWeaponType EffectiveWeaponType = (bWeaponSwapActive && ((bHolsterPointReached && !bPlayingUnequipMontage) || !IsValid(CurrentWeapon))) ? PendingWeaponType : CurrentWeaponType;
