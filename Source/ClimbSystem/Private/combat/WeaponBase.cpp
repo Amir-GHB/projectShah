@@ -309,10 +309,18 @@ void AWeaponBase::PlaySwingEffects(bool bPlaySound, bool bPlayNiagara)
 	const FTransform EffectTransform = WeaponMesh
 		? WeaponMesh->GetComponentTransform() * WeaponConfig.SwingEffectRelativeTransform
 		: GetActorTransform() * WeaponConfig.SwingEffectRelativeTransform;
-	if (bPlayNiagara && IsValid(WeaponConfig.SwingNiagara))
+	if (bPlayNiagara && IsValid(WeaponConfig.SwingNiagara) && IsValid(WeaponMesh))
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), WeaponConfig.SwingNiagara,
-			EffectTransform.GetLocation(), EffectTransform.Rotator(), EffectTransform.GetScale3D());
+		// Attach to the weapon mesh/socket so the trail follows the blade throughout the swing.
+		UNiagaraFunctionLibrary::SpawnSystemAttached(
+			WeaponConfig.SwingNiagara,
+			WeaponMesh,
+			WeaponConfig.SwingEffectSocketName,
+			WeaponConfig.SwingEffectRelativeTransform.GetLocation(),
+			WeaponConfig.SwingEffectRelativeTransform.Rotator(),
+			WeaponConfig.SwingEffectRelativeTransform.GetScale3D(),
+			EAttachLocation::KeepRelativeOffset,
+			true);
 	}
 	if (bPlaySound && IsValid(WeaponConfig.SwingSound))
 	{
