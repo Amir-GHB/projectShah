@@ -131,6 +131,15 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 	{
 		if (Stimulus.WasSuccessfullySensed() && IsValidCombatTarget(Actor))
 		{
+			// Register this real enemy with the player's encounter tracker when the player is acquired.
+			// This also covers spawn/BeginPlay ordering where the player pawn did not exist yet.
+			if (AEnemyCharacter* Enemy = ControlledEnemy.Get())
+			{
+				if (UCombatComponent* PlayerCombat = Actor->FindComponentByClass<UCombatComponent>())
+				{
+					PlayerCombat->RegisterEncounterEnemy(Enemy);
+				}
+			}
 			CurrentTarget = Actor;
 			InvestigationTimeRemaining = 0.0f;
 			SetFocus(Actor);
