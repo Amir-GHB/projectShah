@@ -130,9 +130,9 @@ void ACombatProjectile::HandleProjectileHit(UPrimitiveComponent* HitComponent, A
 	Destroy();
 }
 
-void ACombatProjectile::ApplyHitDamage(AActor* TargetActor, const FHitResult& Hit)
+void ACombatProjectile::ApplyHitDamage(AActor* HitTargetActor, const FHitResult& Hit)
 {
-	if (!IsValid(TargetActor) || !DamageInstigator.IsValid()) return;
+	if (!IsValid(HitTargetActor) || !DamageInstigator.IsValid()) return;
 
 	FDamageInfo DamageInfo;
 	DamageInfo.BaseDamage = ProjectileConfig.BaseDamage;
@@ -150,10 +150,10 @@ void ACombatProjectile::ApplyHitDamage(AActor* TargetActor, const FHitResult& Hi
 	DamageInfo.InstigatorWeapon = SourceWeapon.Get();
 	DamageInfo.Normalize();
 
-	if (UDamageHandlerComponent* Handler = TargetActor->FindComponentByClass<UDamageHandlerComponent>())
+	if (UDamageHandlerComponent* Handler = HitTargetActor->FindComponentByClass<UDamageHandlerComponent>())
 	{
-		Handler->ApplyDamage(DamageInstigator.Get(), TargetActor, DamageInfo, Hit);
-		if (UDamageReactionComponent* Reactions = TargetActor->FindComponentByClass<UDamageReactionComponent>())
+		Handler->ApplyDamage(DamageInstigator.Get(), HitTargetActor, DamageInfo, Hit);
+		if (UDamageReactionComponent* Reactions = HitTargetActor->FindComponentByClass<UDamageReactionComponent>())
 		{
 			Reactions->PlayHitReactionOverride(DemoHitMontage);
 		}
@@ -163,5 +163,5 @@ void ACombatProjectile::ApplyHitDamage(AActor* TargetActor, const FHitResult& Hi
 	const float RawDamage = DamageInfo.GetCalculatedRawDamage();
 	FPointDamageEvent DamageEvent(RawDamage, Hit, Hit.ImpactNormal, nullptr);
 	APawn* InstigatorPawn = Cast<APawn>(DamageInstigator.Get());
-	TargetActor->TakeDamage(RawDamage, DamageEvent, InstigatorPawn ? InstigatorPawn->GetController() : nullptr, SourceWeapon.IsValid() ? static_cast<AActor*>(SourceWeapon.Get()) : this);
+	HitTargetActor->TakeDamage(RawDamage, DamageEvent, InstigatorPawn ? InstigatorPawn->GetController() : nullptr, SourceWeapon.IsValid() ? static_cast<AActor*>(SourceWeapon.Get()) : this);
 }
