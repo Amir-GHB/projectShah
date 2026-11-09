@@ -56,12 +56,22 @@ This is a first-pass foundation, not a full tactical AI:
 - One target at a time; no squad coordination, alert propagation, cover, or ranged combat tactics.
 - The combat component needs valid weapon classes and compatible animation montages for attacks to occur.
 - Hearing requires explicit gameplay noise events.
+- Real AI enemies register with the player's encounter tracker when the player is acquired by sight; manually placed non-AI encounter actors may still need explicit registration.
+- The mage's preferred distance is derived from its `AttackRange` (2.5x); tune `AttackRange` if the desired casting distance differs.
 - Code has not been compiled or run in Unreal Editor as part of this repository edit.
 
 
 ## Magic enemy
 
-Create a child Blueprint of `AMagicEnemyCharacter`, assign `MagicProjectileClass`, and optionally configure `ProjectileSpawnSocket`, `ProjectileSpawnOffset`, `MagicAttackCooldown`, and `AttackRange`. The projectile Blueprint should own its movement, collision, damage, and visual configuration (for example, a ProjectileMovement component with an Initial Speed). The native caster aims its spawn rotation toward the target's upper body.
+Create a child Blueprint of `AMagicEnemyCharacter` and configure:
+
+- `MagicProjectileClass`: a child of the native `ACombatProjectile` class (the same projectile foundation used by bow shots).
+- `MagicAttackMontage`: optional casting/attack montage. If assigned, add the native **Release Magic Projectile** notify at the exact frame the projectile should leave the hand. Without a montage, the projectile is released immediately as a prototype fallback.
+- `ProjectileSpawnSocket` and `ProjectileSpawnOffset`: the hand socket/fallback spawn offset.
+- `MagicProjectileConfig`: temporary demo damage, speed, collision, and falloff settings. Set `DemoHitMontage` on the projectile Blueprint for a temporary hit reaction; target characters still need a valid `DamageHandlerComponent` and `DamageReactionComponent`.
+- `MagicAttackCooldown` and `AttackRange`: the AI uses 2.5 times `AttackRange` as its preferred casting distance, then relocates after releasing a shot.
+
+Mage projectiles are aimed at the target's upper-body location at the instant of release and use a gravity-free straight trajectory for this demo, so a stationary target lies on the flight path. This is deliberately temporary projectile-owned damage configuration; a production ranged weapon should route its attack profile through `UCombatComponent`.
 
 ## Random patrol
 
