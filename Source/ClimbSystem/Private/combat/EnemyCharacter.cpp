@@ -76,10 +76,11 @@ void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
 	if (!IsValid(Target) || !IsValid(MagicProjectileClass) || !GetWorld()) return;
 	const float Now = GetWorld()->GetTimeSeconds();
 	if (Now < NextMagicAttackTime || PendingMagicTarget.IsValid()) return;
-	PendingMagicTarget = Target;
-	bNeedsRelocationAfterAttack = false;
 
 	UAnimInstance* Anim = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (IsValid(MagicAttackMontage) && Anim && Anim->Montage_IsPlaying(MagicAttackMontage)) return;
+	PendingMagicTarget = Target;
+	bNeedsRelocationAfterAttack = false;
 	if (IsValid(MagicAttackMontage) && Anim)
 	{
 		if (Anim->Montage_Play(MagicAttackMontage) > 0.0f) return;
