@@ -97,6 +97,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Enemy|Magic")
 	void ReleaseMagicProjectile();
 
+	/** Clears the pending release when the casting montage is interrupted by a hit or parry. */
+	void CancelPendingMagicAttack();
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic|Animation")
 	TObjectPtr<UAnimMontage> MagicAttackMontage = nullptr;
 
