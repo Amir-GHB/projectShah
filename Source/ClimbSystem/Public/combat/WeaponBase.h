@@ -8,6 +8,7 @@
 #include "WeaponBase.generated.h"
 
 class UStaticMeshComponent;
+class UNiagaraComponent;
 class ACharacter;
 
 /**
@@ -75,6 +76,10 @@ public:
 	virtual void EndTrace();
 	UFUNCTION(BlueprintCallable, Category = "Weapon|VFX")
 	void PlaySwingEffects(bool bPlaySound = true, bool bPlayNiagara = true);
+
+	/** Activates/deactivates the attached swing trail. Intended for an animation notify state. */
+	UFUNCTION(BlueprintCallable, Category = "Weapon|VFX")
+	void SetSwingEffectsActive(bool bActive);
 	void PlayHitEffects(const FHitResult& HitResult);
 
 	UFUNCTION(BlueprintCallable, Category = "Weapon|Trace")
@@ -102,6 +107,9 @@ public:
 	FORCEINLINE const TArray<FName>& GetValidatedTraceSockets() const { return ValidatedTraceSockets; }
 
 protected:
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> ActiveSwingEffect = nullptr;
+
 	UPROPERTY(Transient)
 	TWeakObjectPtr<ACharacter> OwningCharacter;
 
