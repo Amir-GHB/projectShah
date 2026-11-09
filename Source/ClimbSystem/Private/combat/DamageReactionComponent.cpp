@@ -171,8 +171,12 @@ void UDamageReactionComponent::HandleDamageTaken(
 
 void UDamageReactionComponent::BeginParryWindow(float Duration)
 {
-	if (!GetWorld()) return;
+	if (!GetWorld() || bDeathHandled) return;
+	UCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr;
+	if (!Combat || !Combat->IsGuarding()) return;
 	bParryWindowActive = true;
+	Combat->SetParryAnimationState(true);
+	PlayReaction(DefaultParryAttemptMontage, HitReactionBlendOutTime);
 	GetWorld()->GetTimerManager().ClearTimer(ParryWindowTimer);
 	GetWorld()->GetTimerManager().SetTimer(ParryWindowTimer, this,
 		&UDamageReactionComponent::EndParryWindow, FMath::Max(0.05f, Duration > 0.0f ? Duration : ParryWindowDuration), false);
@@ -182,6 +186,10 @@ void UDamageReactionComponent::EndParryWindow()
 {
 	bParryWindowActive = false;
 	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ParryWindowTimer);
+	if (UCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr)
+	{
+		Combat->SetParryAnimationState(false);
+	}
 }
 
 bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult)
@@ -240,6 +248,25 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 		}
 	}
 	return true;
+}
+
+bool UDamageReactionComponent::ResolveIncomingMeleeHit(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult)
+{
+	if (!IsValid(Attacker) || !IsValid(AttackingWeapon)) return false;
+
+	// A successful timed parry consumes the incoming hit before VFX or damage are dispatched.
+	if (TryParry(Attacker, AttackingWeapon, HitResult)) return true;
+
+	UCombatComponent* DefenderCombat = GetOwner()
+		? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr;
+	if (DefenderCombat && DefenderCombat->IsGuarding() && AttackingWeapon->GetConfig().bIsLightAttack)
+	{
+		// Current standard melee attacks are light attacks: they break guard but deal no health damage.
+		DefenderCombat->TriggerGuardBreak();
+		return true;
+	}
+
+	return false;
 }
 
 void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
