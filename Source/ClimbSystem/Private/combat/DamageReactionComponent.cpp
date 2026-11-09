@@ -209,11 +209,17 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	}
 	const UDamageHandlerComponent* AttackerDamageState =
 		Attacker->FindComponentByClass<UDamageHandlerComponent>();
-	if ((!AttackerDamageState || !AttackerDamageState->bIsDead))
+		if ((!AttackerDamageState || !AttackerDamageState->bIsDead))
 	{
+		// Cancel the active attack transaction as well as replacing its pose.
+		// This closes weapon traces and invalidates pending combo/montage callbacks.
+		if (UCombatComponent* AttackerCombat = Attacker->FindComponentByClass<UCombatComponent>())
+		{
+			AttackerCombat->StopActiveAttack(true, true, 0.04f);
+		}
 		if (UDamageReactionComponent* AttackerReaction = Attacker->FindComponentByClass<UDamageReactionComponent>())
 		{
-			AttackerReaction->PlayReaction(AttackerMontage, HitReactionBlendOutTime);
+			AttackerReaction->PlayReaction(AttackerMontage, 0.04f);
 		}
 	}
 	return true;
@@ -280,11 +286,12 @@ void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 	{
 		ACharacter* Character = Cast<ACharacter>(GetOwner());
 		UAnimInstance* Anim = Character && Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr;
-		if (IsValid(FinalDeathMontage) && Anim && Anim->Montage_IsPlaying(FinalDeathMontage))
+				if (IsValid(FinalDeathMontage) && Anim && Anim->Montage_IsPlaying(FinalDeathMontage))
 		{
-			FOnMontageEnded EndDelegate;
-			EndDelegate.BindLambda([this](UAnimMontage*, bool) { ActivateRagdoll(); });
-			Anim->Montage_SetEndDelegate(EndDelegate, FinalDeathMontage);
+			// Hand off at the start of the final blend-out, before the AnimBP restores locomotion.
+			FOnMontageBlendingOutStarted BlendOutDelegate;
+			BlendOutDelegate.BindLambda([this](UAnimMontage*, bool) { ActivateRagdoll(); });
+			Anim->Montage_SetBlendingOutDelegate(BlendOutDelegate, FinalDeathMontage);
 		}
 		else
 		{
@@ -597,6 +604,15 @@ void UDamageReactionComponent::ActivateRagdoll()
 {
 	ACharacter* Character = Cast<ACharacter>(GetOwner());
 	if (!IsValid(Character) || !Character->GetMesh()) return;
+
+	// Freeze the final death pose before handing the mesh to physics.
+	if (UAnimInstance* Anim = Character->GetMesh()->GetAnimInstance())
+	{
+		if (IsValid(ActiveReactionMontage) && Anim->Montage_IsPlaying(ActiveReactionMontage))
+		{
+			Anim->Montage_Stop(0.0f, ActiveReactionMontage);
+		}
+	}
 	Character->GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
 	Character->GetMesh()->SetAllBodiesSimulatePhysics(true);
 	Character->GetMesh()->SetSimulatePhysics(true);
