@@ -12,7 +12,7 @@ class CLIMBSYSTEM_API UAnimNotify_WeaponHitEffects : public UAnimNotify
 {
 	GENERATED_BODY()
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon VFX")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon VFX", meta=(DisplayName="Weapon Socket Name", ToolTip="Socket on the equipped weapon mesh where the impact effect should spawn."))
 	FName EffectSocketName = NAME_None;
 
 	virtual void Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation,
