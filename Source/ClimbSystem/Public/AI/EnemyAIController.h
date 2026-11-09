@@ -48,6 +48,8 @@ private:
 	bool bWaitingAtPatrolPoint = false;
 	FVector RandomPatrolDestination = FVector::ZeroVector;
 	bool bHasRandomPatrolDestination = false;
+	bool bMageRelocationIssued = false;
+	FVector MageRelocationDestination = FVector::ZeroVector;
 	FTimerHandle UpdateTimer;
 	FTimerHandle PatrolWaitTimer;
 
