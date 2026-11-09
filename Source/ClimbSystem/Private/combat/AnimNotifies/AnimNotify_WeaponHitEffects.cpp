@@ -16,9 +16,19 @@ void UAnimNotify_WeaponHitEffects::Notify(USkeletalMeshComponent* MeshComp, UAni
 	AWeaponBase* Weapon = Combat ? Combat->CurrentWeapon : nullptr;
 	if (!IsValid(Weapon) || !IsValid(Weapon->WeaponMesh)) return;
 
-	const FVector Location = !EffectSocketName.IsNone() && Weapon->WeaponMesh->DoesSocketExist(EffectSocketName)
-		? Weapon->WeaponMesh->GetSocketLocation(EffectSocketName)
-		: Weapon->WeaponMesh->GetComponentLocation();
+	FVector Location = Weapon->WeaponMesh->GetComponentLocation();
+	if (!EffectSocketName.IsNone())
+	{
+		if (Weapon->WeaponMesh->DoesSocketExist(EffectSocketName))
+		{
+			Location = Weapon->WeaponMesh->GetSocketTransform(EffectSocketName, RTS_World).GetLocation();
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[WeaponHitEffects] Socket '%s' does not exist on weapon mesh '%s'. Using weapon mesh origin."),
+				*EffectSocketName.ToString(), *GetNameSafe(Weapon->WeaponMesh->GetStaticMesh()));
+		}
+	}
 	FHitResult SyntheticHit;
 	SyntheticHit.Location = Location;
 	SyntheticHit.ImpactPoint = Location;
