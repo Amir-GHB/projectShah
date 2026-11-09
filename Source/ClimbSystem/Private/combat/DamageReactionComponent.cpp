@@ -14,6 +14,7 @@
 #include "combat/CombatComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/WeaponBase.h"
+#include "combat/EnemyCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DamageEvents.h"
 
@@ -161,6 +162,10 @@ void UDamageReactionComponent::HandleDamageTaken(
 		return;
 	}
 
+	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(GetOwner()))
+	{
+		Mage->CancelPendingMagicAttack();
+	}
 	PlayReaction(FindBestHitReaction(DamageInfo), HitReactionBlendOutTime);
 }
 
