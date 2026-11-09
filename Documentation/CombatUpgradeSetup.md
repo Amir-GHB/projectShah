@@ -67,17 +67,13 @@ On the player Blueprint:
 - Cinematic camera is disabled by default for every pair. Enable `bUseCinematicCamera` only on entries that need a custom shot.
 - Configure `CameraShot.RelativeOffset` in the victim's local axes (X forward, Y right, Z up), choose whether to look at the midpoint, attacker, or victim, and tune FOV and blend times. Enable `bFollowCharacters` to keep the camera framed as the paired animations move.
 
-### Registering test enemies
+### Registering encounter enemies
 
-For now, register the enemies manually from Blueprint. For example, from the Level Blueprint's BeginPlay:
+Native `AEnemyCharacter` actors now register themselves with the first player's `CombatComponent` during BeginPlay. The enemy AI also registers itself when it acquires the player by sight, covering cases where the player pawn is spawned after the enemy. They unregister when the enemy ends play or dies.
 
-1. Get the player and its `CombatComponent`.
-2. Get the enemy actors you want to include in this test fight.
-3. Call `RegisterEncounterEnemy` on the player's CombatComponent for each enemy.
+Non-AI test actors such as `ACombatDamageDummy` are not automatically treated as encounter enemies; register those manually from Blueprint with `RegisterEncounterEnemy` if you want to test last-enemy finishers against them.
 
-An enemy must have `UDamageHandlerComponent` and `UDamageReactionComponent`. When a registered enemy dies, it is removed from the attacker's encounter list. The last remaining registered enemy is eligible for a finisher.
-
-This is intentionally a test harness, not the final AI encounter lifecycle. Enemy AI can call the same register/unregister functions later when it detects or leaves combat.
+Every finisher victim must have `UDamageHandlerComponent` and `UDamageReactionComponent`. The last living registered victim is eligible for a paired finisher. The attacker must have a `UCombatComponent` and matching weapon/direction montage pair.
 
 ### Current rules and limitations
 
