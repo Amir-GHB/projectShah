@@ -84,6 +84,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|Animation")
 	void SetNonCombatAnimation(bool bEnableNonCombatAnimation);
 
+	/** Enters or leaves the sustained guard stance. Call this from the owning character Blueprint. */
+	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
+	void SetGuardMode(bool bEnableGuard);
+
+	/** Called when a light attack hits an active guard. Enters the guard-break animation state. */
+	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
+	void TriggerGuardBreak();
+
+	/** Called by Blueprint when the guard-break animation/recovery has finished. */
+	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
+	void EndGuardBreak();
+
+	UFUNCTION(BlueprintPure, Category = "Combat|Defense")
+	bool IsGuarding() const { return AnimationState.DefenseState == ECombatDefenseState::Guarding || AnimationState.DefenseState == ECombatDefenseState::Parrying; }
+
+	/** Used by DamageReactionComponent to expose the parry attempt to the AnimBP. */
+	void SetParryAnimationState(bool bIsParrying);
+
 	void NotifyComboWindowBegin(const UAnimSequenceBase* Animation);
 	void NotifyComboWindowEnd(const UAnimSequenceBase* Animation);
 	/** Starts a queued individual-montage combo step at an authored transition frame. */
