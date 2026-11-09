@@ -140,6 +140,10 @@ public:
 	/** Plays a projectile/demo-supplied hit reaction after damage has been applied. */
 	void PlayHitReactionOverride(UAnimMontage* Montage);
 
+	/** Played immediately when Blueprint requests a parry attempt while guarding. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
+	TObjectPtr<UAnimMontage> DefaultParryAttemptMontage = nullptr;
+
 	/** Weapon parry montages override these shared fallbacks. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
 	TObjectPtr<UAnimMontage> DefaultDefenderParryMontage = nullptr;
@@ -153,6 +157,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
 	void EndParryWindow();
 	bool TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult);
+
+	/** Returns true when this incoming melee hit was parried or guard-broken and must not deal damage. */
+	bool ResolveIncomingMeleeHit(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Death")
 	bool bRagdollOnDeath = true;
