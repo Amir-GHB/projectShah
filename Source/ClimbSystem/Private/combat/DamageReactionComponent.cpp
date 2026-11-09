@@ -311,12 +311,12 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 		return false;
 	}
 
-	// The first implementation is player-only and requires a registered, final encounter enemy.
+	// Finisher eligibility is based on combat state and encounter registration, not controller type.
 	APlayerController* PlayerController = Cast<APlayerController>(AttackerCharacter->GetController());
 	UCombatComponent* AttackerCombat = AttackerCharacter->FindComponentByClass<UCombatComponent>();
 	UDamageReactionComponent* VictimReactions = VictimCharacter->FindComponentByClass<UDamageReactionComponent>();
 	UDamageHandlerComponent* VictimDamage = VictimCharacter->FindComponentByClass<UDamageHandlerComponent>();
-	if (!PlayerController || !AttackerCombat || !VictimReactions || !VictimDamage
+	if (!AttackerCombat || !VictimReactions || !VictimDamage
 		|| !VictimDamage->bIsDead || !AttackerCombat->IsLastLivingEncounterEnemy(Victim))
 	{
 		return false;
@@ -372,9 +372,12 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 	bFinisherActive = true;
 	FinisherVictim = VictimCharacter;
 	FinisherController = PlayerController;
-	PreviousViewTarget = PlayerController->GetViewTarget();
-	PlayerController->SetIgnoreMoveInput(true);
-	PlayerController->SetIgnoreLookInput(true);
+	if (PlayerController)
+	{
+		PreviousViewTarget = PlayerController->GetViewTarget();
+		PlayerController->SetIgnoreMoveInput(true);
+		PlayerController->SetIgnoreLookInput(true);
+	}
 	ActiveFinisherAttackerMontage = SelectedPair->AttackerMontage;
 	ActiveFinisherVictimMontage = SelectedPair->VictimMontage;
 	bAttackerFinisherEnded = false;
@@ -439,8 +442,11 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 				}
 				UpdateFinisherCamera();
 				SetComponentTickEnabled(ActiveFinisherCameraShot.bFollowCharacters);
-				PlayerController->SetViewTargetWithBlend(FinisherCameraActor,
-					FMath::Max(0.0f, ActiveFinisherCameraShot.BlendInTime));
+				if (PlayerController)
+				{
+					PlayerController->SetViewTargetWithBlend(FinisherCameraActor,
+						FMath::Max(0.0f, ActiveFinisherCameraShot.BlendInTime));
+				}
 			}
 		}
 	}
