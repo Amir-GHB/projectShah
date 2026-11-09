@@ -23,6 +23,12 @@ class CLIMBSYSTEM_API AEnemyCharacter : public ACharacter
 public:
 	AEnemyCharacter();
 
+protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+public:
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat")
 	TObjectPtr<UCombatComponent> CombatComponent;
 
