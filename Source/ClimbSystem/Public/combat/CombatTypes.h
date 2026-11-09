@@ -485,6 +485,9 @@ struct FWeaponConfig : public FTableRowBase
 	TObjectPtr<UNiagaraSystem> SwingNiagara = nullptr;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|VFX")
 	TObjectPtr<USoundBase> SwingSound = nullptr;
+	/** Optional weapon-mesh socket that anchors the moving swing trail. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|VFX")
+	FName SwingEffectSocketName = NAME_None;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|VFX")
 	FTransform SwingEffectRelativeTransform = FTransform::Identity;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry")
