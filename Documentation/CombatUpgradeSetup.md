@@ -147,15 +147,16 @@ The source changes are committed to this feature branch, but they have not been 
 Configure these fields in each weapon Blueprint's `WeaponConfig`:
 
 - `HitNiagara` and `HitSound` play at the confirmed impact point, with Niagara aligned to the impact normal.
-- `SwingNiagara` and `SwingSound` play when the swing notify is reached, whether or not the trace hits anything.
-- `SwingEffectRelativeTransform` is relative to the weapon mesh and controls location, rotation, and scale.
-
-Add `Weapon Swing Effects` to attack animation frames where the blade passes through the swing. Its notify properties independently enable sound and Niagara (both enabled by default).
+- `SwingNiagara` is spawned attached to the weapon mesh, so it follows the moving blade instead of remaining at a world-space point.
+- `SwingEffectSocketName` optionally anchors the trail to a weapon-mesh socket; `SwingEffectRelativeTransform` offsets it from that socket.
+- `SwingSound` remains a one-shot sound at the configured swing-effect transform.
+- Add `Weapon Swing Effects` to attack animation frames where the blade passes through the swing. Its notify properties independently enable sound and Niagara.
+- Add the new `Weapon Hit Effects` notify wherever an authored impact VFX is needed. It reads the character's currently equipped weapon and plays that weapon's configured `HitNiagara` and `HitSound` at the notify's optional weapon socket. Actual confirmed trace hits continue to spawn impact effects automatically.
 
 ## 8. Parry
 
-Trigger `BeginParryWindow` from the player's parry input, or add `Parry Window` notify state over the active frames of the defensive animation (the notify state automatically uses its authored duration). Set the default defender and attacker-parried montages on the character's `DamageReactionComponent`. A defender's equipped weapon-specific parry montages override those defaults. The defender's weapon `ParryDamage` is applied to the attacker when a weapon trace intersects the active parry window.
+Trigger `BeginParryWindow` from the player's parry input, or add `Parry Window` notify state over the active frames of the defensive animation (the notify state automatically uses its authored duration). Set the default defender and attacker-parried montages on the character's `DamageReactionComponent`. A defender's equipped weapon-specific parry montages override those defaults. The defender's weapon `ParryDamage` is applied to the attacker when a weapon trace intersects the active parry window. A successful parry now explicitly cancels the attacker's active combat transaction before playing the parried reaction, closing its weapon trace and invalidating queued combo transitions.
 
 ## 9. Death ragdoll
 
-`DamageReactionComponent.bRagdollOnDeath` enables shared ragdoll behavior for player and enemy characters. The configured death montage is allowed to finish first; then the skeletal mesh switches to the Ragdoll collision profile and simulates physics. Ensure the skeleton has a valid Physics Asset and the project has a Ragdoll collision profile.
+`DamageReactionComponent.bRagdollOnDeath` enables shared ragdoll behavior for player and enemy characters. The skeletal mesh hands off to physics at the death montage's final blend-out rather than waiting for its end delegate, avoiding the brief return to the AnimBP's standing pose. Ensure the skeleton has a valid Physics Asset and the project has a Ragdoll collision profile. The transition still depends on a valid death montage and compatible collision/physics setup.
