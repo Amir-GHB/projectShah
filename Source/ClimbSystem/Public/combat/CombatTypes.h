@@ -44,6 +44,16 @@ enum class ECombatState : uint8
 	DrawingBow     UMETA(DisplayName = "Drawing Bow")
 };
 
+/** Defensive stance exposed through the centralized animation-state snapshot. */
+UENUM(BlueprintType)
+enum class ECombatDefenseState : uint8
+{
+	None UMETA(DisplayName = "None"),
+	Guarding UMETA(DisplayName = "Guarding"),
+	Parrying UMETA(DisplayName = "Parrying"),
+	GuardBroken UMETA(DisplayName = "Guard Broken")
+};
+
 /** Shared animation stance selected from the currently equipped weapon. */
 UENUM(BlueprintType)
 enum class ECombatAnimationStyle : uint8
@@ -87,6 +97,9 @@ struct FCombatAnimationState
 
 	UPROPERTY(BlueprintReadOnly, Category = "Combat Animation")
 	ECombatState CombatState = ECombatState::Idle;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Combat Animation")
+	ECombatDefenseState DefenseState = ECombatDefenseState::None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Combat Animation")
 	bool bWeaponTransitionActive = false;
@@ -451,6 +464,10 @@ struct FWeaponConfig : public FTableRowBase
 	/** Played when switching to this weapon. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Animation")
 	TObjectPtr<UAnimMontage> EquipMontage = nullptr;
+
+	/** Existing standard melee attacks are light attacks and can be guard-broken. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage")
+	bool bIsLightAttack = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage")
 	float BaseDamage = 35.0f;
