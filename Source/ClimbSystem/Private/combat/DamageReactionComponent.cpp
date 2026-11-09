@@ -421,6 +421,14 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 	FOnMontageEnded VictimEndDelegate;
 	VictimEndDelegate.BindUObject(this, &UDamageReactionComponent::HandleFinisherMontageEnded);
 	VictimAnim->Montage_SetEndDelegate(VictimEndDelegate, ActiveFinisherVictimMontage);
+	// A paired finisher victim needs the same pose-preserving physics handoff as a normal death.
+	TWeakObjectPtr<UDamageReactionComponent> WeakVictimReactions(VictimReactions);
+	FOnMontageBlendingOutStarted VictimBlendOutDelegate;
+	VictimBlendOutDelegate.BindLambda([WeakVictimReactions](UAnimMontage*, bool)
+	{
+		if (WeakVictimReactions.IsValid()) WeakVictimReactions->ActivateRagdoll();
+	});
+	VictimAnim->Montage_SetBlendingOutDelegate(VictimBlendOutDelegate, ActiveFinisherVictimMontage);
 
 	// The victim's normal death montage is suppressed; the paired finisher montage owns the death pose.
 	VictimReactions->bDeathHandled = true;
@@ -626,7 +634,7 @@ void UDamageReactionComponent::DestroyFinisherCamera()
 void UDamageReactionComponent::ActivateRagdoll()
 {
 	ACharacter* Character = Cast<ACharacter>(GetOwner());
-	if (!IsValid(Character) || !Character->GetMesh()) return;
+	if (!IsValid(Character) || !Character->GetMesh() || Character->GetMesh()->IsSimulatingPhysics()) return;
 
 	// The blending-out delegate fires while the death montage still owns the pose.
 	// Enable full-body simulation at that handoff; the mesh then remains in physics control.
