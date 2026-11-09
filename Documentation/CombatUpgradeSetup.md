@@ -53,7 +53,7 @@ Reaction montages are assigned per character Blueprint because the actual animat
 
 ## 5. Last-enemy finishers (initial implementation)
 
-Finishers are coordinated by the attacker's existing `UDamageReactionComponent`; no additional actor component is required. The player's existing `UCombatComponent` owns a deliberately small list of enemies registered for the current test encounter.
+Finishers are coordinated by the attacker's existing `UDamageReactionComponent`; no additional actor component is required. The attacker's `UCombatComponent` owns the list of enemies registered for the current encounter. The paired finisher can target any character with the shared damage/reaction components, including native AI enemies.
 
 ### Player setup
 
@@ -77,7 +77,7 @@ Every finisher victim must have `UDamageHandlerComponent` and `UDamageReactionCo
 
 ### Current rules and limitations
 
-- Only a direct player melee killing blow can trigger a finisher. Bow/projectile and damage-over-time kills use the normal death reaction.
+- Only a direct melee killing blow from an attacker with a `UCombatComponent` can trigger a finisher. Bow/projectile and damage-over-time kills use the normal death reaction. The attacker does not need to be player-possessed; a player controller is only needed for player input locking and optional cinematic camera control.
 - The victim must be registered in the player's encounter list and be the last living registered enemy.
 - A valid montage pair must exist for the killing weapon type. If not, the ordinary death reaction plays.
 - The victim's ordinary death montage is suppressed only when both finisher montages successfully start.
