@@ -2,7 +2,6 @@
 
 #include "AI/EnemyAIController.h"
 
-#include "AI/EnemyCharacter.h"
 #include "combat/EnemyCharacter.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
