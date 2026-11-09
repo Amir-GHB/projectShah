@@ -137,6 +137,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions", meta = (ClampMin = "0.0"))
 	float DeathBlendOutTime = 0.12f;
 
+	/** Plays a projectile/demo-supplied hit reaction after damage has been applied. */
+	void PlayHitReactionOverride(UAnimMontage* Montage);
+
 	/** Weapon parry montages override these shared fallbacks. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
 	TObjectPtr<UAnimMontage> DefaultDefenderParryMontage = nullptr;
