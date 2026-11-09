@@ -703,6 +703,7 @@ void UCombatComponent::EnterDeadState()
 	}
 
 	StopActiveAttack(true, true, 0.12f);
+	AnimationState.DefenseState = ECombatDefenseState::None;
 	SetCombatState(ECombatState::Dead);
 }
 
@@ -770,6 +771,7 @@ void UCombatComponent::EnterFinisherState()
 {
 	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing) return;
 	StopActiveAttack(true, true, 0.08f);
+	AnimationState.DefenseState = ECombatDefenseState::None;
 	SetCombatState(ECombatState::Finishing);
 }
 
