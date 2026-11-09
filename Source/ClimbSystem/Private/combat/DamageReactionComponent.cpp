@@ -194,13 +194,11 @@ void UDamageReactionComponent::EndParryWindow()
 
 bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult)
 {
-	if (!bParryWindowActive || bDeathHandled || !IsValid(Attacker) || !IsValid(AttackingWeapon)) return false;
+	if (!bParryWindowActive || bDeathHandled || !IsValid(Attacker) || !IsValid(AttackingWeapon) || !GetOwner()) return false;
+	UCombatComponent* DefenderCombat = GetOwner()->FindComponentByClass<UCombatComponent>();
+	if (!DefenderCombat || !DefenderCombat->IsGuarding()) return false;
 	EndParryWindow();
-	AWeaponBase* DefenderWeapon = nullptr;
-	if (UCombatComponent* DefenderCombat = GetOwner()->FindComponentByClass<UCombatComponent>())
-	{
-		DefenderWeapon = DefenderCombat->CurrentWeapon;
-	}
+	AWeaponBase* DefenderWeapon = DefenderCombat->CurrentWeapon;
 	const FWeaponConfig& Config = IsValid(DefenderWeapon)
 		? DefenderWeapon->GetConfig() : AttackingWeapon->GetConfig();
 	UAnimMontage* DefenderMontage = IsValid(Config.DefenderParryMontage)
