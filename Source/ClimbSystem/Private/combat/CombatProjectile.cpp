@@ -11,6 +11,7 @@
 #include "Curves/CurveFloat.h"
 #include "Kismet/GameplayStatics.h"
 #include "combat/DamageHandlerComponent.h"
+#include "combat/DamageReactionComponent.h"
 #include "combat/WeaponBase.h"
 
 ACombatProjectile::ACombatProjectile()
@@ -152,6 +153,10 @@ void ACombatProjectile::ApplyHitDamage(AActor* TargetActor, const FHitResult& Hi
 	if (UDamageHandlerComponent* Handler = TargetActor->FindComponentByClass<UDamageHandlerComponent>())
 	{
 		Handler->ApplyDamage(DamageInstigator.Get(), TargetActor, DamageInfo, Hit);
+		if (UDamageReactionComponent* Reactions = TargetActor->FindComponentByClass<UDamageReactionComponent>())
+		{
+			Reactions->PlayHitReactionOverride(DemoHitMontage);
+		}
 		return;
 	}
 
