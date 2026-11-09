@@ -10,6 +10,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Engine/World.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 AEnemyCharacter::AEnemyCharacter()
 {
@@ -33,6 +34,33 @@ AEnemyCharacter::AEnemyCharacter()
 		Movement->MaxWalkSpeed = 300.0f;
 		Movement->NavAgentProps.bCanCrouch = true;
 	}
+}
+
+void AEnemyCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Register real AI enemies with the player's encounter tracker so last-enemy
+	// finishers work without Level Blueprint/manual dummy-only setup.
+	if (ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(this, 0))
+	{
+		if (UCombatComponent* PlayerCombat = PlayerCharacter->FindComponentByClass<UCombatComponent>())
+		{
+			PlayerCombat->RegisterEncounterEnemy(this);
+		}
+	}
+}
+
+void AEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(this, 0))
+	{
+		if (UCombatComponent* PlayerCombat = PlayerCharacter->FindComponentByClass<UCombatComponent>())
+		{
+			PlayerCombat->UnregisterEncounterEnemy(this);
+		}
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 void AEnemyCharacter::PerformAICombatAction(AActor* Target)
