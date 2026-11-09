@@ -89,6 +89,11 @@ void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
 	ReleaseMagicProjectile();
 }
 
+void AMagicEnemyCharacter::CancelPendingMagicAttack()
+{
+	PendingMagicTarget.Reset();
+}
+
 void AMagicEnemyCharacter::ReleaseMagicProjectile()
 {
 	AActor* Target = PendingMagicTarget.Get();
