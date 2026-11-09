@@ -619,14 +619,8 @@ void UDamageReactionComponent::ActivateRagdoll()
 	ACharacter* Character = Cast<ACharacter>(GetOwner());
 	if (!IsValid(Character) || !Character->GetMesh()) return;
 
-	// Freeze the final death pose before handing the mesh to physics.
-	if (UAnimInstance* Anim = Character->GetMesh()->GetAnimInstance())
-	{
-		if (IsValid(ActiveReactionMontage) && Anim->Montage_IsPlaying(ActiveReactionMontage))
-		{
-			Anim->Montage_Stop(0.0f, ActiveReactionMontage);
-		}
-	}
+	// The blending-out delegate fires while the death montage still owns the pose.
+	// Enable full-body simulation at that handoff; the mesh then remains in physics control.
 	Character->GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
 	Character->GetMesh()->SetAllBodiesSimulatePhysics(true);
 	Character->GetMesh()->SetSimulatePhysics(true);
