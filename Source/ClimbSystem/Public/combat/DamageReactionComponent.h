@@ -230,11 +230,15 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveFinisherVictimMontage = nullptr;
 
-	/** The single participant warp target created for the active paired finisher. */
+	/** Warp targets created for the active attacker/victim montage pair. */
 	UPROPERTY(Transient)
-	TWeakObjectPtr<UMotionWarpingComponent> ActiveFinisherMotionWarpingComponent;
+	TWeakObjectPtr<UMotionWarpingComponent> ActiveFinisherAttackerWarpingComponent;
 
-	FName ActiveFinisherWarpTargetName = NAME_None;
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UMotionWarpingComponent> ActiveFinisherVictimWarpingComponent;
+
+	FName ActiveFinisherAttackerWarpTargetName = NAME_None;
+	FName ActiveFinisherVictimWarpTargetName = NAME_None;
 
 	bool bFinisherActive = false;
 	bool bAttackerFinisherEnded = false;
