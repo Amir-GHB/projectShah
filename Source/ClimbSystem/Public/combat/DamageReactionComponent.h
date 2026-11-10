@@ -118,12 +118,12 @@ struct FFinisherMontagePair
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping", meta = (EditCondition = "bUseMotionWarping"))
     EFinisherWarpSubject WarpSubject = EFinisherWarpSubject::Attacker;
 
-    /** Must match the Warp Target Name on the attacker's Motion Warping notify state. */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping", meta = (EditCondition = "bUseMotionWarping && WarpSubject == EFinisherWarpSubject::Attacker"))
+    /** Must match the Warp Target Name used by the attacker's montage Motion Warping notify state. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping", meta = (EditCondition = "bUseMotionWarping"))
     FName AttackerWarpTargetName = FName("FinisherTarget");
 
-    /** Must match the Warp Target Name on the victim's Motion Warping notify state when Warp Subject is Victim. */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping", meta = (EditCondition = "bUseMotionWarping && WarpSubject == EFinisherWarpSubject::Victim"))
+    /** Must match the Warp Target Name used by the victim's montage Motion Warping notify state. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping", meta = (EditCondition = "bUseMotionWarping"))
     FName VictimWarpTargetName = FName("FinisherTarget");
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera")
