@@ -4,6 +4,7 @@
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "MotionWarpingComponent.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Character.h"
@@ -425,6 +426,43 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 	bAttackerFinisherEnded = false;
 	bVictimFinisherEnded = false;
 
+	// Create the target before either montage starts so the first Motion Warping window can resolve it.
+	if (SelectedPair->bUseMotionWarping)
+	{
+		UMotionWarpingComponent* WarpComponent = nullptr;
+		FName WarpTargetName = NAME_None;
+		FTransform WarpTargetTransform = FTransform::Identity;
+
+		if (SelectedPair->WarpSubject == EFinisherWarpSubject::Attacker)
+		{
+			WarpComponent = AttackerCharacter->FindComponentByClass<UMotionWarpingComponent>();
+			WarpTargetName = SelectedPair->AttackerWarpTargetName;
+
+			// Authored transform is VictimRelativeToAttacker. Invert it to position the attacker
+			// relative to the anchored victim.
+			const FTransform AttackerRelativeToVictim = SelectedPair->VictimRelativeToAttacker.Inverse();
+			WarpTargetTransform = AttackerRelativeToVictim * VictimCharacter->GetActorTransform();
+		}
+		else
+		{
+			WarpComponent = VictimCharacter->FindComponentByClass<UMotionWarpingComponent>();
+			WarpTargetName = SelectedPair->VictimWarpTargetName;
+
+			// Keep the attacker anchored and move the victim to the authored relative transform.
+			WarpTargetTransform = SelectedPair->VictimRelativeToAttacker * AttackerCharacter->GetActorTransform();
+		}
+
+		if (!IsValid(WarpComponent) || WarpTargetName.IsNone())
+		{
+			EndFinisher(true);
+			return false;
+		}
+
+		WarpComponent->AddOrUpdateWarpTargetFromTransform(WarpTargetName, WarpTargetTransform);
+		ActiveFinisherMotionWarpingComponent = WarpComponent;
+		ActiveFinisherWarpTargetName = WarpTargetName;
+	}
+
 	const float AttackerDuration = AttackerAnim->Montage_Play(ActiveFinisherAttackerMontage);
 	if (AttackerDuration <= 0.0f)
 	{
@@ -583,6 +621,14 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 		Controller->SetIgnoreMoveInput(false);
 		Controller->SetIgnoreLookInput(false);
 	}
+
+	// Remove only the target owned by this finisher. Other combat warp targets remain untouched.
+	if (ActiveFinisherMotionWarpingComponent.IsValid() && !ActiveFinisherWarpTargetName.IsNone())
+	{
+		ActiveFinisherMotionWarpingComponent->RemoveWarpTarget(ActiveFinisherWarpTargetName);
+	}
+	ActiveFinisherMotionWarpingComponent.Reset();
+	ActiveFinisherWarpTargetName = NAME_None;
 
 	if (IsValid(FinisherCameraActor))
 	{
