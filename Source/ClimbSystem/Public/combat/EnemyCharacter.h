@@ -10,6 +10,7 @@
 class UCombatComponent;
 class UDamageHandlerComponent;
 class UDamageReactionComponent;
+class UMotionWarpingComponent;
 class AEnemyAIController;
 class ACombatProjectile;
 class UAnimMontage;
@@ -40,6 +41,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat")
 	TObjectPtr<UDamageReactionComponent> DamageReactionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat|Motion Warping")
+	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
 
 	/** Optional ordered patrol route. If empty, random reachable patrol is used when enabled. */
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol")
