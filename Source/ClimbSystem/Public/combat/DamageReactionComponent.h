@@ -13,6 +13,7 @@ class UDamageHandlerComponent;
 class ACharacter;
 class ACameraActor;
 class APlayerController;
+class UMotionWarpingComponent;
 
 /** A data-driven hit reaction with optional weapon, body-region, and direction filters. */
 USTRUCT(BlueprintType)
@@ -79,6 +80,14 @@ struct FFinisherCameraShot
     bool bFollowCharacters = true;
 };
 
+/** Selects which participant is moved to satisfy the authored paired-animation alignment. */
+UENUM(BlueprintType)
+enum class EFinisherWarpSubject : uint8
+{
+    Attacker UMETA(DisplayName = "Warp Attacker (Keep Victim Anchored)"),
+    Victim UMETA(DisplayName = "Warp Victim (Keep Attacker Anchored)")
+};
+
 /** A paired execution animation with optional direction filtering and an optional custom camera shot. */
 USTRUCT(BlueprintType)
 struct FFinisherMontagePair
@@ -96,6 +105,26 @@ struct FFinisherMontagePair
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
     TObjectPtr<UAnimMontage> VictimMontage = nullptr;
+
+    /** Enables root-motion alignment through Motion Warping. The montages must contain matching Motion Warping notify windows. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping")
+    bool bUseMotionWarping = true;
+
+    /** Victim transform relative to attacker in the authoring preview, with the attacker at the origin. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping", meta = (EditCondition = "bUseMotionWarping"))
+    FTransform VictimRelativeToAttacker = FTransform::Identity;
+
+    /** Default keeps the victim at its current location and moves the attacker into the paired pose. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping", meta = (EditCondition = "bUseMotionWarping"))
+    EFinisherWarpSubject WarpSubject = EFinisherWarpSubject::Attacker;
+
+    /** Must match the Warp Target Name on the attacker's Motion Warping notify state. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping", meta = (EditCondition = "bUseMotionWarping && WarpSubject == EFinisherWarpSubject::Attacker"))
+    FName AttackerWarpTargetName = FName("FinisherTarget");
+
+    /** Must match the Warp Target Name on the victim's Motion Warping notify state when Warp Subject is Victim. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Motion Warping", meta = (EditCondition = "bUseMotionWarping && WarpSubject == EFinisherWarpSubject::Victim"))
+    FName VictimWarpTargetName = FName("FinisherTarget");
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers|Camera")
     bool bUseCinematicCamera = false;
@@ -200,6 +229,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveFinisherVictimMontage = nullptr;
+
+	/** The single participant warp target created for the active paired finisher. */
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UMotionWarpingComponent> ActiveFinisherMotionWarpingComponent;
+
+	FName ActiveFinisherWarpTargetName = NAME_None;
 
 	bool bFinisherActive = false;
 	bool bAttackerFinisherEnded = false;
