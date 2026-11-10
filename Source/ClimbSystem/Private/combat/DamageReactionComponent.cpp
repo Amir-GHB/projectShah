@@ -426,43 +426,44 @@ bool UDamageReactionComponent::TryPlayFinisher(AActor* Victim, const FDamageInfo
 	bAttackerFinisherEnded = false;
 	bVictimFinisherEnded = false;
 
-	// Create the target before either montage starts so the first Motion Warping window can resolve it.
+	// Set both participant targets before either montage starts. The anchored participant's
+	// target is its current transform, allowing its own notify window to cancel root-motion drift.
 	if (SelectedPair->bUseMotionWarping)
 	{
-		UMotionWarpingComponent* WarpComponent = nullptr;
-		FName WarpTargetName = NAME_None;
-		FTransform WarpTargetTransform = FTransform::Identity;
-
-		if (SelectedPair->WarpSubject == EFinisherWarpSubject::Attacker)
-		{
-			WarpComponent = AttackerCharacter->FindComponentByClass<UMotionWarpingComponent>();
-			WarpTargetName = SelectedPair->AttackerWarpTargetName;
-
-			// Authored transform is VictimRelativeToAttacker. Invert it to position the attacker
-			// relative to the anchored victim.
-			const FTransform AttackerRelativeToVictim = SelectedPair->VictimRelativeToAttacker.Inverse();
-			WarpTargetTransform = AttackerRelativeToVictim * VictimCharacter->GetActorTransform();
-		}
-		else
-		{
-			WarpComponent = VictimCharacter->FindComponentByClass<UMotionWarpingComponent>();
-			WarpTargetName = SelectedPair->VictimWarpTargetName;
-
-			// Keep the attacker anchored and move the victim to the authored relative transform.
-			WarpTargetTransform = SelectedPair->VictimRelativeToAttacker * AttackerCharacter->GetActorTransform();
-		}
-
-		if (!IsValid(WarpComponent) || WarpTargetName.IsNone())
+		UMotionWarpingComponent* AttackerWarping = AttackerCharacter->FindComponentByClass<UMotionWarpingComponent>();
+		UMotionWarpingComponent* VictimWarping = VictimCharacter->FindComponentByClass<UMotionWarpingComponent>();
+		if (!IsValid(AttackerWarping) || !IsValid(VictimWarping)
+			|| SelectedPair->AttackerWarpTargetName.IsNone() || SelectedPair->VictimWarpTargetName.IsNone())
 		{
 			EndFinisher(true);
 			return false;
 		}
 
-		WarpComponent->AddOrUpdateWarpTargetFromTransform(WarpTargetName, WarpTargetTransform);
-		ActiveFinisherMotionWarpingComponent = WarpComponent;
-		ActiveFinisherWarpTargetName = WarpTargetName;
-	}
+		const FTransform AttackerWorld = AttackerCharacter->GetActorTransform();
+		const FTransform VictimWorld = VictimCharacter->GetActorTransform();
+		FTransform AttackerTarget = AttackerWorld;
+		FTransform VictimTarget = VictimWorld;
 
+		if (SelectedPair->WarpSubject == EFinisherWarpSubject::Attacker)
+		{
+			// Authored transform is VictimRelativeToAttacker. Invert it to position the attacker
+			// relative to the anchored victim.
+			const FTransform AttackerRelativeToVictim = SelectedPair->VictimRelativeToAttacker.Inverse();
+			AttackerTarget = AttackerRelativeToVictim * VictimWorld;
+		}
+		else
+		{
+			// Keep the attacker anchored and move the victim to the authored relative transform.
+			VictimTarget = SelectedPair->VictimRelativeToAttacker * AttackerWorld;
+		}
+
+		AttackerWarping->AddOrUpdateWarpTargetFromTransform(SelectedPair->AttackerWarpTargetName, AttackerTarget);
+		VictimWarping->AddOrUpdateWarpTargetFromTransform(SelectedPair->VictimWarpTargetName, VictimTarget);
+		ActiveFinisherAttackerWarpingComponent = AttackerWarping;
+		ActiveFinisherVictimWarpingComponent = VictimWarping;
+		ActiveFinisherAttackerWarpTargetName = SelectedPair->AttackerWarpTargetName;
+		ActiveFinisherVictimWarpTargetName = SelectedPair->VictimWarpTargetName;
+	}
 	const float AttackerDuration = AttackerAnim->Montage_Play(ActiveFinisherAttackerMontage);
 	if (AttackerDuration <= 0.0f)
 	{
@@ -622,13 +623,19 @@ void UDamageReactionComponent::EndFinisher(bool bStopMontages)
 		Controller->SetIgnoreLookInput(false);
 	}
 
-	// Remove only the target owned by this finisher. Other combat warp targets remain untouched.
-	if (ActiveFinisherMotionWarpingComponent.IsValid() && !ActiveFinisherWarpTargetName.IsNone())
+	// Remove only the two targets owned by this finisher. Other combat warp targets remain untouched.
+	if (ActiveFinisherAttackerWarpingComponent.IsValid() && !ActiveFinisherAttackerWarpTargetName.IsNone())
 	{
-		ActiveFinisherMotionWarpingComponent->RemoveWarpTarget(ActiveFinisherWarpTargetName);
+		ActiveFinisherAttackerWarpingComponent->RemoveWarpTarget(ActiveFinisherAttackerWarpTargetName);
 	}
-	ActiveFinisherMotionWarpingComponent.Reset();
-	ActiveFinisherWarpTargetName = NAME_None;
+	if (ActiveFinisherVictimWarpingComponent.IsValid() && !ActiveFinisherVictimWarpTargetName.IsNone())
+	{
+		ActiveFinisherVictimWarpingComponent->RemoveWarpTarget(ActiveFinisherVictimWarpTargetName);
+	}
+	ActiveFinisherAttackerWarpingComponent.Reset();
+	ActiveFinisherVictimWarpingComponent.Reset();
+	ActiveFinisherAttackerWarpTargetName = NAME_None;
+	ActiveFinisherVictimWarpTargetName = NAME_None;
 
 	if (IsValid(FinisherCameraActor))
 	{
