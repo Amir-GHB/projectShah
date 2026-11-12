@@ -1,83 +1,103 @@
-# Enemy Character and Basic AI Setup
+# Enemy AI Foundation (Behavior Tree + Blackboard)
 
-This branch adds a native enemy foundation using the existing combat and damage systems.
+This branch uses Unreal's native Behavior Tree and Blackboard runtime. Perception remains on the native AI controller; the controller writes observed target/investigation state to the Blackboard. Behavior Tree nodes own movement and action decisions. Existing combat components remain authoritative for weapon state, attacks, montage callbacks, damage, and combo progression.
 
-## Included native classes
+## Native classes
 
-- `AEnemyCharacter`: character base with `UCombatComponent`, `UDamageHandlerComponent`, and `UDamageReactionComponent`.
-- `AEnemyAIController`: native random/point patrol, sight/hearing perception, investigation, and pursuit.
-- `AMagicEnemyCharacter`: optional ranged enemy that launches a configurable projectile Blueprint.
-- Unreal AI Perception is configured in C++; no Behavior Tree or Blackboard asset is required for this first implementation.
+- `AEnemyCharacter`: shared enemy base, combat/damage components, Behavior Tree asset reference, perception tuning, and patrol settings.
+- `AEnemyAIController`: sight/hearing perception adapter, target validation, encounter registration, Blackboard updates, and combo-window forwarding. It no longer runs a periodic decision loop.
+- `UBTService_EnemyState`: mirrors target, investigation, and death state into Blackboard keys.
+- `UBTTask_EnemyEngageTarget`: target pursuit, archetype-aware spacing, facing, attack cadence, and task-abort cleanup.
+- `UBTTask_EnemyPatrol`: ordered patrol points or random reachable NavMesh destinations, with waits and retry handling.
+- `AMagicEnemyCharacter`: existing montage-notify-driven magic projectile behavior and preferred-distance relocation.
+- `ABowEnemyCharacter`: AI bow draw/release timing through the existing `UCombatComponent` and equipped `AWeapon_Bow`.
 
-## Minimal Blueprint setup
+## Required editor assets
 
-Create a child Blueprint of `AEnemyCharacter` and configure:
+The C++ runtime nodes are included in the module, but Unreal Behavior Tree and Blackboard assets are editor-authored assets and are not safely represented by source-only C++ files. Create the assets below once in the Content Browser, then assign the Behavior Tree on each enemy Blueprint.
 
-1. Skeletal mesh and Animation Blueprint.
-2. `CombatComponent.WeaponClasses` and `DefaultWeaponType` for the enemy's weapon. The existing combat component spawns and equips the configured weapon.
-3. Damage/reaction values and optional hit/death reaction montages.
-4. Optionally place patrol point actors and assign them to `PatrolPoints`. If the array is empty, the enemy chooses random reachable destinations within `RandomPatrolRadius` when `bUseRandomPatrolWhenNoPoints` is enabled.
-5. Adjust sight, hearing, attack range, patrol wait, and investigation values if needed.
+### 1. Create the Blackboard
 
-The enemy automatically possesses `AEnemyAIController` when placed or spawned.
+Create a Blackboard asset named `BB_Enemy` with these keys (spelling and type must match):
 
-## Current behavior
+| Key | Type | Purpose |
+|---|---|---|
+| `TargetActor` | Object (Base Class: Actor) | Current visible player target |
+| `HasTarget` | Bool | Target branch condition |
+| `InvestigationLocation` | Vector | Last heard/seen location |
+| `HasInvestigation` | Bool | Investigation branch condition |
+| `IsDead` | Bool | Death state for optional decorators/debugging |
 
-- Patrols the assigned points in array order and loops.
-- Sight detects player-controlled Pawns inside the configured sight cone.
-- Hearing records a noise location and investigates it for a limited duration.
-- Losing sight of a target moves the enemy to the last seen location before resuming patrol.
-- Pursues a visible player and calls the enemy's virtual combat action inside `AttackRange`. `AMagicEnemyCharacter` instead launches its configured projectile Blueprint toward the target.
-- Stops its AI update loop when its damage handler reports death.
+Assign `BB_Enemy` to the Blackboard field of the Behavior Tree.
 
-For sound detection, gameplay systems should report noise with Unreal's `UAISense_Hearing::ReportNoiseEvent` (or an equivalent Pawn noise event). Merely playing an audio asset does not automatically create an AI hearing stimulus.
+### 2. Create the Behavior Tree
 
-## Combat component decision
+Create `BT_Enemy`, assign `BB_Enemy`, and construct this priority-ordered tree:
 
-The existing `UCombatComponent` is reused because its weapon spawning, equip flow, montage handling, combo logic, and weapon trace integration are character-agnostic enough for an AI Pawn. The AI invokes the enemy's virtual `PerformAICombatAction(Target)` when the target is in range. The base enemy requests a melee attack through `UCombatComponent`; `AMagicEnemyCharacter` spawns its configured projectile instead. Player input and camera targeting are not added to the enemy.
+```text
+Root
+└── Selector
+    ├── Sequence [Decorator: HasTarget is true, Observer Aborts: Both]
+    │   └── Engage Target (UBTTask_EnemyEngageTarget)
+    ├── Sequence [Decorator: HasInvestigation is true, Observer Aborts: Both]
+    │   ├── Move To (Blackboard: InvestigationLocation, acceptable radius: 100)
+    │   └── Wait (0.5 to 1.0 seconds)
+    └── Patrol (UBTTask_EnemyPatrol)
+```
 
-Configure the enemy's weapon classes in its child Blueprint. Do not add `UCombatTargetingComponent`; it is player-camera/attack-focus oriented.
+Add `UBTService_EnemyState` to the root Selector (or a parent composite) and retain its default Blackboard key names. Its 0.2-second service interval updates the state used by branch decorators. Set both target/investigation decorators to observe their Blackboard key and abort lower-priority branches when the condition changes. The patrol task returns Failed when patrol is disabled, leaving the tree idle until a higher-priority branch becomes relevant.
 
-## Blackboard and Behavior Tree
+### 3. Assign assets
 
-Unreal supports both Blackboard and Behavior Tree workflows from C++: native controllers can create/configure Blackboard data and start Behavior Trees, while behavior tasks/services/decorators can be implemented in C++. This initial controller deliberately uses a small native state loop and AI Perception directly, avoiding required editor-authored Blackboard/Behavior Tree assets. They can be introduced later if the behavior grows beyond this compact state machine.
+For each child Blueprint of `AEnemyCharacter`:
 
-## Navigation requirements
+1. Set `BehaviorTreeAsset` to `BT_Enemy`.
+2. Configure the mesh, Animation Blueprint, damage/reaction settings, and `CombatComponent.WeaponClasses`.
+3. Set `CombatComponent.DefaultWeaponType` to the weapon the archetype should use.
+4. Tune sight, hearing, attack range, retry interval, and investigation duration.
+5. Add a NavMeshBoundsVolume over the playable area and build navigation.
 
-- Add a NavMeshBoundsVolume covering patrol and combat areas.
-- Build navigation data.
-- Ensure patrol points and enemy spawn positions lie on navigable space.
-- Ensure the enemy capsule and mesh use appropriate collision settings.
+The enemy auto-possesses `AEnemyAIController` when placed or spawned. If no Behavior Tree is assigned, the controller logs an explicit error and does not silently fall back to the removed timer-driven state machine.
 
-## Scope and limitations
+## Archetypes
 
-This is a first-pass foundation, not a full tactical AI:
-- Targets player-controlled Pawns only; faction/team filtering is not yet integrated.
-- One target at a time; no squad coordination, alert propagation, cover, or ranged combat tactics.
-- The combat component needs valid weapon classes and compatible animation montages for attacks to occur.
-- Hearing requires explicit gameplay noise events.
-- Real AI enemies register with the player's encounter tracker when the player is acquired by sight; manually placed non-AI encounter actors may still need explicit registration.
-- The mage's preferred distance is derived from its `AttackRange` (2.5x); tune `AttackRange` if the desired casting distance differs.
-- Code has not been compiled or run in Unreal Editor as part of this repository edit.
+### Melee
 
+Use a child of `AEnemyCharacter`, configure its melee weapon class and default weapon, and use `BT_Enemy`. The engage task closes to `AttackRange`, faces the target, and calls `PerformAICombatAction`. Combo chaining still uses the authored `UCombatComponent` combo-window event and transition notifies.
 
-## Magic enemy
+### Mage
 
-Create a child Blueprint of `AMagicEnemyCharacter` and configure:
+Use a child of `AMagicEnemyCharacter`. Configure `MagicProjectileClass`, `MagicAttackMontage`, projectile config, spawn socket/offset, cooldown, and preferred-distance multiplier. If a montage is assigned, retain the native **Release Magic Projectile** notify at the exact release frame. The engage task maintains the mage's preferred range and honors its post-shot relocation flag. Projectile release remains target-directed and montage-notify driven.
 
-- `MagicProjectileClass`: a child of the native `ACombatProjectile` class (the same projectile foundation used by bow shots).
-- `MagicAttackMontage`: optional casting/attack montage. If assigned, add the native **Release Magic Projectile** notify at the exact frame the projectile should leave the hand. Without a montage, the projectile is released immediately as a prototype fallback.
-- `ProjectileSpawnSocket` and `ProjectileSpawnOffset`: the hand socket/fallback spawn offset.
-- `MagicProjectileConfig`: temporary demo damage, speed, collision, and falloff settings. Set `DemoHitMontage` on the projectile Blueprint for a temporary hit reaction; target characters still need a valid `DamageHandlerComponent` and `DamageReactionComponent`.
-- `MagicAttackCooldown` and `AttackRange`: the AI uses 2.5 times `AttackRange` as its preferred casting distance, then relocates after releasing a shot.
+### Archer
 
-Mage projectiles are aimed at the target's upper-body location at the instant of release and use a gravity-free straight trajectory for this demo, so a stationary target lies on the flight path. This is deliberately temporary projectile-owned damage configuration; a production ranged weapon should route its attack profile through `UCombatComponent`.
+Use a child of `ABowEnemyCharacter`. Configure its `CombatComponent` with an `AWeapon_Bow` subclass and set the default weapon to Bow. Tune `BowDrawDuration`, `BowAttackCooldown`, and `PreferredCombatDistanceMultiplier`. The archer uses `HandleAttackInput` to begin drawing and `HandleAttackReleased` to fire. Projectile configuration, draw scaling, and damage continue through the existing bow implementation. The controller's focus is used by the bow's existing control-rotation aiming path. If sight is lost or the engage task is aborted, the active draw is cancelled rather than released.
 
-## Random patrol
+## Patrol configuration
 
-With no patrol points assigned, `bUseRandomPatrolWhenNoPoints` makes the controller request a random reachable NavMesh point inside `RandomPatrolRadius`, wait for `PatrolWaitTime`, and choose another. A NavMeshBoundsVolume is still required.
+- `bEnablePatrol` is the master switch. Disable it to stop all patrol behavior, even if patrol points are assigned.
+- If `PatrolPoints` contains actors, the task visits them in array order and loops.
+- If there are no points and `bUseRandomPatrolWhenNoPoints` is true, the task chooses random reachable NavMesh points within `RandomPatrolRadius`.
+- If there are no points and random patrol is disabled, the patrol task returns Failed.
+- `PatrolAcceptanceRadius` and `PatrolWaitTime` control arrival and pauses.
 
+Patrol is a lower-priority branch. Acquiring a target or receiving an investigation stimulus aborts patrol movement; when the higher-priority branch ends, the selector can enter patrol again.
 
-## Enemy combo chaining
+## Perception and sound
 
-Enemy melee combos advance through the same `UCombatComponent` combo system used by the player. The AI listens for the authored combo-window event and requests the next attack only while its target remains valid and inside `AttackRange`. Add the existing combo-window and transition notifies to each attack montage as required by the selected montage mode; the AI does not use a fixed-rate attack-input spam timer. If no next combo step is queued, the montage finishes normally and the AI retries after `AttackRetryInterval`.
+Sight detects player-controlled Pawns within the configured radius/cone. Losing sight stores the last seen location and clears the target; hearing stores the stimulus location. The investigation branch remains active for `InvestigateDuration`. Gameplay systems must report noise with `UAISense_Hearing::ReportNoiseEvent` (or an equivalent Pawn noise event); merely playing an audio asset does not emit a hearing stimulus.
+
+The controller registers a newly acquired real enemy with the player's encounter tracker, preserving last-enemy finisher behavior. It also forwards the existing authored combo-window event to the combat component only while the target remains valid and within melee attack range.
+
+## Extension boundary
+
+Keep external decision systems outside combat implementation. Perception providers should feed the controller's target/investigation boundary; decision services can populate the same Blackboard contract or replace the service/task policy. Navigation remains behind AIController movement requests, and all attacks remain behind `PerformAICombatAction` / `UCombatComponent`. A future external integration should not own weapon, montage, damage, or character state.
+
+## Validation
+
+- Targets remain player-controlled Pawns only; faction/team filtering and squad coordination are not included.
+- One target is tracked at a time. No cover system, squad tactics, or alert propagation is included.
+- Bow AI requires an equipped bow, valid projectile class, compatible draw/release montages, and a valid arrow spawn socket (or the existing fallback).
+- Mage and bow spacing are derived from `AttackRange` multiplied by their archetype-specific distance setting.
+- No Behavior Tree/Blackboard `.uasset` files are committed by this source change. Create the two assets in the editor as described above and assign `BehaviorTreeAsset`.
+- Source changes have not been compiled or exercised in Unreal Editor in this environment. Build in UE 5.8, then validate melee combo windows, mage release notify/relocation, bow draw/release/cancel, perception loss/investigation, patrol interruption/resume, and death interruption.
