@@ -159,8 +159,9 @@ void AEnemyAIController::HandleCurrentTargetDeath(AActor* KillerActor)
 
 	if (Enemy->CombatComponent)
 	{
-		Enemy->CombatComponent->StopActiveAttack(true, true, 0.1f);
+		// Cancel a held bow draw before StopActiveAttack transitions the component to Idle.
 		Enemy->CombatComponent->CancelAttackInput();
+		Enemy->CombatComponent->StopActiveAttack(true, true, 0.1f);
 	}
 	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
 	{
