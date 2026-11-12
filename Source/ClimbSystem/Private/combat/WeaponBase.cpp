@@ -1,6 +1,7 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/WeaponBase.h"
+#include "combat/EnemyCharacter.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
@@ -374,6 +375,12 @@ bool AWeaponBase::CanDamageActor(const AActor* TargetActor) const
 	}
 
 	if (TargetActor == this || (OwningCharacter.IsValid() && TargetActor == OwningCharacter.Get()))
+	{
+		return false;
+	}
+
+	// Filter allied enemies before ProcessHit so no hit reaction, impact VFX, or sound plays.
+	if (Cast<AEnemyCharacter>(OwningCharacter.Get()) && Cast<AEnemyCharacter>(TargetActor))
 	{
 		return false;
 	}
