@@ -1,6 +1,7 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/DamageHandlerComponent.h"
+#include "combat/EnemyCharacter.h"
 #include "GameFramework/Actor.h"
 #include "Components/PrimitiveComponent.h"
 
@@ -21,6 +22,13 @@ void UDamageHandlerComponent::BeginPlay()
 float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActor, AActor* TargetActor, const FDamageInfo& DamageInfo, const FHitResult& HitResult)
 {
 	if (bIsDead) return 0.0f;
+
+	// Shared safety net for Blueprint and future damage sources, in addition to
+	// weapon-level filtering that suppresses friendly hit presentation.
+	if (Cast<AEnemyCharacter>(InstigatorActor) && Cast<AEnemyCharacter>(TargetActor))
+	{
+		return 0.0f;
+	}
 
 	FDamageInfo ResolvedInfo = DamageInfo;
 	ResolvedInfo.Normalize();
