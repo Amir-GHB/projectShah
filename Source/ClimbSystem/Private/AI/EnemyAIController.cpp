@@ -86,7 +86,7 @@ void AEnemyAIController::OnUnPossess()
 		if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(ControlledEnemy.Get()))
 			Mage->CancelPendingMagicAttack();
 	}
-	CurrentTarget.Reset();
+	SetCurrentTarget(nullptr);
 	ControlledEnemy.Reset();
 	Super::OnUnPossess();
 }
@@ -107,6 +107,68 @@ void AEnemyAIController::SetBlackboardTarget(AActor* Target)
 	{
 		Blackboard->SetValueAsObject(EnemyAIKeys::TargetActor, Target);
 		Blackboard->SetValueAsBool(EnemyAIKeys::HasTarget, IsValid(Target));
+	}
+}
+
+void AEnemyAIController::SetCurrentTarget(AActor* Target)
+{
+	if (!IsValidCombatTarget(Target))
+	{
+		Target = nullptr;
+	}
+
+	if (CurrentTarget.Get() != Target)
+	{
+		if (UDamageHandlerComponent* PreviousHandler = CurrentTargetDamageHandler.Get())
+		{
+			PreviousHandler->OnDeath.RemoveDynamic(this, &AEnemyAIController::HandleCurrentTargetDeath);
+		}
+		CurrentTargetDamageHandler.Reset();
+		CurrentTarget = Target;
+
+		if (IsValid(Target))
+		{
+			if (UDamageHandlerComponent* TargetHandler = Target->FindComponentByClass<UDamageHandlerComponent>())
+			{
+				CurrentTargetDamageHandler = TargetHandler;
+				TargetHandler->OnDeath.AddUniqueDynamic(this, &AEnemyAIController::HandleCurrentTargetDeath);
+			}
+		}
+	}
+
+	SetBlackboardTarget(CurrentTarget.Get());
+}
+
+void AEnemyAIController::ClearCurrentTarget()
+{
+	SetCurrentTarget(nullptr);
+	ClearFocus(EAIFocusPriority::Gameplay);
+	StopMovement();
+}
+
+void AEnemyAIController::HandleCurrentTargetDeath(AActor* KillerActor)
+{
+	SetCurrentTarget(nullptr);
+	InvestigationExpiryTime = 0.0;
+	ClearBlackboardInvestigation();
+	ClearFocus(EAIFocusPriority::Gameplay);
+	StopMovement();
+
+	AEnemyCharacter* Enemy = ControlledEnemy.Get();
+	if (!IsValid(Enemy)) return;
+
+	if (Enemy->CombatComponent)
+	{
+		Enemy->CombatComponent->StopActiveAttack(true, true, 0.1f);
+		Enemy->CombatComponent->CancelAttackInput();
+	}
+	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
+	{
+		Mage->CancelPendingMagicAttack();
+	}
+	if (ABowEnemyCharacter* Archer = Cast<ABowEnemyCharacter>(Enemy))
+	{
+		Archer->CancelPendingBowAttack();
 	}
 }
 
@@ -148,7 +210,7 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 		{
 			if (UCombatComponent* PlayerCombat = Actor->FindComponentByClass<UCombatComponent>())
 				PlayerCombat->RegisterEncounterEnemy(Enemy);
-			CurrentTarget = Actor;
+			SetCurrentTarget(Actor);
 			InvestigationExpiryTime = 0.0;
 			SetBlackboardTarget(Actor);
 			ClearBlackboardInvestigation();
@@ -159,8 +221,7 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 			InvestigationLocation = Stimulus.StimulusLocation;
 			InvestigationExpiryTime = GetWorld() ?
 				GetWorld()->GetTimeSeconds() + FMath::Max(0.1f, Enemy->InvestigateDuration) : 0.0;
-			CurrentTarget.Reset();
-			SetBlackboardTarget(nullptr);
+			SetCurrentTarget(nullptr);
 			SetBlackboardInvestigation(InvestigationLocation);
 			ClearFocus(EAIFocusPriority::Gameplay);
 			if (Enemy->CombatComponent) Enemy->CombatComponent->CancelAttackInput();
