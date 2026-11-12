@@ -1,6 +1,7 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/CombatProjectile.h"
+#include "combat/EnemyCharacter.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -121,6 +122,14 @@ void ACombatProjectile::HandleProjectileHit(UPrimitiveComponent* HitComponent, A
 {
 	if (bHasHit || !IsValid(OtherActor)) return;
 	if (OtherActor == DamageInstigator.Get() || OtherActor == SourceWeapon.Get()) return;
+
+	// Enemy-fired projectiles pass through allied enemy characters without consuming
+	// the projectile or triggering damage and hit-reaction presentation.
+	if (Cast<AEnemyCharacter>(DamageInstigator.Get()) && Cast<AEnemyCharacter>(OtherActor))
+	{
+		if (CollisionSphere) CollisionSphere->IgnoreActorWhenMoving(OtherActor, true);
+		return;
+	}
 
 	bHasHit = true;
 	if (OtherActor != GetOwner())
