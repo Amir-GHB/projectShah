@@ -48,6 +48,8 @@ private:
 	void HandleComboWindowOpened();
 	UFUNCTION()
 	void HandleCurrentTargetDeath(AActor* KillerActor);
+	UFUNCTION()
+	void HandleCurrentTargetDestroyed(AActor* DestroyedActor);
 	bool IsValidCombatTarget(const AActor* Candidate) const;
 	void SetCurrentTarget(AActor* Target);
 	void SetBlackboardTarget(AActor* Target);
