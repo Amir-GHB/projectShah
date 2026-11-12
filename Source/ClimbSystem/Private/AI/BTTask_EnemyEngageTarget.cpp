@@ -30,10 +30,31 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
 	AActor* Target = Blackboard ? Cast<AActor>(Blackboard->GetValueAsObject(TargetActorKey)) : nullptr;
 
-	if (!Controller || !Enemy || !IsValid(Target) ||
+	const UDamageHandlerComponent* TargetDamageHandler = IsValid(Target)
+		? Target->FindComponentByClass<UDamageHandlerComponent>() : nullptr;
+	const bool bTargetDead = TargetDamageHandler && TargetDamageHandler->bIsDead;
+
+	if (!Controller || !Enemy || !IsValid(Target) || bTargetDead ||
 		(Enemy->DamageHandlerComponent && Enemy->DamageHandlerComponent->bIsDead))
 	{
-		if (Controller) Controller->StopMovement();
+		if (Controller)
+		{
+			if (bTargetDead) Controller->ClearCurrentTarget();
+			Controller->StopMovement();
+		}
+		if (Enemy && Enemy->CombatComponent)
+		{
+			Enemy->CombatComponent->CancelAttackInput();
+			Enemy->CombatComponent->StopActiveAttack(true, true, 0.1f);
+		}
+		if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
+		{
+			Mage->CancelPendingMagicAttack();
+		}
+		if (ABowEnemyCharacter* Archer = Cast<ABowEnemyCharacter>(Enemy))
+		{
+			Archer->CancelPendingBowAttack();
+		}
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
 	}
