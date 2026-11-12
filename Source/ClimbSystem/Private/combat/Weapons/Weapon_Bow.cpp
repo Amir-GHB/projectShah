@@ -1,6 +1,8 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/Weapons/Weapon_Bow.h"
+#include "AI/EnemyAIController.h"
+#include "combat/DamageHandlerComponent.h"
 #include "combat/CombatProjectile.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimInstance.h"
@@ -171,21 +173,46 @@ bool AWeapon_Bow::GetAimDirectionAndSpawnTransform(FVector& OutDirection, FTrans
 		SocketTransform = FTransform(Character->GetActorRotation(), FallbackLocation);
 	}
 
-	FVector AimOrigin = Character->GetPawnViewLocation();
+	const FVector AimOrigin = Character->GetPawnViewLocation();
 	FRotator AimRotation = Character->GetActorRotation();
-	if (AController* Controller = Character->GetController())
+	FVector AimTarget = FVector::ZeroVector;
+	bool bHasAITarget = false;
+
+	// Player characters aim through their camera trace. AI has no player camera, so
+	// resolve its current perception target and aim at the target's upper body instead.
+	if (const AEnemyAIController* AIController = Cast<AEnemyAIController>(Character->GetController()))
 	{
-		AimRotation = Controller->GetControlRotation();
+		if (AActor* Target = AIController->GetCurrentTarget())
+		{
+			const UDamageHandlerComponent* TargetDamage = Target->FindComponentByClass<UDamageHandlerComponent>();
+			if (!TargetDamage || !TargetDamage->bIsDead)
+			{
+				FVector TargetBoundsOrigin;
+				FVector TargetBoundsExtent;
+				Target->GetActorBounds(false, TargetBoundsOrigin, TargetBoundsExtent);
+				AimTarget = TargetBoundsOrigin + FVector(0.0f, 0.0f, TargetBoundsExtent.Z * 0.2f);
+				AimRotation = (AimTarget - AimOrigin).Rotation();
+				bHasAITarget = !AimTarget.ContainsNaN();
+			}
+		}
 	}
 
-	const FVector AimEnd = AimOrigin + AimRotation.Vector() * 10000.0f;
-	FVector AimTarget = AimEnd;
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BowAimTrace), true, Character);
-	QueryParams.AddIgnoredActor(this);
-	FHitResult AimHit;
-	if (GetWorld() && GetWorld()->LineTraceSingleByChannel(AimHit, AimOrigin, AimEnd, ECC_Visibility, QueryParams) && AimHit.bBlockingHit)
+	if (!bHasAITarget)
 	{
-		AimTarget = AimHit.ImpactPoint;
+		if (AController* Controller = Character->GetController())
+		{
+			AimRotation = Controller->GetControlRotation();
+		}
+
+		const FVector AimEnd = AimOrigin + AimRotation.Vector() * 10000.0f;
+		AimTarget = AimEnd;
+		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(BowAimTrace), true, Character);
+		QueryParams.AddIgnoredActor(this);
+		FHitResult AimHit;
+		if (GetWorld() && GetWorld()->LineTraceSingleByChannel(AimHit, AimOrigin, AimEnd, ECC_Visibility, QueryParams) && AimHit.bBlockingHit)
+		{
+			AimTarget = AimHit.ImpactPoint;
+		}
 	}
 
 	const FVector SpawnLocation = SocketTransform.GetLocation();
@@ -199,7 +226,6 @@ bool AWeapon_Bow::GetAimDirectionAndSpawnTransform(FVector& OutDirection, FTrans
 	OutSpawnTransform = FTransform(OutDirection.Rotation(), SpawnLocation);
 	return true;
 }
-
 void AWeapon_Bow::PlayCharacterMontage(UAnimMontage* Montage)
 {
 	if (!IsValid(Montage) || !OwningCharacter.IsValid() || !OwningCharacter->GetMesh()) return;
