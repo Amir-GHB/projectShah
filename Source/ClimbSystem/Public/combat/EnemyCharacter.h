@@ -107,6 +107,7 @@ class CLIMBSYSTEM_API ABowEnemyCharacter : public AEnemyCharacter
 	GENERATED_BODY()
 public:
 	virtual void PerformAICombatAction(AActor* Target) override;
+	void CancelPendingBowAttack();
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Bow", meta = (ClampMin = "0.05"))
 	float BowDrawDuration = 0.8f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Bow", meta = (ClampMin = "0.1"))
