@@ -82,6 +82,16 @@ void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
 void AMagicEnemyCharacter::CancelPendingMagicAttack()
 {
 	PendingMagicTarget.Reset();
+	if (IsValid(MagicAttackMontage) && GetMesh())
+	{
+		if (UAnimInstance* Anim = GetMesh()->GetAnimInstance())
+		{
+			if (Anim->Montage_IsPlaying(MagicAttackMontage))
+			{
+				Anim->Montage_Stop(0.1f, MagicAttackMontage);
+			}
+		}
+	}
 }
 
 void AMagicEnemyCharacter::ReleaseMagicProjectile()
@@ -136,6 +146,13 @@ void ABowEnemyCharacter::PerformAICombatAction(AActor* Target)
 		FMath::Max(0.05f, BowDrawDuration), false);
 }
 
+void ABowEnemyCharacter::CancelPendingBowAttack()
+{
+	GetWorldTimerManager().ClearTimer(BowReleaseTimer);
+	PendingBowTarget.Reset();
+	if (CombatComponent) CombatComponent->CancelAttackInput();
+}
+
 void ABowEnemyCharacter::ReleaseBowShot()
 {
 	AActor* Target = PendingBowTarget.Get();
@@ -150,9 +167,7 @@ void ABowEnemyCharacter::ReleaseBowShot()
 
 void ABowEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	GetWorldTimerManager().ClearTimer(BowReleaseTimer);
-	PendingBowTarget.Reset();
-	if (CombatComponent) CombatComponent->CancelAttackInput();
+	CancelPendingBowAttack();
 	Super::EndPlay(EndPlayReason);
 }
 
