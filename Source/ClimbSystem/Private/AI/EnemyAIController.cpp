@@ -119,6 +119,10 @@ void AEnemyAIController::SetCurrentTarget(AActor* Target)
 
 	if (CurrentTarget.Get() != Target)
 	{
+		if (AActor* PreviousTarget = CurrentTarget.Get())
+		{
+			PreviousTarget->OnDestroyed.RemoveDynamic(this, &AEnemyAIController::HandleCurrentTargetDestroyed);
+		}
 		if (UDamageHandlerComponent* PreviousHandler = CurrentTargetDamageHandler.Get())
 		{
 			PreviousHandler->OnDeath.RemoveDynamic(this, &AEnemyAIController::HandleCurrentTargetDeath);
@@ -128,6 +132,7 @@ void AEnemyAIController::SetCurrentTarget(AActor* Target)
 
 		if (IsValid(Target))
 		{
+			Target->OnDestroyed.AddUniqueDynamic(this, &AEnemyAIController::HandleCurrentTargetDestroyed);
 			if (UDamageHandlerComponent* TargetHandler = Target->FindComponentByClass<UDamageHandlerComponent>())
 			{
 				CurrentTargetDamageHandler = TargetHandler;
@@ -171,6 +176,11 @@ void AEnemyAIController::HandleCurrentTargetDeath(AActor* KillerActor)
 	{
 		Archer->CancelPendingBowAttack();
 	}
+}
+
+void AEnemyAIController::HandleCurrentTargetDestroyed(AActor* DestroyedActor)
+{
+	HandleCurrentTargetDeath(DestroyedActor);
 }
 
 void AEnemyAIController::SetBlackboardInvestigation(const FVector& Location)
