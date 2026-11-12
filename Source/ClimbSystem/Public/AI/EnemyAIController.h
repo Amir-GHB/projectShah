@@ -9,6 +9,7 @@ class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 class UAISenseConfig_Hearing;
 class AEnemyCharacter;
+class UDamageHandlerComponent;
 
 UCLASS()
 class CLIMBSYSTEM_API AEnemyAIController : public AAIController
@@ -17,6 +18,7 @@ class CLIMBSYSTEM_API AEnemyAIController : public AAIController
 public:
 	AEnemyAIController();
 	AActor* GetCurrentTarget() const { return CurrentTarget.Get(); }
+	void ClearCurrentTarget();
 	FVector GetInvestigationLocation() const { return InvestigationLocation; }
 	bool HasActiveInvestigation() const;
 	int32 GetPatrolPointIndex() const { return PatrolPointIndex; }
@@ -35,6 +37,7 @@ protected:
 private:
 	TWeakObjectPtr<AEnemyCharacter> ControlledEnemy;
 	TWeakObjectPtr<AActor> CurrentTarget;
+	TWeakObjectPtr<UDamageHandlerComponent> CurrentTargetDamageHandler;
 	FVector InvestigationLocation = FVector::ZeroVector;
 	double InvestigationExpiryTime = 0.0;
 	int32 PatrolPointIndex = 0;
@@ -43,7 +46,10 @@ private:
 	void HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 	UFUNCTION()
 	void HandleComboWindowOpened();
+	UFUNCTION()
+	void HandleCurrentTargetDeath(AActor* KillerActor);
 	bool IsValidCombatTarget(const AActor* Candidate) const;
+	void SetCurrentTarget(AActor* Target);
 	void SetBlackboardTarget(AActor* Target);
 	void SetBlackboardInvestigation(const FVector& Location);
 	void ClearBlackboardInvestigation();
