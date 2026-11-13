@@ -353,6 +353,7 @@ void UCombatComponent::CancelAttackInput()
 
 bool UCombatComponent::StartNewCombo()
 {
+	bParryWindowOpen = false;
 	if (!IsValid(CurrentWeapon) || !OwningCharacter.IsValid() || !OwningCharacter->GetMesh()) return false;
 	const FWeaponConfig& Config = CurrentWeapon->GetConfig();
 	StopActiveAttack(true, true, 0.1f);
@@ -420,6 +421,7 @@ bool UCombatComponent::StartNewCombo()
 
 bool UCombatComponent::PlayIndividualAttack(int32 AttackIndex)
 {
+	bParryWindowOpen = false;
 	if (!OwningCharacter.IsValid() || !OwningCharacter->GetMesh() || !ActiveAttackWeapon.IsValid()) return false;
 	const TArray<TObjectPtr<UAnimMontage>>& Montages = ActiveAttackWeapon->GetConfig().IndividualAttackMontages;
 	if (!Montages.IsValidIndex(AttackIndex) || !IsValid(Montages[AttackIndex]))
@@ -828,10 +830,11 @@ void UCombatComponent::SetNonCombatAnimation(bool bEnableNonCombatAnimation)
 
 void UCombatComponent::SetGuardMode(bool bEnableGuard)
 {
-	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing ||
-		CurrentCombatState == ECombatState::Staggered || bWeaponSwapActive ||
-		CurrentCombatState == ECombatState::Attacking || CurrentCombatState == ECombatState::ComboWindow ||
-		CurrentCombatState == ECombatState::SwappingWeapon || !IsValid(CurrentWeapon))
+	if (bEnableGuard && (CurrentCombatState == ECombatState::Dead ||
+		CurrentCombatState == ECombatState::Finishing || CurrentCombatState == ECombatState::Staggered ||
+		bWeaponSwapActive || CurrentCombatState == ECombatState::Attacking ||
+		CurrentCombatState == ECombatState::ComboWindow || CurrentCombatState == ECombatState::SwappingWeapon ||
+		!IsValid(CurrentWeapon)))
 	{
 		return;
 	}
