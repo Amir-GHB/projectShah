@@ -26,6 +26,7 @@ private:
 		FVector Destination = FVector::ZeroVector;
 		float WaitRemaining = 0.0f;
 		float RetryRemaining = 0.0f;
+		float MontageTimer = 0.0f;
 		bool bWaiting = false;
 		bool bHasDestination = false;
 	};
