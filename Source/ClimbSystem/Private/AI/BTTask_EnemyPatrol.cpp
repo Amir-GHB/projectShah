@@ -147,11 +147,8 @@ void UBTTask_EnemyPatrol::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 EBTNodeResult::Type UBTTask_EnemyPatrol::AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	if (AEnemyAIController* Controller = Cast<AEnemyAIController>(OwnerComp.GetAIOwner()))
-	{
 		Controller->StopMovement();
-		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Controller->GetPawn()))
-			if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
-				Movement->MaxWalkSpeed = Enemy->PatrolWalkSpeed;
-	}
+	// Do not overwrite the pursuit/investigation speed when this task is aborted
+	// because a higher-priority behavior has taken over.
 	return Super::AbortTask(OwnerComp, NodeMemory);
 }
