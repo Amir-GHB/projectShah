@@ -174,7 +174,7 @@ void UDamageReactionComponent::HandleReactionMontageEnded(UAnimMontage* Montage,
 		if (Combat->IsParryAttemptActive())
 		{
 			const AWeaponBase* Weapon = Combat->CurrentWeapon;
-			if (IsValid(Weapon) && Weapon->GetConfig().DefenderParryMontage == Montage)
+			if (IsValid(Weapon) && Weapon->GetConfig().DefenderParryMontage.Get() == Montage)
 			{
 				Combat->SetParryAnimationState(false);
 			}
@@ -283,12 +283,12 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	const UDamageHandlerComponent* AttackerDamageState =
 		Attacker->FindComponentByClass<UDamageHandlerComponent>();
 	if ((!AttackerDamageState || !AttackerDamageState->bIsDead)
-		&& IsValid(AttackerConfig.AttackerParriedMontage))
+		&& IsValid(AttackerConfig.AttackerParriedMontage.Get()))
 	{
 		if (UDamageReactionComponent* AttackerReaction =
 			Attacker->FindComponentByClass<UDamageReactionComponent>())
 		{
-			AttackerReaction->PlayHitReactionOverride(AttackerConfig.AttackerParriedMontage);
+			AttackerReaction->PlayHitReactionOverride(AttackerConfig.AttackerParriedMontage.Get());
 		}
 	}
 
