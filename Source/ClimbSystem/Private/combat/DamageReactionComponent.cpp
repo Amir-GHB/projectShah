@@ -16,6 +16,7 @@
 #include "combat/DamageHandlerComponent.h"
 #include "combat/WeaponBase.h"
 #include "combat/EnemyCharacter.h"
+#include "AI/EnemyAIController.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DamageEvents.h"
 
@@ -143,7 +144,26 @@ void UDamageReactionComponent::PlayReaction(UAnimMontage* Montage, float Previou
 	if (PlayedDuration > 0.0f)
 	{
 		ActiveReactionMontage = Montage;
+		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Character))
+		{
+			Enemy->bIsInDamageReaction = true;
+			if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
+				Movement->StopMovementImmediately();
+			if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Enemy->GetController()))
+				AIController->StopMovement();
+		}
+		FOnMontageEnded EndDelegate;
+		EndDelegate.BindUObject(this, &UDamageReactionComponent::HandleReactionMontageEnded);
+		AnimInstance->Montage_SetEndDelegate(EndDelegate, Montage);
 	}
+}
+
+void UDamageReactionComponent::HandleReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (Montage != ActiveReactionMontage) return;
+	ActiveReactionMontage = nullptr;
+	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
+		Enemy->bIsInDamageReaction = false;
 }
 
 void UDamageReactionComponent::PlayHitReactionOverride(UAnimMontage* Montage)
