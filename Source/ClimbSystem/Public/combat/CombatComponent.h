@@ -100,7 +100,7 @@ public:
 	bool CanBeParried() const;
 	bool IsParryAttemptActive() const { return AnimationState.DefenseState == ECombatDefenseState::Parrying; }
 
-	/** Called when a light attack hits an active guard. Enters the guard-break animation state. */
+	/** Called when an incoming hit breaks an active guard. Plays the equipped weapon's break montage. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
 	void TriggerGuardBreak();
 
