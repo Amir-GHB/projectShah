@@ -167,28 +167,12 @@ public:
 	float DeathBlendOutTime = 0.12f;
 
 	/** Plays a projectile/demo-supplied hit reaction after damage has been applied. */
-	void PlayHitReactionOverride(UAnimMontage* Montage);
+	bool PlayHitReactionOverride(UAnimMontage* Montage);
 
-	/** Played immediately when Blueprint requests a parry attempt while guarding. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
-	TObjectPtr<UAnimMontage> DefaultParryAttemptMontage = nullptr;
-
-	/** Weapon parry montages override these shared fallbacks. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
-	TObjectPtr<UAnimMontage> DefaultDefenderParryMontage = nullptr;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry")
-	TObjectPtr<UAnimMontage> DefaultAttackerParriedMontage = nullptr;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry", meta = (ClampMin = "0.05"))
-	float ParryWindowDuration = 0.35f;
-
-	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
-	void BeginParryWindow(float Duration = -1.0f);
-	UFUNCTION(BlueprintCallable, Category = "Combat|Parry")
-	void EndParryWindow();
+	/** Resolves a parry or guard response before ordinary hit VFX and damage. */
 	bool TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult);
-
-	/** Returns true when this incoming melee hit was parried or guard-broken and must not deal damage. */
-	bool ResolveIncomingMeleeHit(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult);
+	bool ResolveIncomingMeleeHit(AActor* Attacker, AWeaponBase* AttackingWeapon,
+		const FDamageInfo& DamageInfo, const FHitResult& HitResult);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Death")
 	bool bRagdollOnDeath = true;
@@ -246,8 +230,6 @@ private:
 	FTimerHandle FinisherCameraDestroyTimer;
 
 	bool bDeathHandled = false;
-	bool bParryWindowActive = false;
-	FTimerHandle ParryWindowTimer;
 
 	UFUNCTION()
 	void HandleDamageTaken(float ActualDamage, AActor* InstigatorActor,
@@ -259,7 +241,7 @@ private:
 	UAnimMontage* FindBestHitReaction(const FDamageInfo& DamageInfo) const;
 	UAnimMontage* FindBestReaction(const TArray<FDamageReactionMontage>& ReactionSet,
 		const FDamageInfo& DamageInfo) const;
-	void PlayReaction(UAnimMontage* Montage, float PreviousMontageBlendOutTime);
+	bool PlayReaction(UAnimMontage* Montage, float PreviousMontageBlendOutTime);
 	UFUNCTION()
 	void HandleReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
