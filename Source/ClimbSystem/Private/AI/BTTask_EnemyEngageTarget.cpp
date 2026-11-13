@@ -7,6 +7,7 @@
 #include "combat/DamageHandlerComponent.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 uint16 UBTTask_EnemyEngageTarget::GetInstanceMemorySize() const { return sizeof(FEngageMemory); }
 
@@ -33,6 +34,12 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	const UDamageHandlerComponent* TargetDamageHandler = IsValid(Target)
 		? Target->FindComponentByClass<UDamageHandlerComponent>() : nullptr;
 	const bool bTargetDead = TargetDamageHandler && TargetDamageHandler->bIsDead;
+
+	if (Controller && Enemy && Enemy->bIsInDamageReaction)
+	{
+		Controller->StopMovement();
+		return;
+	}
 
 	if (!Controller || !Enemy || !IsValid(Target) || bTargetDead ||
 		(Enemy->DamageHandlerComponent && Enemy->DamageHandlerComponent->bIsDead))
@@ -69,6 +76,14 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	const FVector TargetLocation = Target->GetActorLocation();
 	const float Distance = FVector::Dist2D(EnemyLocation, TargetLocation);
 	Controller->SetFocus(Target);
+	if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
+		Movement->MaxWalkSpeed = Enemy->PursuitWalkSpeed;
+	const FVector ToTarget = TargetLocation - EnemyLocation;
+	if (!ToTarget.IsNearlyZero())
+	{
+		const FRotator DesiredRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
+		Enemy->SetActorRotation(FMath::RInterpTo(Enemy->GetActorRotation(), DesiredRotation, DeltaSeconds, 8.0f));
+	}
 
 	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
 	{
@@ -115,6 +130,47 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 		}
 	}
 
+	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
+	{
+		Memory.StrafeCooldown = FMath::Max(0.0f, Memory.StrafeCooldown - DeltaSeconds);
+		if (Distance <= DesiredRange * 1.15f)
+		{
+			if (Memory.bStrafeMoveIssued)
+			{
+				if (Controller->GetMoveStatus() == EPathFollowingStatus::Idle ||
+					FVector::Dist2D(Enemy->GetActorLocation(), Memory.RelocationDestination) <= 90.0f)
+				{
+					Memory.bStrafeMoveIssued = false;
+					Memory.StrafeCooldown = FMath::FRandRange(0.4f, 1.0f);
+				}
+				return;
+			}
+			if (Memory.StrafeCooldown <= 0.0f)
+			{
+				UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Enemy->GetWorld());
+				if (Nav)
+				{
+					const FVector Away = (EnemyLocation - TargetLocation).GetSafeNormal2D();
+					const FVector Right = FVector::CrossProduct(FVector::UpVector, Away).GetSafeNormal2D();
+					const FVector Direction = Distance < DesiredRange * 0.82f ? Away : (FMath::RandBool() ? Right : -Right);
+					const FVector DesiredPoint = EnemyLocation + Direction * FMath::FRandRange(220.0f, 340.0f);
+					FNavLocation ProjectedPoint;
+					if (Nav->ProjectPointToNavigation(DesiredPoint, ProjectedPoint))
+					{
+						Memory.RelocationDestination = ProjectedPoint.Location;
+						Memory.bStrafeMoveIssued = true;
+						Controller->MoveToLocation(Memory.RelocationDestination, 65.0f);
+						return;
+					}
+				}
+				Memory.StrafeCooldown = 0.8f;
+			}
+			Controller->StopMovement();
+			return;
+		}
+		Memory.bStrafeMoveIssued = false;
+	}
+
 	if (Distance > DesiredRange)
 	{
 		if (!Memory.bHasMoveGoal ||
@@ -130,12 +186,6 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 
 	Controller->StopMovement();
 	Memory.bHasMoveGoal = false;
-	const FVector ToTarget = TargetLocation - EnemyLocation;
-	if (!ToTarget.IsNearlyZero())
-	{
-		const FRotator DesiredRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
-		Enemy->SetActorRotation(FMath::RInterpTo(Enemy->GetActorRotation(), DesiredRotation, DeltaSeconds, 8.0f));
-	}
 
 	Memory.AttackCooldown = FMath::Max(0.0f, Memory.AttackCooldown - DeltaSeconds);
 	if (Memory.AttackCooldown <= 0.0f && Enemy->CombatComponent &&
