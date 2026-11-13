@@ -5,6 +5,9 @@
 #include "combat/DamageHandlerComponent.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 
 uint16 UBTTask_EnemyPatrol::GetInstanceMemorySize() const { return sizeof(FPatrolMemory); }
 
@@ -23,6 +26,10 @@ EBTNodeResult::Type UBTTask_EnemyPatrol::ExecuteTask(UBehaviorTreeComponent& Own
 	if (!Enemy || !Enemy->bEnablePatrol ||
 		(Enemy->PatrolPoints.IsEmpty() && !Enemy->bUseRandomPatrolWhenNoPoints))
 		return EBTNodeResult::Failed;
+	if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
+		Movement->MaxWalkSpeed = Enemy->PatrolWalkSpeed;
+	Memory.MontageTimer = FMath::FRandRange(FMath::Max(0.1f, Enemy->PatrolMontageMinInterval),
+		FMath::Max(Enemy->PatrolMontageMinInterval, Enemy->PatrolMontageMaxInterval));
 	return EBTNodeResult::InProgress;
 }
 
@@ -71,6 +78,31 @@ void UBTTask_EnemyPatrol::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
 	}
+	if (Enemy->bIsInDamageReaction)
+	{
+		Controller->StopMovement();
+		return;
+	}
+	if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
+		Movement->MaxWalkSpeed = Enemy->PatrolWalkSpeed;
+	Memory.MontageTimer -= DeltaSeconds;
+	if (Memory.MontageTimer <= 0.0f)
+	{
+		if (!Enemy->PatrolMontages.IsEmpty() && Enemy->GetMesh())
+		{
+			TArray<UAnimMontage*> ValidMontages;
+			for (const TObjectPtr<UAnimMontage>& Montage : Enemy->PatrolMontages)
+				if (IsValid(Montage)) ValidMontages.Add(Montage.Get());
+			if (!ValidMontages.IsEmpty())
+			{
+				UAnimInstance* Anim = Enemy->GetMesh()->GetAnimInstance();
+				if (Anim && !Anim->IsAnyMontagePlaying())
+					Anim->Montage_Play(ValidMontages[FMath::RandRange(0, ValidMontages.Num() - 1)]);
+			}
+		}
+		Memory.MontageTimer = FMath::FRandRange(FMath::Max(0.1f, Enemy->PatrolMontageMinInterval),
+			FMath::Max(Enemy->PatrolMontageMinInterval, Enemy->PatrolMontageMaxInterval));
+	}
 	if (Memory.bWaiting)
 	{
 		Memory.WaitRemaining -= DeltaSeconds;
@@ -115,6 +147,11 @@ void UBTTask_EnemyPatrol::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 EBTNodeResult::Type UBTTask_EnemyPatrol::AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	if (AEnemyAIController* Controller = Cast<AEnemyAIController>(OwnerComp.GetAIOwner()))
+	{
 		Controller->StopMovement();
+		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Controller->GetPawn()))
+			if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
+				Movement->MaxWalkSpeed = Enemy->PatrolWalkSpeed;
+	}
 	return Super::AbortTask(OwnerComp, NodeMemory);
 }
