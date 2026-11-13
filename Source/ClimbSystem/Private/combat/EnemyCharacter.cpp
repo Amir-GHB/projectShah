@@ -32,7 +32,7 @@ AEnemyCharacter::AEnemyCharacter()
 	{
 		Movement->bOrientRotationToMovement = true;
 		Movement->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
-		Movement->MaxWalkSpeed = 300.0f;
+		Movement->MaxWalkSpeed = 250.0f;
 		Movement->NavAgentProps.bCanCrouch = true;
 	}
 }
