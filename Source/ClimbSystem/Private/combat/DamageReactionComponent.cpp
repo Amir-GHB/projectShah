@@ -64,7 +64,6 @@ void UDamageReactionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			this, &UDamageReactionComponent::HandleDeath);
 	}
 	EndFinisher(true);
-	EndParryWindow();
 	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(FinisherCameraDestroyTimer);
 	DestroyFinisherCamera();
 	Super::EndPlay(EndPlayReason);
@@ -117,23 +116,23 @@ UAnimMontage* UDamageReactionComponent::FindBestReaction(
 	return BestMatch ? BestMatch->Montage.Get() : nullptr;
 }
 
-void UDamageReactionComponent::PlayReaction(UAnimMontage* Montage, float PreviousMontageBlendOutTime)
+bool UDamageReactionComponent::PlayReaction(UAnimMontage* Montage, float PreviousMontageBlendOutTime)
 {
 	if (!IsValid(Montage))
 	{
-		return;
+		return false;
 	}
 
 	ACharacter* Character = Cast<ACharacter>(GetOwner());
 	if (!IsValid(Character) || !Character->GetMesh())
 	{
-		return;
+		return false;
 	}
 
 	UAnimInstance* AnimInstance = Character->GetMesh()->GetAnimInstance();
 	if (!AnimInstance)
 	{
-		return;
+		return false;
 	}
 
 	if (IsValid(ActiveReactionMontage) && AnimInstance->Montage_IsPlaying(ActiveReactionMontage))
@@ -160,13 +159,27 @@ void UDamageReactionComponent::PlayReaction(UAnimMontage* Montage, float Previou
 		FOnMontageEnded EndDelegate;
 		EndDelegate.BindUObject(this, &UDamageReactionComponent::HandleReactionMontageEnded);
 		AnimInstance->Montage_SetEndDelegate(EndDelegate, Montage);
+		return true;
 	}
+	return false;
 }
 
 void UDamageReactionComponent::HandleReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
 	if (Montage != ActiveReactionMontage) return;
 	ActiveReactionMontage = nullptr;
+	if (UCombatComponent* Combat = GetOwner()
+		? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr)
+	{
+		if (Combat->IsParryAttemptActive())
+		{
+			const AWeaponBase* Weapon = Combat->CurrentWeapon;
+			if (IsValid(Weapon) && Weapon->GetConfig().DefenderParryMontage == Montage)
+			{
+				Combat->SetParryAnimationState(false);
+			}
+		}
+	}
 	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
 	{
 		Enemy->bIsInDamageReaction = false;
@@ -180,12 +193,10 @@ void UDamageReactionComponent::HandleReactionMontageEnded(UAnimMontage* Montage,
 	}
 }
 
-void UDamageReactionComponent::PlayHitReactionOverride(UAnimMontage* Montage)
+bool UDamageReactionComponent::PlayHitReactionOverride(UAnimMontage* Montage)
 {
-	if (!bDeathHandled && IsValid(Montage))
-	{
-		PlayReaction(Montage, HitReactionBlendOutTime);
-	}
+	return !bDeathHandled && IsValid(Montage)
+		&& PlayReaction(Montage, HitReactionBlendOutTime);
 }
 
 void UDamageReactionComponent::HandleDamageTaken(
@@ -197,6 +208,15 @@ void UDamageReactionComponent::HandleDamageTaken(
 		return;
 	}
 
+	if (UCombatComponent* Combat = GetOwner()
+		? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr)
+	{
+		if (Combat->GetAnimationState().DefenseState == ECombatDefenseState::GuardBroken)
+		{
+			return;
+		}
+	}
+
 	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(GetOwner()))
 	{
 		Mage->CancelPendingMagicAttack();
@@ -204,54 +224,51 @@ void UDamageReactionComponent::HandleDamageTaken(
 	PlayReaction(FindBestHitReaction(DamageInfo), HitReactionBlendOutTime);
 }
 
-void UDamageReactionComponent::BeginParryWindow(float Duration)
-{
-	if (!GetWorld() || bDeathHandled) return;
-	UCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr;
-	if (!Combat || !Combat->IsGuarding()) return;
-	bParryWindowActive = true;
-	Combat->SetParryAnimationState(true);
-	PlayReaction(DefaultParryAttemptMontage, HitReactionBlendOutTime);
-	GetWorld()->GetTimerManager().ClearTimer(ParryWindowTimer);
-	GetWorld()->GetTimerManager().SetTimer(ParryWindowTimer, this,
-		&UDamageReactionComponent::EndParryWindow, FMath::Max(0.05f, Duration > 0.0f ? Duration : ParryWindowDuration), false);
-}
-
-void UDamageReactionComponent::EndParryWindow()
-{
-	bParryWindowActive = false;
-	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ParryWindowTimer);
-	if (UCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr)
-	{
-		Combat->SetParryAnimationState(false);
-	}
-}
-
 bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult)
 {
-	if (!bParryWindowActive || bDeathHandled || !IsValid(Attacker) || !IsValid(AttackingWeapon) || !GetOwner()) return false;
+	if (bDeathHandled || !IsValid(Attacker) || !IsValid(AttackingWeapon) || !GetOwner())
+	{
+		return false;
+	}
+
 	UCombatComponent* DefenderCombat = GetOwner()->FindComponentByClass<UCombatComponent>();
-	if (!DefenderCombat || !DefenderCombat->IsGuarding()) return false;
-	EndParryWindow();
+	UCombatComponent* AttackerCombat = Attacker->FindComponentByClass<UCombatComponent>();
+	if (!DefenderCombat || !DefenderCombat->IsParryAttemptActive()
+		|| !AttackerCombat || !AttackerCombat->CanBeParried())
+	{
+		return false;
+	}
+
 	AWeaponBase* DefenderWeapon = DefenderCombat->CurrentWeapon;
-	const FWeaponConfig& Config = IsValid(DefenderWeapon)
-		? DefenderWeapon->GetConfig() : AttackingWeapon->GetConfig();
-	UAnimMontage* DefenderMontage = IsValid(Config.DefenderParryMontage)
-		? Config.DefenderParryMontage.Get() : DefaultDefenderParryMontage.Get();
-	UAnimMontage* AttackerMontage = IsValid(Config.AttackerParriedMontage)
-		? Config.AttackerParriedMontage.Get() : DefaultAttackerParriedMontage.Get();
-	PlayReaction(DefenderMontage, HitReactionBlendOutTime);
+	if (!IsValid(DefenderWeapon)) return false;
+
+	// Cancel the attack transaction first. This invalidates montage callbacks and closes
+	// the trace before any damage delegate can trigger another reaction or hit presentation.
+	AttackerCombat->StopActiveAttack(true, true, 0.04f);
+	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Attacker))
+	{
+		Mage->CancelPendingMagicAttack();
+	}
+
+	DefenderCombat->SetParryAnimationState(false);
+
+	const FWeaponConfig& DefenderConfig = DefenderWeapon->GetConfig();
+	const FWeaponConfig& AttackerConfig = AttackingWeapon->GetConfig();
+
 	FDamageInfo ParryDamage;
-	ParryDamage.BaseDamage = Config.ParryDamage;
+	ParryDamage.BaseDamage = DefenderConfig.ParryDamage;
 	ParryDamage.DamageCategory = EDamageCategory::Physical;
 	ParryDamage.DamageCauser = GetOwner();
 	ParryDamage.InstigatorWeapon = DefenderWeapon;
-	ParryDamage.WeaponType = IsValid(DefenderWeapon) ? DefenderWeapon->GetWeaponType() : EWeaponType::Unarmed;
+	ParryDamage.WeaponType = DefenderWeapon->GetWeaponType();
 	ParryDamage.DamageDirection = (Attacker->GetActorLocation() - GetOwner()->GetActorLocation()).GetSafeNormal();
+	ParryDamage.bCriticalRollResolved = true;
 	ParryDamage.Normalize();
+
 	FHitResult ParryHit;
 	ParryHit.Location = Attacker->GetActorLocation();
 	ParryHit.ImpactPoint = Attacker->GetActorLocation();
+
 	if (UDamageHandlerComponent* AttackerDamage = Attacker->FindComponentByClass<UDamageHandlerComponent>())
 	{
 		AttackerDamage->ApplyDamage(GetOwner(), Attacker, ParryDamage, ParryHit);
@@ -259,47 +276,57 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	else
 	{
 		FPointDamageEvent Event(ParryDamage.GetCalculatedRawDamage(), ParryHit, FVector::UpVector, nullptr);
-		Attacker->TakeDamage(ParryDamage.GetCalculatedRawDamage(), Event, GetOwner()->GetInstigatorController(), GetOwner());
+		Attacker->TakeDamage(ParryDamage.GetCalculatedRawDamage(), Event,
+			GetOwner()->GetInstigatorController(), GetOwner());
 	}
+
 	const UDamageHandlerComponent* AttackerDamageState =
 		Attacker->FindComponentByClass<UDamageHandlerComponent>();
-		if ((!AttackerDamageState || !AttackerDamageState->bIsDead))
+	if ((!AttackerDamageState || !AttackerDamageState->bIsDead)
+		&& IsValid(AttackerConfig.AttackerParriedMontage))
 	{
-		// Cancel the active attack transaction as well as replacing its pose.
-		// This closes weapon traces and invalidates pending combo/montage callbacks.
-		if (UCombatComponent* AttackerCombat = Attacker->FindComponentByClass<UCombatComponent>())
+		if (UDamageReactionComponent* AttackerReaction =
+			Attacker->FindComponentByClass<UDamageReactionComponent>())
 		{
-			AttackerCombat->StopActiveAttack(true, true, 0.04f);
-		}
-		if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Attacker))
-		{
-			Mage->CancelPendingMagicAttack();
-		}
-		if (UDamageReactionComponent* AttackerReaction = Attacker->FindComponentByClass<UDamageReactionComponent>())
-		{
-			AttackerReaction->PlayReaction(AttackerMontage, 0.04f);
+			AttackerReaction->PlayHitReactionOverride(AttackerConfig.AttackerParriedMontage);
 		}
 	}
+
 	return true;
 }
 
-bool UDamageReactionComponent::ResolveIncomingMeleeHit(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult)
+bool UDamageReactionComponent::ResolveIncomingMeleeHit(AActor* Attacker,
+	AWeaponBase* AttackingWeapon, const FDamageInfo& DamageInfo, const FHitResult& HitResult)
 {
 	if (!IsValid(Attacker) || !IsValid(AttackingWeapon)) return false;
 
-	// A successful timed parry consumes the incoming hit before VFX or damage are dispatched.
+	// Parry is valid only while the defender is actively playing its weapon parry attempt
+	// and the attacker's montage is inside its authored/fallback parry window.
 	if (TryParry(Attacker, AttackingWeapon, HitResult)) return true;
 
 	UCombatComponent* DefenderCombat = GetOwner()
 		? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr;
-	if (DefenderCombat && DefenderCombat->IsGuarding() && AttackingWeapon->GetConfig().bIsLightAttack)
+	if (!DefenderCombat || !DefenderCombat->IsGuarding()) return false;
+
+	// DamageDirection points from attacker to defender. Its inverse points toward the attacker.
+	FVector ToAttacker = -DamageInfo.DamageDirection.GetSafeNormal();
+	if (ToAttacker.IsNearlyZero())
 	{
-		// Current standard melee attacks are light attacks: they break guard but deal no health damage.
-		DefenderCombat->TriggerGuardBreak();
-		return true;
+		ToAttacker = (Attacker->GetActorLocation() - GetOwner()->GetActorLocation()).GetSafeNormal();
+	}
+	const bool bHitFromFront = FVector::DotProduct(
+		GetOwner()->GetActorForwardVector(), ToAttacker) >= 0.0f;
+
+	// Heavy and critical hits bypass the block entirely. They still break the guard and
+	// continue through the ordinary damage path.
+	DefenderCombat->TriggerGuardBreak();
+	if (DamageInfo.bIsHeavyAttack || DamageInfo.bIsCriticalHit)
+	{
+		return false;
 	}
 
-	return false;
+	// Light front hits are blocked; rear hits damage the character but still break guard.
+	return bHitFromFront;
 }
 
 void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
