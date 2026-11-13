@@ -260,6 +260,8 @@ private:
 	UAnimMontage* FindBestReaction(const TArray<FDamageReactionMontage>& ReactionSet,
 		const FDamageInfo& DamageInfo) const;
 	void PlayReaction(UAnimMontage* Montage, float PreviousMontageBlendOutTime);
+	UFUNCTION()
+	void HandleReactionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	void HandleFinisherMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	void EndFinisher(bool bStopMontages);
