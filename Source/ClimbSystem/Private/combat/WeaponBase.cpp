@@ -436,7 +436,6 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 
 	PlayHitEffects(HitResult);
 
-	// Calculate unified raw damage consistently across both handler and native fallback.
 	float CalculatedRawDamage = DamageInfo.GetCalculatedRawDamage();
 	if (DamageInfo.bIsCriticalHit)
 	{
@@ -449,16 +448,6 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 		return;
 	}
 
-	FPointDamageEvent PointDamageEvent(
-		CalculatedRawDamage,
-		HitResult,
-		HitResult.ImpactNormal,
-		nullptr
-	);
-	TargetActor->TakeDamage(
-		CalculatedRawDamage,
-		PointDamageEvent,
-		OwningCharacter->GetController(),
-		this
-	);
+	FPointDamageEvent PointDamageEvent(CalculatedRawDamage, HitResult, HitResult.ImpactNormal, nullptr);
+	TargetActor->TakeDamage(CalculatedRawDamage, PointDamageEvent, OwningCharacter->GetController(), this);
 }
