@@ -110,6 +110,11 @@ void UCombatComponent::EquipWeapon(EWeaponType NewWeaponType)
 
 void UCombatComponent::BeginWeaponSwap(EWeaponType NewWeaponType)
 {
+	if (AnimationState.DefenseState == ECombatDefenseState::Guarding ||
+		AnimationState.DefenseState == ECombatDefenseState::Parrying)
+	{
+		SetGuardMode(false);
+	}
 	AWeaponBase* Target = GetWeapon(NewWeaponType);
 	if (!IsValid(Target) || !OwningCharacter.IsValid()) return;
 
