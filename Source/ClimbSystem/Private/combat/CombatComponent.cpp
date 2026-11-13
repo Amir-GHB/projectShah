@@ -601,7 +601,6 @@ void UCombatComponent::NotifyMeleeTraceEnd(const UAnimSequenceBase* Animation)
 	if (Animation == ActiveAttackMontage && ActiveAttackToken != 0 && ActiveAttackWeapon.IsValid())
 	{
 		ActiveAttackWeapon->EndTrace();
-		if (!bParryWindowOpen) bParryWindowOpen = false;
 	}
 }
 
@@ -843,6 +842,10 @@ void UCombatComponent::SetGuardMode(bool bEnableGuard)
 	if (bEnableGuard)
 	{
 		if (AnimationState.DefenseState != ECombatDefenseState::None) return;
+		if (CurrentCombatState == ECombatState::Recovering)
+		{
+			StopActiveAttack(true, true, 0.08f);
+		}
 		AnimationState.DefenseState = ECombatDefenseState::Guarding;
 		RefreshAnimationState();
 		if (UDamageReactionComponent* Reactions = OwningCharacter.IsValid()
