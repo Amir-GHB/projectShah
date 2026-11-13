@@ -25,6 +25,8 @@ private:
 		FVector LastMoveGoal = FVector::ZeroVector;
 		FVector RelocationDestination = FVector::ZeroVector;
 		float AttackCooldown = 0.0f;
+		float StrafeCooldown = 0.0f;
+		bool bStrafeMoveIssued = false;
 		bool bHasMoveGoal = false;
 		bool bRelocationIssued = false;
 	};
