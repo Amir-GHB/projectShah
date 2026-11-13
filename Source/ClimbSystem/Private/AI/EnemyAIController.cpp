@@ -103,10 +103,10 @@ void AEnemyAIController::AdvancePatrolPointIndex(int32 PointCount)
 
 void AEnemyAIController::SetBlackboardTarget(AActor* Target)
 {
-	if (UBlackboardComponent* Blackboard = GetBlackboardComponent())
+	if (UBlackboardComponent* Blackboardcomp = GetBlackboardComponent())
 	{
-		Blackboard->SetValueAsObject(EnemyAIKeys::TargetActor, Target);
-		Blackboard->SetValueAsBool(EnemyAIKeys::HasTarget, IsValid(Target));
+		Blackboardcomp->SetValueAsObject(EnemyAIKeys::TargetActor, Target);
+		Blackboardcomp->SetValueAsBool(EnemyAIKeys::HasTarget, IsValid(Target));
 	}
 }
 
@@ -185,17 +185,17 @@ void AEnemyAIController::HandleCurrentTargetDestroyed(AActor* DestroyedActor)
 
 void AEnemyAIController::SetBlackboardInvestigation(const FVector& Location)
 {
-	if (UBlackboardComponent* Blackboard = GetBlackboardComponent())
+	if (UBlackboardComponent* Blackboardcomp = GetBlackboardComponent())
 	{
-		Blackboard->SetValueAsVector(EnemyAIKeys::InvestigationLocation, Location);
-		Blackboard->SetValueAsBool(EnemyAIKeys::HasInvestigation, HasActiveInvestigation());
+		Blackboardcomp->SetValueAsVector(EnemyAIKeys::InvestigationLocation, Location);
+		Blackboardcomp->SetValueAsBool(EnemyAIKeys::HasInvestigation, HasActiveInvestigation());
 	}
 }
 
 void AEnemyAIController::ClearBlackboardInvestigation()
 {
-	if (UBlackboardComponent* Blackboard = GetBlackboardComponent())
-		Blackboard->SetValueAsBool(EnemyAIKeys::HasInvestigation, false);
+	if (UBlackboardComponent* Blackboardcomp = GetBlackboardComponent())
+		Blackboardcomp->SetValueAsBool(EnemyAIKeys::HasInvestigation, false);
 }
 
 void AEnemyAIController::HandleComboWindowOpened()

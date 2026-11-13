@@ -345,7 +345,8 @@ void AWeaponBase::SetSwingEffectsActive(bool bActive)
 			WeaponConfig.SwingEffectRelativeTransform.GetScale3D(),
 			EAttachLocation::KeepRelativeOffset,
 			false,
-			ENCPoolMethod::None);
+			ENCPoolMethod::None,
+			false);
 	}
 
 	if (IsValid(ActiveSwingEffect))

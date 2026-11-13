@@ -190,7 +190,7 @@ bool AWeapon_Bow::GetAimDirectionAndSpawnTransform(FVector& OutDirection, FTrans
 				FVector TargetBoundsOrigin;
 				FVector TargetBoundsExtent;
 				Target->GetActorBounds(false, TargetBoundsOrigin, TargetBoundsExtent);
-				AimTarget = TargetBoundsOrigin + FVector(0.0f, 0.0f, TargetBoundsExtent.Z * 0.2f);
+				AimTarget = TargetBoundsOrigin + FVector(0.0f, 0.0f, 0.2f);
 				AimRotation = (AimTarget - AimOrigin).Rotation();
 				bHasAITarget = !AimTarget.ContainsNaN();
 			}

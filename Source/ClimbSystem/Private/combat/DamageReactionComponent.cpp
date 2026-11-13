@@ -323,7 +323,15 @@ void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 	}
 
 	UAnimMontage* SelectedDeathMontage = FindBestReaction(DeathReactions, DeathDamageInfo);
-	UAnimMontage* FinalDeathMontage = IsValid(SelectedDeathMontage) ? SelectedDeathMontage.Get() : DeathMontage.Get();
+	UAnimMontage* FinalDeathMontage;
+	if (IsValid(SelectedDeathMontage))
+	{
+		FinalDeathMontage = SelectedDeathMontage;
+	}
+	else
+	{
+		FinalDeathMontage = DeathMontage.Get();
+	}
 	PlayReaction(FinalDeathMontage, DeathBlendOutTime);
 	if (bRagdollOnDeath)
 	{
