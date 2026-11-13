@@ -49,6 +49,18 @@ public:
 	float PatrolWaitTime = 2.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol")
 	bool bUseRandomPatrolWhenNoPoints = true;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Movement", meta = (ClampMin = "0.0"))
+	float PatrolWalkSpeed = 250.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Movement", meta = (ClampMin = "0.0"))
+	float PursuitWalkSpeed = 600.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol|Animation")
+	TArray<TObjectPtr<UAnimMontage>> PatrolMontages;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol|Animation", meta = (ClampMin = "0.1"))
+	float PatrolMontageMinInterval = 4.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol|Animation", meta = (ClampMin = "0.1"))
+	float PatrolMontageMaxInterval = 9.0f;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|AI")
+	bool bIsInDamageReaction = false;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol", meta = (ClampMin = "100.0"))
 	float RandomPatrolRadius = 900.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Perception", meta = (ClampMin = "100.0"))
