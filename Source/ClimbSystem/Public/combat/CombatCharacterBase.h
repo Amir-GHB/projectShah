@@ -65,6 +65,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> AttackAction;
 
+	/** Held input for entering/leaving the sustained guard stance. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> GuardAction;
+
+	/** Press input for a weapon-specific parry attempt while guarding. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> ParryAction;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> NextWeaponAction;
 
@@ -79,6 +87,9 @@ protected:
 	void OnAttackTriggered(const FInputActionValue& Value);
 	void OnAttackReleased(const FInputActionValue& Value);
 	void OnAttackCanceled(const FInputActionValue& Value);
+	void OnGuardStarted(const FInputActionValue& Value);
+	void OnGuardEnded(const FInputActionValue& Value);
+	void OnParryTriggered(const FInputActionValue& Value);
 	void OnNextWeaponTriggered(const FInputActionValue& Value);
 	void OnTargetLockTriggered(const FInputActionValue& Value);
 
