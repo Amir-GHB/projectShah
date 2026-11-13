@@ -417,8 +417,8 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 	DamageInfo.DamageCauser = this;
 	DamageInfo.InstigatorWeapon = this;
 	DamageInfo.bIsHeavyAttack = AttackConfig && AttackConfig->bOverrideAttackType
-		? AttackConfig->bIsHeavyAttack : WeaponConfig.bIsHeavyAttack;
-	DamageInfo.bIsHeavyAttack = DamageInfo.bIsHeavyAttack || !WeaponConfig.bIsLightAttack;
+		? AttackConfig->bIsHeavyAttack
+		: (WeaponConfig.bIsHeavyAttack || !WeaponConfig.bIsLightAttack);
 	DamageInfo.Normalize();
 
 	// Resolve the critical roll once, before defense. DamageHandlerComponent respects this
