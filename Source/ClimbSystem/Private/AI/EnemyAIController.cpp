@@ -12,6 +12,7 @@
 #include "combat/EnemyCharacter.h"
 #include "combat/CombatComponent.h"
 #include "combat/DamageHandlerComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 namespace EnemyAIKeys
 {
@@ -161,6 +162,8 @@ void AEnemyAIController::HandleCurrentTargetDeath(AActor* KillerActor)
 
 	AEnemyCharacter* Enemy = ControlledEnemy.Get();
 	if (!IsValid(Enemy)) return;
+	if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
+		Movement->MaxWalkSpeed = Enemy->PatrolWalkSpeed;
 
 	if (Enemy->CombatComponent)
 	{
@@ -222,6 +225,8 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 			if (UCombatComponent* PlayerCombat = Actor->FindComponentByClass<UCombatComponent>())
 				PlayerCombat->RegisterEncounterEnemy(Enemy);
 			SetCurrentTarget(Actor);
+			if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
+				Movement->MaxWalkSpeed = Enemy->PursuitWalkSpeed;
 			InvestigationExpiryTime = 0.0;
 			SetBlackboardTarget(Actor);
 			ClearBlackboardInvestigation();
@@ -233,6 +238,8 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 			InvestigationExpiryTime = GetWorld() ?
 				GetWorld()->GetTimeSeconds() + FMath::Max(0.1f, Enemy->InvestigateDuration) : 0.0;
 			SetCurrentTarget(nullptr);
+			if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
+				Movement->MaxWalkSpeed = Enemy->PursuitWalkSpeed;
 			SetBlackboardInvestigation(InvestigationLocation);
 			ClearFocus(EAIFocusPriority::Gameplay);
 			if (Enemy->CombatComponent) Enemy->CombatComponent->CancelAttackInput();
@@ -245,6 +252,8 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 		InvestigationLocation = Stimulus.StimulusLocation;
 		InvestigationExpiryTime = GetWorld() ?
 			GetWorld()->GetTimeSeconds() + FMath::Max(0.1f, Enemy->InvestigateDuration) : 0.0;
+		if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
+			Movement->MaxWalkSpeed = Enemy->PursuitWalkSpeed;
 		SetBlackboardInvestigation(InvestigationLocation);
 	}
 }
