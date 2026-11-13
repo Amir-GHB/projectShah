@@ -394,16 +394,8 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 	AActor* TargetActor = HitResult.GetActor();
 	if (!TargetActor || !OwningCharacter.IsValid()) return;
 
-	// Resolve defense before ordinary hit presentation. A parry or guard break consumes
-	// this hit completely: no hit Niagara, sound, health damage, or normal hit reaction.
-	if (UDamageReactionComponent* TargetReactions = TargetActor->FindComponentByClass<UDamageReactionComponent>())
-	{
-		if (TargetReactions->ResolveIncomingMeleeHit(OwningCharacter.Get(), this, HitResult)) return;
-	}
-
-	PlayHitEffects(HitResult);
-
-	// Build structured damage payload using data-driven config and active attack multiplier
+	// Build the complete damage payload before resolving defense. Critical hits must be
+	// identified before a guard can decide whether it is allowed to block this impact.
 	FDamageInfo DamageInfo;
 	const FAttackDamageConfig* AttackConfig = WeaponConfig.AttackDamageConfigs.IsValidIndex(ActiveAttackIndex)
 		? &WeaponConfig.AttackDamageConfigs[ActiveAttackIndex] : nullptr;
@@ -424,29 +416,45 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 	DamageInfo.WeaponType = WeaponConfig.WeaponType;
 	DamageInfo.DamageCauser = this;
 	DamageInfo.InstigatorWeapon = this;
-
-	// Normalize damage payload ensuring non-negative finite bounds
+	DamageInfo.bIsHeavyAttack = AttackConfig && AttackConfig->bOverrideAttackType
+		? AttackConfig->bIsHeavyAttack : WeaponConfig.bIsHeavyAttack;
+	DamageInfo.bIsHeavyAttack = DamageInfo.bIsHeavyAttack || !WeaponConfig.bIsLightAttack;
 	DamageInfo.Normalize();
 
-	// Calculate unified raw damage consistently across both handler and native fallback
-	const float CalculatedRawDamage = DamageInfo.GetCalculatedRawDamage();
+	// Resolve the critical roll once, before defense. DamageHandlerComponent respects this
+	// resolved result and will not roll a second time.
+	DamageInfo.bIsCriticalHit = DamageInfo.CriticalChance > 0.0f
+		&& FMath::FRand() < DamageInfo.CriticalChance;
+	DamageInfo.bCriticalRollResolved = true;
 
-	// 1. Primary: Target implements UDamageHandlerComponent
-	UDamageHandlerComponent* TargetHandler = TargetActor->FindComponentByClass<UDamageHandlerComponent>();
-	if (TargetHandler)
+	// A successful parry or a front-facing light guard block consumes this hit completely.
+	if (UDamageReactionComponent* TargetReactions = TargetActor->FindComponentByClass<UDamageReactionComponent>())
+	{
+		if (TargetReactions->ResolveIncomingMeleeHit(OwningCharacter.Get(), this, DamageInfo, HitResult))
+			return;
+	}
+
+	PlayHitEffects(HitResult);
+
+	// Calculate unified raw damage consistently across both handler and native fallback.
+	float CalculatedRawDamage = DamageInfo.GetCalculatedRawDamage();
+	if (DamageInfo.bIsCriticalHit)
+	{
+		CalculatedRawDamage *= DamageInfo.CriticalDamageMultiplier;
+	}
+
+	if (UDamageHandlerComponent* TargetHandler = TargetActor->FindComponentByClass<UDamageHandlerComponent>())
 	{
 		TargetHandler->ApplyDamage(OwningCharacter.Get(), TargetActor, DamageInfo, HitResult);
 		return;
 	}
 
-	// 2. Fallback: Native Unreal Engine TakeDamage
 	FPointDamageEvent PointDamageEvent(
 		CalculatedRawDamage,
 		HitResult,
 		HitResult.ImpactNormal,
 		nullptr
 	);
-
 	TargetActor->TakeDamage(
 		CalculatedRawDamage,
 		PointDamageEvent,
