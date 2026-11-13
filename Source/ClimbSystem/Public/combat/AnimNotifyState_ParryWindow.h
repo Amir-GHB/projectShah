@@ -3,7 +3,7 @@
 #include "Animation/AnimNotifies/AnimNotifyState.h"
 #include "AnimNotifyState_ParryWindow.generated.h"
 
-/** Opens a timed parry window for the duration of this animation notify state. */
+/** Marks the active attack montage as parryable for this notify-state window. */
 UCLASS(meta=(DisplayName="Parry Window"))
 class CLIMBSYSTEM_API UAnimNotifyState_ParryWindow : public UAnimNotifyState
 {
