@@ -8,6 +8,9 @@
 #include "Animation/AnimMontage.h"
 #include "Engine/World.h"
 #include "combat/WeaponBase.h"
+#include "combat/DamageReactionComponent.h"
+#include "combat/AnimNotifyState_ParryWindow.h"
+#include "Animation/AnimNotifies/AnimNotifyState.h"
 #include "combat/Weapons/Weapon_Bow.h"
 
 UCombatComponent::UCombatComponent()
@@ -592,7 +595,11 @@ void UCombatComponent::NotifyMeleeTraceTick(const UAnimSequenceBase* Animation, 
 }
 void UCombatComponent::NotifyMeleeTraceEnd(const UAnimSequenceBase* Animation)
 {
-	if (Animation == ActiveAttackMontage && ActiveAttackToken != 0 && ActiveAttackWeapon.IsValid()) ActiveAttackWeapon->EndTrace();
+	if (Animation == ActiveAttackMontage && ActiveAttackToken != 0 && ActiveAttackWeapon.IsValid())
+	{
+		ActiveAttackWeapon->EndTrace();
+		if (!bParryWindowOpen) bParryWindowOpen = false;
+	}
 }
 
 void UCombatComponent::OnMontageInstanceBlendingOut(UAnimMontage* Montage, bool bInterrupted, uint64 AttackToken)
@@ -669,6 +676,7 @@ void UCombatComponent::StopActiveAttack(bool bInterrupted, bool bStopMontage, fl
 
 	ActiveAttackWeapon.Reset();
 	ActiveAttackMontage = nullptr;
+	bParryWindowOpen = false;
 	ActiveSectionIndex = INDEX_NONE;
 	PendingSectionIndex = INDEX_NONE;
 	ActiveAttackIndex = INDEX_NONE;
@@ -821,25 +829,95 @@ void UCombatComponent::SetNonCombatAnimation(bool bEnableNonCombatAnimation)
 void UCombatComponent::SetGuardMode(bool bEnableGuard)
 {
 	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing ||
-		CurrentCombatState == ECombatState::Staggered || bWeaponSwapActive)
+		CurrentCombatState == ECombatState::Staggered || bWeaponSwapActive ||
+		CurrentCombatState == ECombatState::Attacking || CurrentCombatState == ECombatState::ComboWindow ||
+		CurrentCombatState == ECombatState::SwappingWeapon || !IsValid(CurrentWeapon))
 	{
 		return;
 	}
 
 	if (bEnableGuard)
 	{
-		if (AnimationState.DefenseState == ECombatDefenseState::None)
+		if (AnimationState.DefenseState != ECombatDefenseState::None) return;
+		AnimationState.DefenseState = ECombatDefenseState::Guarding;
+		RefreshAnimationState();
+		if (UDamageReactionComponent* Reactions = OwningCharacter.IsValid()
+			? OwningCharacter->FindComponentByClass<UDamageReactionComponent>() : nullptr)
 		{
-			AnimationState.DefenseState = ECombatDefenseState::Guarding;
-			RefreshAnimationState();
+			Reactions->PlayHitReactionOverride(CurrentWeapon->GetConfig().BeginGuardMontage);
 		}
 	}
 	else if (AnimationState.DefenseState == ECombatDefenseState::Guarding ||
 		AnimationState.DefenseState == ECombatDefenseState::Parrying)
 	{
 		AnimationState.DefenseState = ECombatDefenseState::None;
+		bParryWindowOpen = false;
 		RefreshAnimationState();
 	}
+}
+
+bool UCombatComponent::BeginParryAttempt()
+{
+	if (!IsValid(CurrentWeapon) || !OwningCharacter.IsValid() ||
+		AnimationState.DefenseState != ECombatDefenseState::Guarding ||
+		CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing ||
+		bWeaponSwapActive)
+	{
+		return false;
+	}
+
+	UAnimMontage* ParryMontage = CurrentWeapon->GetConfig().DefenderParryMontage;
+	UDamageReactionComponent* Reactions =
+		OwningCharacter->FindComponentByClass<UDamageReactionComponent>();
+	if (!IsValid(ParryMontage) || !Reactions || !Reactions->PlayHitReactionOverride(ParryMontage))
+	{
+		return false;
+	}
+
+	SetParryAnimationState(true);
+	return true;
+}
+
+void UCombatComponent::NotifyParryWindowBegin(const UAnimSequenceBase* Animation)
+{
+	if (Animation == ActiveAttackMontage && ActiveAttackToken != 0)
+	{
+		bParryWindowOpen = true;
+	}
+}
+
+void UCombatComponent::NotifyParryWindowEnd(const UAnimSequenceBase* Animation)
+{
+	if (Animation == ActiveAttackMontage)
+	{
+		bParryWindowOpen = false;
+	}
+}
+
+bool UCombatComponent::CanBeParried() const
+{
+	if (!IsValid(ActiveAttackMontage) || ActiveAttackToken == 0 || !ActiveAttackWeapon.IsValid()
+		|| !OwningCharacter.IsValid() || !OwningCharacter->GetMesh())
+	{
+		return false;
+	}
+
+	const UAnimInstance* Anim = OwningCharacter->GetMesh()->GetAnimInstance();
+	if (!Anim || !Anim->Montage_IsPlaying(ActiveAttackMontage))
+	{
+		return false;
+	}
+
+	// If this montage authors a parry notify state, that state is authoritative.
+	// Legacy montages without it fall back to their active melee-trace notify window.
+	const bool bHasAuthoredParryWindow = ActiveAttackMontage->Notifies.ContainsByPredicate(
+		[](const FAnimNotifyEvent& Notify)
+		{
+			return IsValid(Notify.NotifyStateClass)
+				&& Notify.NotifyStateClass->IsA(UAnimNotifyState_ParryWindow::StaticClass());
+		});
+
+	return bHasAuthoredParryWindow ? bParryWindowOpen : ActiveAttackWeapon->IsTracing();
 }
 
 void UCombatComponent::TriggerGuardBreak()
