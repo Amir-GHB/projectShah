@@ -216,7 +216,6 @@ protected:
 	uint64 ActiveAttackToken = 0;
 	bool bIsStoppingAttack = false;
 	bool bParryWindowOpen = false;
-	bool bParryWindowOpen = false;
 	double LastAttackInputTimestamp = -1.0;
 	bool bHasBufferedAttackInput = false;
 	TOptional<EWeaponType> QueuedWeaponSwitch;
