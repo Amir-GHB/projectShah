@@ -37,8 +37,12 @@ float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActo
 
 	float RawDamage = ResolvedInfo.GetCalculatedRawDamage()
 		* GetHitLocationMultiplier(ResolvedInfo.HitLocation);
-	ResolvedInfo.bIsCriticalHit = ResolvedInfo.CriticalChance > 0.0f
-		&& FMath::FRand() < ResolvedInfo.CriticalChance;
+	if (!ResolvedInfo.bCriticalRollResolved)
+	{
+		ResolvedInfo.bIsCriticalHit = ResolvedInfo.CriticalChance > 0.0f
+			&& FMath::FRand() < ResolvedInfo.CriticalChance;
+		ResolvedInfo.bCriticalRollResolved = true;
+	}
 
 	if (ResolvedInfo.bIsCriticalHit)
 	{
