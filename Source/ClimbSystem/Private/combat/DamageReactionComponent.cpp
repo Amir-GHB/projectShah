@@ -803,7 +803,6 @@ void UDamageReactionComponent::ActivateRagdoll()
 void UDamageReactionComponent::ResetReactionState()
 {
 	EndFinisher(true);
-	EndParryWindow();
 	bDeathHandled = false;
 
 	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
