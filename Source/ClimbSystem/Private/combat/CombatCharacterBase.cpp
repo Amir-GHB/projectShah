@@ -93,6 +93,16 @@ void ACombatCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 			EnhancedInput->BindAction(AttackAction, ETriggerEvent::Completed, this, &ACombatCharacterBase::OnAttackReleased);
 			EnhancedInput->BindAction(AttackAction, ETriggerEvent::Canceled, this, &ACombatCharacterBase::OnAttackCanceled);
 		}
+		if (GuardAction)
+		{
+			EnhancedInput->BindAction(GuardAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnGuardStarted);
+			EnhancedInput->BindAction(GuardAction, ETriggerEvent::Completed, this, &ACombatCharacterBase::OnGuardEnded);
+			EnhancedInput->BindAction(GuardAction, ETriggerEvent::Canceled, this, &ACombatCharacterBase::OnGuardEnded);
+		}
+		if (ParryAction)
+		{
+			EnhancedInput->BindAction(ParryAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnParryTriggered);
+		}
 		if (NextWeaponAction)
 		{
 			EnhancedInput->BindAction(NextWeaponAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnNextWeaponTriggered);
@@ -155,6 +165,30 @@ void ACombatCharacterBase::OnAttackCanceled(const FInputActionValue& Value)
 	if (CombatComponent)
 	{
 		CombatComponent->CancelAttackInput();
+	}
+}
+
+void ACombatCharacterBase::OnGuardStarted(const FInputActionValue& Value)
+{
+	if (CombatComponent)
+	{
+		CombatComponent->SetGuardMode(true);
+	}
+}
+
+void ACombatCharacterBase::OnGuardEnded(const FInputActionValue& Value)
+{
+	if (CombatComponent)
+	{
+		CombatComponent->SetGuardMode(false);
+	}
+}
+
+void ACombatCharacterBase::OnParryTriggered(const FInputActionValue& Value)
+{
+	if (CombatComponent)
+	{
+		CombatComponent->BeginParryAttempt();
 	}
 }
 
