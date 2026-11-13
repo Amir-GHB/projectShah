@@ -187,12 +187,29 @@ bool AWeapon_Bow::GetAimDirectionAndSpawnTransform(FVector& OutDirection, FTrans
 			const UDamageHandlerComponent* TargetDamage = Target->FindComponentByClass<UDamageHandlerComponent>();
 			if (!TargetDamage || !TargetDamage->bIsDead)
 			{
-				FVector TargetBoundsOrigin;
-				FVector TargetBoundsExtent;
-				Target->GetActorBounds(false, TargetBoundsOrigin, TargetBoundsExtent);
-				AimTarget = TargetBoundsOrigin + FVector(0.0f, 0.0f, 0.2f);
-				AimRotation = (AimTarget - AimOrigin).Rotation();
-				bHasAITarget = !AimTarget.ContainsNaN();
+				if (const ACharacter* TargetCharacter = Cast<ACharacter>(Target))
+				{
+					if (const USkeletalMeshComponent* TargetMesh = TargetCharacter->GetMesh())
+					{
+						const FBox MeshBounds = TargetMesh->Bounds.GetBox();
+						if (MeshBounds.IsValid)
+						{
+							AimTarget = MeshBounds.GetCenter();
+							AimTarget.Z = FMath::Lerp(MeshBounds.Min.Z, MeshBounds.Max.Z, 0.68f);
+							bHasAITarget = !AimTarget.ContainsNaN();
+						}
+					}
+				}
+				if (!bHasAITarget)
+				{
+					FVector TargetBoundsOrigin;
+					FVector TargetBoundsExtent;
+					Target->GetActorBounds(false, TargetBoundsOrigin, TargetBoundsExtent);
+					AimTarget = TargetBoundsOrigin + FVector(0.0f, 0.0f, TargetBoundsExtent.Z * 0.25f);
+					bHasAITarget = !AimTarget.ContainsNaN();
+				}
+				if (bHasAITarget)
+					AimRotation = (AimTarget - AimOrigin).Rotation();
 			}
 		}
 	}
