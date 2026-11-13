@@ -208,6 +208,12 @@ void UDamageReactionComponent::HandleDamageTaken(
 		return;
 	}
 
+	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(GetOwner()))
+	{
+		Mage->CancelPendingMagicAttack();
+	}
+
+	// Guard-break montage owns the reaction pose, but damage still cancels pending enemy actions.
 	if (UCombatComponent* Combat = GetOwner()
 		? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr)
 	{
@@ -217,10 +223,6 @@ void UDamageReactionComponent::HandleDamageTaken(
 		}
 	}
 
-	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(GetOwner()))
-	{
-		Mage->CancelPendingMagicAttack();
-	}
 	PlayReaction(FindBestHitReaction(DamageInfo), HitReactionBlendOutTime);
 }
 
