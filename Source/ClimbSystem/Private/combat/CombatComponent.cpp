@@ -929,7 +929,16 @@ void UCombatComponent::TriggerGuardBreak()
 	}
 
 	AnimationState.DefenseState = ECombatDefenseState::GuardBroken;
+	bParryWindowOpen = false;
 	RefreshAnimationState();
+	if (IsValid(CurrentWeapon))
+	{
+		if (UDamageReactionComponent* Reactions = OwningCharacter.IsValid()
+			? OwningCharacter->FindComponentByClass<UDamageReactionComponent>() : nullptr)
+		{
+			Reactions->PlayHitReactionOverride(CurrentWeapon->GetConfig().BreakGuardMontage);
+		}
+	}
 }
 
 void UCombatComponent::EndGuardBreak()
