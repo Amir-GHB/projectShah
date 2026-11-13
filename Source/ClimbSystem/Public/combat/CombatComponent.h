@@ -100,18 +100,6 @@ public:
 	bool CanBeParried() const;
 	bool IsParryAttemptActive() const { return AnimationState.DefenseState == ECombatDefenseState::Parrying; }
 
-	/** Starts a weapon-specific parry attempt while guard is held. */
-	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
-	bool BeginParryAttempt();
-
-	/** Notify-state callbacks used by authored attack-montage parry windows. */
-	void NotifyParryWindowBegin(const UAnimSequenceBase* Animation);
-	void NotifyParryWindowEnd(const UAnimSequenceBase* Animation);
-
-	/** True only while this character's active attack is inside a valid parry window. */
-	bool CanBeParried() const;
-	bool IsParryAttemptActive() const { return AnimationState.DefenseState == ECombatDefenseState::Parrying; }
-
 	/** Called when a light attack hits an active guard. Enters the guard-break animation state. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
 	void TriggerGuardBreak();
