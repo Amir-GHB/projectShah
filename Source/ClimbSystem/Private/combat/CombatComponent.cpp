@@ -299,7 +299,8 @@ AWeaponBase* UCombatComponent::GetWeapon(EWeaponType Type) const
 void UCombatComponent::HandleAttackInput()
 {
 	if (!OwningCharacter.IsValid() || !IsValid(CurrentWeapon) || bWeaponSwapActive
-		|| CurrentCombatState == ECombatState::Dead) return;
+		|| CurrentCombatState == ECombatState::Dead
+		|| AnimationState.DefenseState != ECombatDefenseState::None) return;
 
 	// Ranged weapons use Started/Completed input events so holding and releasing are distinct.
 	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon))
