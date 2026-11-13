@@ -220,6 +220,12 @@ struct FAttackDamageConfig
 	bool bOverrideCriticalSettings = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage")
+	bool bOverrideAttackType = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage", meta = (EditCondition = "bOverrideAttackType"))
+	bool bIsHeavyAttack = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage")
 	bool bOverrideDamageOverTimeEffects = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Attack Damage")
@@ -291,9 +297,15 @@ struct FDamageInfo
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage", meta = (ClampMin = "1.0"))
 	float CriticalDamageMultiplier = 2.0f;
 
-	/** Set by DamageHandlerComponent after its critical-hit roll. */
+	/** Set by the weapon before guard resolution so a critical hit cannot be blocked by guard. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
 	bool bIsCriticalHit = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
+	bool bCriticalRollResolved = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage")
+	bool bIsHeavyAttack = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage Over Time")
 	TArray<FDamageOverTimeEffect> DamageOverTimeEffects;
@@ -465,9 +477,12 @@ struct FWeaponConfig : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Animation")
 	TObjectPtr<UAnimMontage> EquipMontage = nullptr;
 
-	/** Existing standard melee attacks are light attacks and can be guard-broken. */
+	/** Legacy light-attack flag. Heavy attacks always bypass guard. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage")
 	bool bIsLightAttack = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage")
+	bool bIsHeavyAttack = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Damage")
 	float BaseDamage = 35.0f;
@@ -507,6 +522,12 @@ struct FWeaponConfig : public FTableRowBase
 	FName SwingEffectSocketName = NAME_None;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|VFX")
 	FTransform SwingEffectRelativeTransform = FTransform::Identity;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard")
+	TObjectPtr<UAnimMontage> BeginGuardMontage = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard")
+	TObjectPtr<UAnimMontage> BreakGuardMontage = nullptr;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry")
 	TObjectPtr<UAnimMontage> DefenderParryMontage = nullptr;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry")
