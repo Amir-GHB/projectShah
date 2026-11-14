@@ -1000,7 +1000,7 @@ void UCombatComponent::SetGuardMode(bool bEnableGuard)
 		if (AnimationState.DefenseState != ECombatDefenseState::None) return;
 		if (CurrentCombatState == ECombatState::Recovering)
 		{
-			StopActiveAttack(true, true, 0.08f);
+			StopActiveAttack(true, true, GuardReleaseBlendOutDuration);
 		}
 		AnimationState.DefenseState = ECombatDefenseState::Guarding;
 		RefreshAnimationState();
