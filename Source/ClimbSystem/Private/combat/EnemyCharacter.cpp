@@ -224,6 +224,10 @@ void AGuardEnemyCharacter::UpdateDefensiveCombat(AActor* Target)
 		return;
 	}
 
+	if (CombatComponent->IsRiposteWindowActive())
+	{
+		return;
+	}
 	if (CombatComponent->GetAnimationState().DefenseState == ECombatDefenseState::None)
 	{
 		CombatComponent->SetGuardMode(true);
