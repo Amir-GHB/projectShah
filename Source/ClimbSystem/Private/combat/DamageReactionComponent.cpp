@@ -224,7 +224,8 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	UCombatComponent* DefenderCombat = GetOwner()->FindComponentByClass<UCombatComponent>();
 	UCombatComponent* AttackerCombat = Attacker->FindComponentByClass<UCombatComponent>();
 	if (!DefenderCombat || !DefenderCombat->IsParryAttemptActive()
-		|| !AttackerCombat || !AttackerCombat->CanBeParried())
+		|| !AttackerCombat || !AttackerCombat->CanBeParried()
+		|| !DefenderCombat->IsWithinParryArc(Attacker->GetActorLocation() - GetOwner()->GetActorLocation()))
 	{
 		return false;
 	}
