@@ -125,6 +125,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Enemy|Magic")
 	void ReleaseMagicProjectile();
 	void CancelPendingMagicAttack();
+	bool HasPendingMagicAttack() const { return PendingMagicTarget.IsValid(); }
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic|Animation")
 	TObjectPtr<UAnimMontage> MagicAttackMontage = nullptr;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic|Projectile")
@@ -153,6 +154,7 @@ class CLIMBSYSTEM_API ABowEnemyCharacter : public AEnemyCharacter
 public:
 	virtual void PerformAICombatAction(AActor* Target) override;
 	void CancelPendingBowAttack();
+	bool HasPendingBowAttack() const { return PendingBowTarget.IsValid(); }
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Bow", meta = (ClampMin = "0.05"))
 	float BowDrawDuration = 0.8f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Bow", meta = (ClampMin = "0.1"))
