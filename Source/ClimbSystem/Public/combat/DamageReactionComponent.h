@@ -169,10 +169,10 @@ public:
 	/** Plays a projectile/demo-supplied hit reaction after damage has been applied. */
 	bool PlayHitReactionOverride(UAnimMontage* Montage);
 
-	/** Resolves a parry or guard response before ordinary hit VFX and damage. */
+	/** Shared melee/projectile defense resolver. Projectiles pass bAllowParry=false. */
+	bool ResolveIncomingHit(AActor* Attacker, AWeaponBase* AttackingWeapon,
+		FDamageInfo& DamageInfo, const FHitResult& HitResult, bool bAllowParry);
 	bool TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult);
-	bool ResolveIncomingMeleeHit(AActor* Attacker, AWeaponBase* AttackingWeapon,
-		const FDamageInfo& DamageInfo, const FHitResult& HitResult);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Death")
 	bool bRagdollOnDeath = true;
