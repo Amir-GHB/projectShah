@@ -247,11 +247,9 @@ void AGuardEnemyCharacter::UpdateDefensiveCombat(AActor* Target)
 		&& GetWorld()->GetTimeSeconds() >= NextParryAttemptTime
 		&& FMath::FRand() <= FMath::Clamp(ParryAttemptChance, 0.0f, 1.0f))
 	{
-		if (CombatComponent->BeginParryAttempt())
-		{
-			NextParryAttemptTime = GetWorld()->GetTimeSeconds()
-				+ FMath::Max(0.05f, ParryAttemptInterval);
-		}
+		CombatComponent->BeginParryAttempt();
+		NextParryAttemptTime = GetWorld()->GetTimeSeconds()
+			+ FMath::Max(0.05f, ParryAttemptInterval);
 	}
 }
 
