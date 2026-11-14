@@ -166,7 +166,10 @@ void AEnemyCharacter::ReleaseQueuedAICombatAction()
 	PendingAICombatTarget.Reset();
 	bPendingAIHeavyAttack = false;
 
-	if (!IsValid(Target) || !CombatComponent || (DamageHandlerComponent && DamageHandlerComponent->bIsDead))
+	const UDamageHandlerComponent* TargetDamage = IsValid(Target)
+		? Target->FindComponentByClass<UDamageHandlerComponent>() : nullptr;
+	if (!IsValid(Target) || (TargetDamage && TargetDamage->bIsDead)
+		|| !CombatComponent || (DamageHandlerComponent && DamageHandlerComponent->bIsDead))
 	{
 		ReleaseAICombatSlot();
 		return;
@@ -344,6 +347,7 @@ void ABowEnemyCharacter::ReleaseBowShot()
 	if (!IsValid(Target) || !CombatComponent || CombatComponent->CurrentCombatState != ECombatState::DrawingBow)
 	{
 		if (CombatComponent) CombatComponent->CancelAttackInput();
+		ReleaseAICombatSlot();
 		return;
 	}
 	CombatComponent->HandleAttackReleased();
