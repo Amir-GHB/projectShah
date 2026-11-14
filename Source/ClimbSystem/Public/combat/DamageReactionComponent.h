@@ -182,6 +182,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Death")
 	bool bRagdollOnDeath = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Parry", meta = (ClampMin = "0.0"))
+	float ParryAttackStopBlendOutDuration = 0.04f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
 	float BlockHitStopDuration = 0.035f;
 
