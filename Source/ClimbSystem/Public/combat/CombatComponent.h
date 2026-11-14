@@ -102,6 +102,7 @@ public:
 	bool IsParryAttemptActive() const { return AnimationState.DefenseState == ECombatDefenseState::Parrying; }
 	void EndParryAttempt(bool bSuccessful);
 	void NotifyParrySucceeded();
+	float GetRiposteDamageMultiplier() const { return bRiposteAttackActive ? FMath::Max(1.0f, RiposteDamageMultiplier) : 1.0f; }
 	bool IsWithinGuardArc(const FVector& DirectionToAttacker) const;
 	bool IsWithinParryArc(const FVector& DirectionToAttacker) const;
 
