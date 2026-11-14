@@ -236,6 +236,7 @@ For ordinary melee enemy Blueprints:
 - Tune `HeavyAttackTelegraphDuration`; zero uses the montage length.
 - Configure the weapon's `AttackDamageConfigs` with `bOverrideAttackType` and `bIsHeavyAttack` to identify heavy entries. AI selects a matching attack entry/section.
 - `MaxAttackersPerTarget` is clamped to 1-2 and defaults to 2. The slot is released when the attack ends, the enemy is damaged, the task aborts, or the actor ends play.
+- For mage enemies, `MagicProjectileFallbackDelay=0` uses the magic attack montage length to release the projectile if its release notify is missing. A notify release clears the fallback timer, preventing duplicate projectiles.
 
 New enemy AI defaults:
 
