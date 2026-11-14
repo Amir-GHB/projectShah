@@ -232,7 +232,7 @@ void UDamageReactionComponent::PlayDefenseFeedback(AWeaponBase* Weapon,
 	}
 	else
 	{
-		ApplyDefenseTimeDilation(bParry ? ParryHitStopDuration : BlockHitStopDuration, 0.05f);
+		ApplyDefenseTimeDilation(bParry ? ParryHitStopDuration : BlockHitStopDuration, DefenseHitStopTimeDilation);
 	}
 }
 
@@ -248,7 +248,7 @@ void UDamageReactionComponent::PlayGuardBreakFeedback(AWeaponBase* Weapon, const
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, Config.GuardBreakSound, ImpactLocation);
 	}
-	ApplyDefenseTimeDilation(BlockHitStopDuration, 0.05f);
+	ApplyDefenseTimeDilation(BlockHitStopDuration, DefenseHitStopTimeDilation);
 }
 
 void UDamageReactionComponent::ApplyDefenseTimeDilation(float Duration, float TimeDilation)
@@ -328,7 +328,10 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 		Mage->CancelPendingMagicAttack();
 	}
 
-	DefenderCombat->NotifyParrySucceeded();
+	const bool bPerfectParry = DefenderCombat->NotifyParrySucceeded();
+	DefenderCombat->FindComponentByClass<UDamageReactionComponent>()->PlayDefenseFeedback(
+		DefenderWeapon, HitResult.ImpactPoint.IsNearlyZero() ? HitResult.Location : HitResult.ImpactPoint,
+		true, bPerfectParry);
 
 	const FWeaponConfig& DefenderConfig = DefenderWeapon->GetConfig();
 	const FWeaponConfig& AttackerConfig = AttackingWeapon->GetConfig();
@@ -418,8 +421,16 @@ bool UDamageReactionComponent::ResolveIncomingHit(AActor* Attacker,
 
 	if (bBypassesGuard || !bHitFromFront)
 	{
-		DefenderCombat->TriggerGuardBreak();
+		DefenderCombat->TriggerGuardBreak(HitResult.ImpactPoint.IsNearlyZero()
+			? HitResult.Location : HitResult.ImpactPoint);
 		return false;
+	}
+
+	// Block feedback is separate from ordinary weapon hit effects, which are intentionally skipped.
+	if (UDamageReactionComponent* DefenderReactions = GetOwner()->FindComponentByClass<UDamageReactionComponent>())
+	{
+		DefenderReactions->PlayDefenseFeedback(DefenderCombat->CurrentWeapon,
+			HitResult.ImpactPoint.IsNearlyZero() ? HitResult.Location : HitResult.ImpactPoint, false, false);
 	}
 
 	// Guard stamina is represented by poise. A block consumes poise but no health.
