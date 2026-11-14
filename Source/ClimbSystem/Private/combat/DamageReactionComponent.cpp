@@ -341,7 +341,7 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 
 	// Cancel the attack transaction first. This invalidates montage callbacks and closes
 	// the trace before any damage delegate can trigger another reaction or hit presentation.
-	AttackerCombat->StopActiveAttack(true, true, 0.04f);
+	AttackerCombat->StopActiveAttack(true, true, ParryAttackStopBlendOutDuration);
 	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Attacker))
 	{
 		Mage->CancelPendingMagicAttack();
