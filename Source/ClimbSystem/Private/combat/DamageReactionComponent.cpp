@@ -264,7 +264,12 @@ void UDamageReactionComponent::PlayGuardBreakFeedback(AWeaponBase* Weapon, const
 		}
 		if (IsValid(DefenseForceFeedbackEffect))
 		{
-			PlayerController->ClientPlayForceFeedback(DefenseForceFeedbackEffect, false, NAME_None, false);
+			FForceFeedbackParameters FeedbackParameters;
+			FeedbackParameters.bLooping = false;
+			FeedbackParameters.bIgnoreTimeDilation = false;
+			FeedbackParameters.bPlayWhilePaused = false;
+			FeedbackParameters.Tag = TEXT("CombatDefense");
+			PlayerController->ClientPlayForceFeedback(DefenseForceFeedbackEffect, FeedbackParameters);
 		}
 	}
 	ApplyDefenseTimeDilation(GuardBreakHitStopDuration, DefenseHitStopTimeDilation);
