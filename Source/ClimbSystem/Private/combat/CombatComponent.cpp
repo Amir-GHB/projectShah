@@ -891,7 +891,7 @@ bool UCombatComponent::IsLastLivingEncounterEnemy(AActor* Enemy) const
 void UCombatComponent::EnterFinisherState()
 {
 	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing) return;
-	StopActiveAttack(true, true, StaggerAttackBlendOutDuration);
+	StopActiveAttack(true, true, 0.08f);
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
@@ -1229,7 +1229,7 @@ void UCombatComponent::EnterStaggered(float RecoveryDuration)
 		return;
 	}
 
-	StopActiveAttack(true, true, 0.08f);
+	StopActiveAttack(true, true, StaggerAttackBlendOutDuration);
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(StaggerRecoveryTimer);
