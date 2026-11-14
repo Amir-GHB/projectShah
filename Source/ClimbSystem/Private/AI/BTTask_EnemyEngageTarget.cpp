@@ -225,7 +225,18 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 			}
 			else
 			{
-				Enemy->ReleaseAICombatSlot();
+				if (Enemy->CombatComponent->IsRiposteWindowActive())
+				{
+					Enemy->QueueAICombatAction(Target, false);
+					if (Enemy->CombatComponent->CurrentCombatState == ECombatState::Idle)
+					{
+						Enemy->ReleaseAICombatSlot();
+					}
+				}
+				else
+				{
+					Enemy->ReleaseAICombatSlot();
+				}
 			}
 		}
 		Memory.AttackCooldown = FMath::Max(0.05f, Enemy->AttackRetryInterval);
