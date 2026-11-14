@@ -116,7 +116,11 @@ void UCombatComponent::EquipWeapon(EWeaponType NewWeaponType)
 
 void UCombatComponent::BeginWeaponSwap(EWeaponType NewWeaponType)
 {
-	if (AnimationState.DefenseState == ECombatDefenseState::Guarding ||
+	if (AnimationState.DefenseState == ECombatDefenseState::GuardBroken)
+	{
+		EndGuardBreak();
+	}
+	else if (AnimationState.DefenseState == ECombatDefenseState::Guarding ||
 		AnimationState.DefenseState == ECombatDefenseState::Parrying)
 	{
 		SetGuardMode(false);
@@ -814,6 +818,7 @@ void UCombatComponent::EnterFinisherState()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
+		World->GetTimerManager().ClearTimer(StaggerRecoveryTimer);
 	}
 	ClearParryTimers();
 	AnimationState.DefenseState = ECombatDefenseState::None;
