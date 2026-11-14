@@ -313,6 +313,15 @@ void UCombatComponent::HandleAttackInput()
 		|| CurrentCombatState == ECombatState::Dead
 		|| AnimationState.DefenseState != ECombatDefenseState::None) return;
 
+	// A successful perfect parry grants one short melee riposte opportunity.
+	if (bRiposteWindowActive)
+	{
+		if (CurrentWeapon->GetWeaponType() == EWeaponType::Bow) return;
+		bRiposteWindowActive = false;
+		if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(RiposteWindowTimer);
+		bRiposteAttackActive = true;
+	}
+
 	// Ranged weapons use Started/Completed input events so holding and releasing are distinct.
 	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon))
 	{
@@ -690,6 +699,7 @@ void UCombatComponent::StopActiveAttack(bool bInterrupted, bool bStopMontage, fl
 	ActiveAttackWeapon.Reset();
 	ActiveAttackMontage = nullptr;
 	bParryWindowOpen = false;
+	bRiposteAttackActive = false;
 	ActiveSectionIndex = INDEX_NONE;
 	PendingSectionIndex = INDEX_NONE;
 	ActiveAttackIndex = INDEX_NONE;
