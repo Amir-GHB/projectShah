@@ -55,6 +55,7 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
 	}
+	ClearParryTimers();
 	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon)) Bow->CancelDraw();
 	StopActiveAttack(true, true, 0.0f);
 	if (bWeaponSwapActive && OwningCharacter.IsValid() && OwningCharacter->GetMesh())
@@ -727,6 +728,7 @@ void UCombatComponent::EnterDeadState()
 	{
 		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
 	}
+	ClearParryTimers();
 	AnimationState.DefenseState = ECombatDefenseState::None;
 	SetCombatState(ECombatState::Dead);
 }
@@ -799,6 +801,7 @@ void UCombatComponent::EnterFinisherState()
 	{
 		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
 	}
+	ClearParryTimers();
 	AnimationState.DefenseState = ECombatDefenseState::None;
 	SetCombatState(ECombatState::Finishing);
 }
@@ -874,6 +877,10 @@ void UCombatComponent::SetGuardMode(bool bEnableGuard)
 	else if (AnimationState.DefenseState == ECombatDefenseState::Guarding ||
 		AnimationState.DefenseState == ECombatDefenseState::Parrying)
 	{
+		if (AnimationState.DefenseState == ECombatDefenseState::Parrying)
+		{
+			EndParryAttempt(false);
+		}
 		AnimationState.DefenseState = ECombatDefenseState::None;
 		bParryWindowOpen = false;
 		RefreshAnimationState();
@@ -885,12 +892,13 @@ bool UCombatComponent::BeginParryAttempt()
 	if (!IsValid(CurrentWeapon) || !OwningCharacter.IsValid() ||
 		AnimationState.DefenseState != ECombatDefenseState::Guarding ||
 		CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing ||
-		bWeaponSwapActive)
+		CurrentCombatState == ECombatState::Staggered || bWeaponSwapActive || !GetWorld() ||
+		GetWorld()->GetTimeSeconds() < NextParryAllowedTime)
 	{
 		return false;
 	}
 
-	UAnimMontage* ParryMontage = CurrentWeapon->GetConfig().DefenderParryMontage;
+	UAnimMontage* ParryMontage = CurrentWeapon->GetConfig().DefenderParryMontage.Get();
 	UDamageReactionComponent* Reactions =
 		OwningCharacter->FindComponentByClass<UDamageReactionComponent>();
 	if (!IsValid(ParryMontage) || !Reactions || !Reactions->PlayHitReactionOverride(ParryMontage))
@@ -899,7 +907,83 @@ bool UCombatComponent::BeginParryAttempt()
 	}
 
 	SetParryAnimationState(true);
+	ParryAttemptStartTime = GetWorld()->GetTimeSeconds();
+	const float AttemptDuration = ParryWindowDuration > 0.0f
+		? ParryWindowDuration : FMath::Max(0.05f, ParryMontage->GetPlayLength());
+	GetWorld()->GetTimerManager().ClearTimer(ParryAttemptTimer);
+	GetWorld()->GetTimerManager().SetTimer(ParryAttemptTimer, this,
+		&UCombatComponent::HandleParryAttemptExpired, AttemptDuration, false);
 	return true;
+}
+
+void UCombatComponent::HandleParryAttemptExpired()
+{
+	EndParryAttempt(false);
+}
+
+void UCombatComponent::ClearParryTimers()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ParryAttemptTimer);
+		World->GetTimerManager().ClearTimer(RiposteWindowTimer);
+	}
+	ParryAttemptStartTime = -1.0;
+	bRiposteWindowActive = false;
+	bRiposteAttackActive = false;
+}
+
+void UCombatComponent::EndParryAttempt(bool bSuccessful)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ParryAttemptTimer);
+	}
+	ParryAttemptStartTime = -1.0;
+	if (AnimationState.DefenseState == ECombatDefenseState::Parrying)
+	{
+		AnimationState.DefenseState = bSuccessful ? ECombatDefenseState::None : ECombatDefenseState::Guarding;
+		RefreshAnimationState();
+	}
+	if (!bSuccessful && GetWorld())
+	{
+		NextParryAllowedTime = GetWorld()->GetTimeSeconds() + FMath::Max(0.0f, ParryCooldown);
+	}
+}
+
+void UCombatComponent::NotifyParrySucceeded()
+{
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	const bool bPerfect = ParryAttemptStartTime >= 0.0
+		&& (Now - ParryAttemptStartTime) <= FMath::Max(0.0f, PerfectParryWindowDuration);
+	EndParryAttempt(true);
+	if (bPerfect && GetWorld())
+	{
+		bRiposteWindowActive = true;
+		GetWorld()->GetTimerManager().ClearTimer(RiposteWindowTimer);
+		GetWorld()->GetTimerManager().SetTimer(RiposteWindowTimer, [this]()
+		{
+			bRiposteWindowActive = false;
+		}, FMath::Max(0.0f, RiposteWindowDuration), false);
+	}
+}
+
+bool UCombatComponent::IsWithinGuardArc(const FVector& DirectionToAttacker) const
+{
+	if (!OwningCharacter.IsValid()) return false;
+	const FVector Forward = OwningCharacter->GetActorForwardVector().GetSafeNormal2D();
+	const FVector Direction = DirectionToAttacker.GetSafeNormal2D();
+	if (Forward.IsNearlyZero() || Direction.IsNearlyZero()) return false;
+	return FVector::DotProduct(Forward, Direction) >= FMath::Cos(FMath::DegreesToRadians(GuardHalfAngleDegrees));
+}
+
+bool UCombatComponent::IsWithinParryArc(const FVector& DirectionToAttacker) const
+{
+	if (!OwningCharacter.IsValid()) return false;
+	const FVector Forward = OwningCharacter->GetActorForwardVector().GetSafeNormal2D();
+	const FVector Direction = DirectionToAttacker.GetSafeNormal2D();
+	if (Forward.IsNearlyZero() || Direction.IsNearlyZero()) return false;
+	return FVector::DotProduct(Forward, Direction) >= FMath::Cos(FMath::DegreesToRadians(ParryHalfAngleDegrees));
 }
 
 void UCombatComponent::NotifyParryWindowBegin(const UAnimSequenceBase* Animation)
@@ -957,6 +1041,7 @@ void UCombatComponent::TriggerGuardBreak()
 		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
 	}
 
+	ClearParryTimers();
 	AnimationState.DefenseState = ECombatDefenseState::GuardBroken;
 	bParryWindowOpen = false;
 	RefreshAnimationState();
