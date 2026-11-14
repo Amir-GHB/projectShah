@@ -9,6 +9,7 @@
 #include "DrawDebugHelpers.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/DamageReactionComponent.h"
+#include "combat/CombatComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -402,6 +403,13 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 	DamageInfo.BaseDamage = AttackConfig && AttackConfig->bOverrideBaseDamage
 		? AttackConfig->BaseDamage : WeaponConfig.BaseDamage;
 	DamageInfo.DamageMultiplier = CurrentDamageMultiplier * (AttackConfig ? AttackConfig->DamageMultiplier : 1.0f);
+	if (OwningCharacter.IsValid())
+	{
+		if (const UCombatComponent* Combat = OwningCharacter->FindComponentByClass<UCombatComponent>())
+		{
+			DamageInfo.DamageMultiplier *= Combat->GetRiposteDamageMultiplier();
+		}
+	}
 	DamageInfo.CriticalChance = AttackConfig && AttackConfig->bOverrideCriticalSettings
 		? AttackConfig->CriticalChance : WeaponConfig.CriticalChance;
 	DamageInfo.CriticalDamageMultiplier = AttackConfig && AttackConfig->bOverrideCriticalSettings
