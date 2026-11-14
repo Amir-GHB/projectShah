@@ -182,12 +182,23 @@ void UDamageReactionComponent::HandleReactionMontageEnded(UAnimMontage* Montage,
 	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
 	{
 		Enemy->bIsInDamageReaction = false;
+		if (UCombatComponent* Combat = Enemy->FindComponentByClass<UCombatComponent>())
+		{
+			Combat->ResumeHeldGuard();
+		}
 		const bool bEnemyDead = Enemy->DamageHandlerComponent && Enemy->DamageHandlerComponent->bIsDead;
-		if (!bEnemyDead)
+		if (!bEnemyDead && !Enemy->bIsInDamageReaction)
 		{
 			if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Enemy->GetController()))
 				if (UBrainComponent* Brain = AIController->GetBrainComponent())
 					Brain->ResumeLogic(TEXT("Enemy hit reaction montage ended"));
+		}
+	}
+	else if (AActor* OwnerActor = GetOwner())
+	{
+		if (UCombatComponent* Combat = OwnerActor->FindComponentByClass<UCombatComponent>())
+		{
+			Combat->ResumeHeldGuard();
 		}
 	}
 }
