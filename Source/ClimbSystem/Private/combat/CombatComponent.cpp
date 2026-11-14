@@ -977,6 +977,20 @@ void UCombatComponent::SetGuardMode(bool bEnableGuard)
 		{
 			EndParryAttempt(false);
 		}
+		else if (IsValid(CurrentWeapon) && OwningCharacter.IsValid() && OwningCharacter->GetMesh())
+		{
+			UAnimMontage* BeginGuardMontage = CurrentWeapon->GetConfig().BeginGuardMontage.Get();
+			if (IsValid(BeginGuardMontage))
+			{
+				if (UAnimInstance* Anim = OwningCharacter->GetMesh()->GetAnimInstance())
+				{
+					if (Anim->Montage_IsPlaying(BeginGuardMontage))
+					{
+						Anim->Montage_Stop(GuardReleaseBlendOutDuration, BeginGuardMontage);
+					}
+				}
+			}
+		}
 		AnimationState.DefenseState = ECombatDefenseState::None;
 		bParryWindowOpen = false;
 		RefreshAnimationState();
