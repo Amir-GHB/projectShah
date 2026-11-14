@@ -138,7 +138,7 @@ Default tuning values are intentionally conservative and exposed on the componen
 The source changes are committed to this feature branch, but they have not been compiled or run in Unreal Editor from this environment. Treat the first local build as the compile verification step before gameplay testing.
 
 
-## 7. Weapon hit and swing feedback
+## 9. Weapon hit and swing feedback
 
 Configure these fields in each weapon Blueprint's `WeaponConfig`:
 
@@ -149,7 +149,7 @@ Configure these fields in each weapon Blueprint's `WeaponConfig`:
 - Add `Weapon Swing Effects` to attack animation frames where the blade passes through the swing. Its notify properties independently enable sound and Niagara.
 - Add the new `Weapon Hit Effects` notify wherever an authored impact VFX is needed. It reads the character's currently equipped weapon and plays that weapon's configured `HitNiagara` and `HitSound` at the notify's optional weapon socket. Actual confirmed trace hits continue to spawn impact effects automatically.
 
-## 8. Guard and parry
+## 10. Guard and parry
 
 Guard and parry animations are weapon-owned. Configure `BeginGuardMontage`, `BreakGuardMontage`, `DefenderParryMontage`, and `AttackerParriedMontage` in each weapon's `WeaponConfig`. Tune `ParryDamage` and `ParryPoiseDamage` there as well. Do not assign shared guard/parry montage defaults on `DamageReactionComponent`; those legacy defaults have been removed.
 
@@ -164,7 +164,7 @@ On the character Blueprint, assign two Enhanced Input actions to `GuardAction` a
 
 `ParryWindowDuration = 0` means the defender parry montage length. A nonzero value overrides it. A whiff or cancelled attempt applies `ParryCooldown`; a successful parry does not. Releasing guard, taking a valid hit, guard break, death, finisher, and weapon swap all clear the active attempt.
 
-## 10. Guard, poise, and defense tuning
+## 12. Guard, poise, and defense tuning
 
 `UCombatComponent` owns the defense state and the following defaults:
 
@@ -196,7 +196,7 @@ Every blocked frontal hit spends its `FDamageInfo.PoiseDamage` and deals no heal
 
 The guard-break montage length owns recovery when it successfully starts. Otherwise `GuardBreakFallbackDuration` owns recovery. Blueprint may still call `EndGuardBreak` for an authored early exit, but gameplay no longer depends on a notify or Blueprint event to leave the state.
 
-## 11. Ranged defense and feedback
+## 13. Ranged defense and feedback
 
 Melee and projectiles use `UDamageReactionComponent::ResolveIncomingHit`. Projectiles pass `bAllowParry=false`: they can be blocked by the frontal guard arc and spend poise, but cannot grant or preserve a melee parry. Rear ranged hits break guard and damage health.
 
@@ -221,7 +221,7 @@ On `DamageReactionComponent`, configure optional `DefenseCameraShakeClass` and `
 
 Force-feedback intensity is authored in the `UForceFeedbackEffect` asset. Camera shake and rumble are optional until assets are assigned. No Content assets are created or modified by these code changes.
 
-## 12. Enemy combat setup
+## 14. Enemy combat setup
 
 For ordinary melee enemy Blueprints:
 
@@ -235,7 +235,7 @@ Create a Blueprint child of `AGuardEnemyCharacter` for the defensive archetype. 
 
 Enemy behavior trees pause during guard break and stagger. They resume after the C++ recovery timer or after the active reaction montage ends. Dodge/evade behavior is not part of this upgrade.
 
-## 13. Manual guard/parry verification checklist
+## 15. Manual guard/parry verification checklist
 
 Run these in PIE with a player character and at least two enemy types. Expected results are included so failures are easy to isolate.
 
@@ -260,17 +260,17 @@ Run these in PIE with a player character and at least two enemy types. Expected 
 19. **Feedback:** Assign block/parry/guard-break VFX and SFX, camera shake, and force-feedback assets. Verify each event plays the correct response. Confirm a blocked hit does not also play ordinary weapon hit VFX.
 20. **No asset changes:** Confirm the upgrade did not modify or delete any files under `Content/`.
 
-## 14. Defaults and verification status
+## 16. Defaults and verification status
 
-New defaults are listed in sections 9-11. The only deliberate behavior-default change from the previous implementation is `bCriticalHitsBypassGuard=false`: frontal critical hits are blockable unless explicitly enabled. `bHeavyHitsBypassGuard=true` and a 90-degree guard half-angle preserve the previous heavy-bypass and front-half-plane behavior. All other new defaults establish previously missing timers, stamina, feedback, AI selection, and recovery behavior.
+New defaults are listed in sections 12-14. The only deliberate behavior-default change from the previous implementation is `bCriticalHitsBypassGuard=false`: frontal critical hits are blockable unless explicitly enabled. `bHeavyHitsBypassGuard=true` and a 90-degree guard half-angle preserve the previous heavy-bypass and front-half-plane behavior. All other new defaults establish previously missing timers, stamina, feedback, AI selection, and recovery behavior.
 
 The code has been reviewed against the Unreal Engine 5.8 API for global time dilation and force-feedback parameters, but this environment cannot run the project's Unreal build or PIE session. Compile and runtime verification remain required.
 
-## 9. Death ragdoll
+## 11. Death ragdoll
 
 `DamageReactionComponent.bRagdollOnDeath` enables shared ragdoll behavior for player and enemy characters. The skeletal mesh hands off to physics at the death montage's final blend-out rather than waiting for its end delegate, avoiding the brief return to the AnimBP's standing pose. Ensure the skeleton has a valid Physics Asset and the project has a Ragdoll collision profile. The transition still depends on a valid death montage and compatible collision/physics setup.
 
 
-## 15. Investor-demo acceptance pass
+## 17. Investor-demo acceptance pass
 
 Before recording the demo, run the full manual checklist above with the actual player and enemy AnimBPs. In particular, confirm that every weapon has compatible guard/parry montages and that every heavy AI attack has a readable telegraph. Tune montage blend-outs and feedback assets per weapon rather than relying on shared placeholder values. The feature deliberately does not add dodge/evade.
