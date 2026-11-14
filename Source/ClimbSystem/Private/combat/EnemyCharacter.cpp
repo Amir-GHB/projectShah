@@ -203,6 +203,46 @@ void AEnemyCharacter::PerformAICombatAction(AActor* Target)
 	if (CombatComponent) CombatComponent->HandleAttackInput();
 }
 
+void AGuardEnemyCharacter::UpdateDefensiveCombat(AActor* Target)
+{
+	if (!CombatComponent || !IsValid(Target) || !GetWorld()) return;
+
+	const float Distance = FVector::Dist2D(GetActorLocation(), Target->GetActorLocation());
+	if (Distance > GuardEngageRange)
+	{
+		if (CombatComponent->GetAnimationState().DefenseState == ECombatDefenseState::Guarding ||
+			CombatComponent->GetAnimationState().DefenseState == ECombatDefenseState::Parrying)
+		{
+			CombatComponent->SetGuardMode(false);
+		}
+		return;
+	}
+
+	if (CombatComponent->CurrentCombatState == ECombatState::Dead ||
+		CombatComponent->CurrentCombatState == ECombatState::Finishing ||
+		CombatComponent->CurrentCombatState == ECombatState::Staggered)
+	{
+		return;
+	}
+
+	if (CombatComponent->GetAnimationState().DefenseState == ECombatDefenseState::None)
+	{
+		CombatComponent->SetGuardMode(true);
+	}
+
+	UCombatComponent* TargetCombat = Target->FindComponentByClass<UCombatComponent>();
+	if (TargetCombat && TargetCombat->CanBeParried()
+		&& GetWorld()->GetTimeSeconds() >= NextParryAttemptTime
+		&& FMath::FRand() <= FMath::Clamp(ParryAttemptChance, 0.0f, 1.0f))
+	{
+		if (CombatComponent->BeginParryAttempt())
+		{
+			NextParryAttemptTime = GetWorld()->GetTimeSeconds()
+				+ FMath::Max(0.05f, ParryAttemptInterval);
+		}
+	}
+}
+
 void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
 {
 	if (!IsValid(Target) || !IsValid(MagicProjectileClass) || !GetWorld()) return;
