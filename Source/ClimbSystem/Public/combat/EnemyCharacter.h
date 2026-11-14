@@ -81,6 +81,39 @@ public:
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
 		AController* EventInstigator, AActor* DamageCauser) override;
 	virtual void PerformAICombatAction(AActor* Target);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Combat", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float HeavyAttackChance = 0.25f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Combat")
+	TObjectPtr<UAnimMontage> HeavyAttackTelegraphMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Combat", meta = (ClampMin = "0.0"))
+	float HeavyAttackTelegraphDuration = 0.55f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Combat", meta = (ClampMin = "1"))
+	int32 MaxAttackersPerTarget = 2;
+
+	bool TryAcquireAttackSlot(AActor* Target);
+	void ReleaseAICombatSlot();
+	void QueueAICombatAction(AActor* Target, bool bHeavyAttack);
+	void CancelPendingAICombatAction();
+	bool HasPendingAICombatAction() const { return PendingAICombatTarget.IsValid(); }
+
+protected:
+	UFUNCTION()
+	void HandleAICombatAttackEnded();
+
+	UFUNCTION()
+	void HandleAICombatDamageTaken(float ActualDamage, AActor* InstigatorActor,
+		const FDamageInfo& DamageInfo, const FHitResult& HitResult);
+
+private:
+	FTimerHandle HeavyAttackTelegraphTimer;
+	TWeakObjectPtr<AActor> AttackSlotTarget;
+	TWeakObjectPtr<AActor> PendingAICombatTarget;
+	bool bPendingAIHeavyAttack = false;
+	void ReleaseQueuedAICombatAction();
 };
 
 UCLASS()
