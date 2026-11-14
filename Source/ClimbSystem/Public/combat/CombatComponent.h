@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "TimerManager.h"
 #include "CombatTypes.h"
 #include "CombatComponent.generated.h"
 
@@ -104,7 +105,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
 	void TriggerGuardBreak();
 
-	/** Called by Blueprint when the guard-break animation/recovery has finished. */
+	/** Optional early recovery hook; C++ also ends guard break from its montage/fallback timer. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
 	void EndGuardBreak();
 
@@ -216,6 +217,12 @@ protected:
 	uint64 ActiveAttackToken = 0;
 	bool bIsStoppingAttack = false;
 	bool bParryWindowOpen = false;
+	FTimerHandle GuardBreakRecoveryTimer;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.05"))
+	float GuardBreakFallbackDuration = 1.0f;
+
+	void HandleGuardBreakRecovery();
 	double LastAttackInputTimestamp = -1.0;
 	bool bHasBufferedAttackInput = false;
 	TOptional<EWeaponType> QueuedWeaponSwitch;
