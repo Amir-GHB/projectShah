@@ -15,7 +15,7 @@ Open the weapon Blueprint that derives from `AWeaponBase` and edit its `WeaponCo
 - Enable `bOverrideCriticalSettings` to use that step's critical chance and critical multiplier instead of weapon defaults.
 - Enable `bOverrideDamageOverTimeEffects` to use that step's effect list, including an intentionally empty list.
 
-Critical chance is a probability from 0 to 1. The target's `UDamageHandlerComponent` rolls the chance and applies the critical multiplier before armor mitigation.
+Critical chance is a probability from 0 to 1. The incoming-hit resolver rolls it once before guard/parry resolution; `UDamageHandlerComponent` respects the resolved result and applies the critical multiplier before armor mitigation.
 
 ## 2. Damage-over-time effects
 
@@ -149,10 +149,125 @@ Configure these fields in each weapon Blueprint's `WeaponConfig`:
 - Add `Weapon Swing Effects` to attack animation frames where the blade passes through the swing. Its notify properties independently enable sound and Niagara.
 - Add the new `Weapon Hit Effects` notify wherever an authored impact VFX is needed. It reads the character's currently equipped weapon and plays that weapon's configured `HitNiagara` and `HitSound` at the notify's optional weapon socket. Actual confirmed trace hits continue to spawn impact effects automatically.
 
-## 8. Parry
+## 8. Guard and parry
 
-Trigger `BeginParryWindow` from the player's parry input, or add `Parry Window` notify state over the active frames of the defensive animation (the notify state automatically uses its authored duration). Set the default defender and attacker-parried montages on the character's `DamageReactionComponent`. A defender's equipped weapon-specific parry montages override those defaults. The defender's weapon `ParryDamage` is applied to the attacker when a weapon trace intersects the active parry window. A successful parry now explicitly cancels the attacker's active combat transaction before playing the parried reaction, closing its weapon trace and invalidating queued combo transitions.
+Guard and parry animations are weapon-owned. Configure `BeginGuardMontage`, `BreakGuardMontage`, `DefenderParryMontage`, and `AttackerParriedMontage` in each weapon's `WeaponConfig`. Do not assign shared guard/parry montage defaults on `DamageReactionComponent`; those legacy defaults have been removed.
+
+On the character Blueprint, assign two Enhanced Input actions to `GuardAction` and `ParryAction`:
+
+- Guard is held: Started enters guard; Completed/Canceled releases it.
+- Parry is pressed while guarding: Started calls `BeginParryAttempt`.
+- Guard/parry state is exposed through `FCombatAnimationState.DefenseState`. Use `Guarding`, `Parrying`, and `GuardBroken` in the AnimBP to drive the equipped weapon's guard blend space and transitions.
+- Add the `Parry Window` notify state to the attacker's attack montage for explicit parryable frames. If a montage has no such notify state, the active melee trace window is the fallback.
+- A successful parry invalidates and stops the attacker's active attack transaction before applying the reward. The ordinary hit VFX and normal hit reaction are suppressed; the attacker's weapon-specific `AttackerParriedMontage` is then played.
+- A perfect parry grants the defender a short riposte window. A melee attack during that window receives `RiposteDamageMultiplier`; attacks from guard outside that window remain blocked.
+
+`ParryWindowDuration = 0` means the defender parry montage length. A nonzero value overrides it. A whiff or cancelled attempt applies `ParryCooldown`; a successful parry does not. Releasing guard, taking a valid hit, guard break, death, finisher, and weapon swap all clear the active attempt.
+
+## 9. Guard, poise, and defense tuning
+
+`UCombatComponent` owns the defense state and the following defaults:
+
+| Property | Default | Purpose |
+| --- | ---: | --- |
+| `GuardHalfAngleDegrees` | 90 | Half-angle of the planar frontal guard arc; 90 preserves the previous front half-plane |
+| `ParryHalfAngleDegrees` | 70 | Half-angle of the planar parry arc |
+| `bHeavyHitsBypassGuard` | true | Heavy hits break guard and continue to health |
+| `bCriticalHitsBypassGuard` | false | Critical hits are blockable by default |
+| `GuardBreakFallbackDuration` | 1.0 s | C++ recovery if the break montage is missing or cannot play |
+| `ParryWindowDuration` | 0 | Zero uses the defender parry montage length |
+| `ParryCooldown` | 0.6 s | Cooldown after a whiff/cancel only |
+| `PerfectParryWindowDuration` | 0.18 s | Time from parry start in which a successful parry is perfect |
+| `RiposteWindowDuration` | 1.25 s | Time allowed to start the riposte |
+| `RiposteDamageMultiplier` | 1.5 | Multiplier for the riposte attack |
+
+Poise is the guard stamina pool and the stagger meter. Configure these on `UDamageHandlerComponent`:
+
+| Property | Default | Purpose |
+| --- | ---: | --- |
+| `PoiseRegenerationDelay` | 2.0 s | Delay after the last poise damage before regeneration |
+| `PoiseRegenerationRate` | 20 units/s | Regeneration rate |
+| `PoiseRegenerationInterval` | 0.1 s | Timer interval while regeneration is active |
+| `PoiseBreakStaggerDuration` | 0.85 s | C++ stagger duration when unguarded poise reaches zero |
+
+Every blocked frontal hit spends its `FDamageInfo.PoiseDamage` and deals no health damage. When guard poise reaches zero, guard breaks. When unguarded poise reaches zero, the character enters `ECombatState::Staggered`. Regeneration uses a delayed timer, not a permanent tick. `OnPoiseBroken` is available for UI, audio, or Blueprint reactions.
+
+The guard-break montage length owns recovery when it successfully starts. Otherwise `GuardBreakFallbackDuration` owns recovery. Blueprint may still call `EndGuardBreak` for an authored early exit, but gameplay no longer depends on a notify or Blueprint event to leave the state.
+
+## 10. Ranged defense and feedback
+
+Melee and projectiles use `UDamageReactionComponent::ResolveIncomingHit`. Projectiles pass `bAllowParry=false`: they can be blocked by the frontal guard arc and spend poise, but cannot grant or preserve a melee parry. Rear ranged hits break guard and damage health.
+
+Per weapon, configure optional feedback assets:
+
+- `GuardBlockNiagara` / `GuardBlockSound`
+- `GuardBreakNiagara` / `GuardBreakSound`
+- `ParryNiagara` / `ParrySound`
+
+On `DamageReactionComponent`, configure optional `DefenseCameraShakeClass` and `DefenseForceFeedbackEffect`, plus the timing/scaling values:
+
+| Property | Default |
+| --- | ---: |
+| `BlockHitStopDuration` | 0.035 s |
+| `ParryHitStopDuration` | 0.06 s |
+| `GuardBreakHitStopDuration` | 0.05 s |
+| `DefenseHitStopTimeDilation` | 0.05 |
+| `PerfectParrySlowMotionDuration` | 0.18 s |
+| `PerfectParryTimeDilation` | 0.25 |
+| `DefenseCameraShakeScale` | 0.65 |
+
+Force-feedback intensity is authored in the `UForceFeedbackEffect` asset. Camera shake and rumble are optional until assets are assigned. No Content assets are created or modified by these code changes.
+
+## 11. Enemy combat setup
+
+For ordinary melee enemy Blueprints:
+
+- Set `HeavyAttackChance` to tune the chance of requesting a heavy attack.
+- Assign `HeavyAttackTelegraphMontage`. If it is not assigned or cannot play, the AI falls back to a light attack instead of issuing an untelegraphed guard-bypassing heavy.
+- Tune `HeavyAttackTelegraphDuration`; zero uses the montage length.
+- Configure the weapon's `AttackDamageConfigs` with `bOverrideAttackType` and `bIsHeavyAttack` to identify heavy entries. AI selects a matching attack entry/section.
+- `MaxAttackersPerTarget` is clamped to 1-2 and defaults to 2. The slot is released when the attack ends, the enemy is damaged, the task aborts, or the actor ends play.
+
+Create a Blueprint child of `AGuardEnemyCharacter` for the defensive archetype. Assign its weapon's guard/parry montages and tune `GuardEngageRange`, `ParryAttemptInterval`, and `ParryAttemptChance`. It enters guard and attempts parries through `SetGuardMode` and `BeginParryAttempt`; its guard can be broken through the same poise system.
+
+Enemy behavior trees pause during guard break and stagger. They resume after the C++ recovery timer or after the active reaction montage ends. Dodge/evade behavior is not part of this upgrade.
+
+## 12. Manual guard/parry verification checklist
+
+Run these in PIE with a player character and at least two enemy types. Expected results are included so failures are easy to isolate.
+
+1. **Ordinary frontal block:** Hold guard and receive a light melee hit from inside the guard arc. Health remains unchanged, poise decreases, block VFX/SFX play, and guard remains active unless poise reaches zero.
+2. **Rear hit:** Hold guard and receive a hit from behind. Health decreases, guard breaks, and the weapon's break montage plays.
+3. **Heavy bypass:** Configure an attack entry as heavy and enable `bHeavyHitsBypassGuard`. A frontal hit breaks guard and deals damage. Confirm the heavy telegraph plays first in AI combat.
+4. **Critical toggle:** Set critical chance to 1.0. With `bCriticalHitsBypassGuard=false`, a frontal critical hit is blocked and spends poise. Toggle it true and verify it breaks guard and deals damage.
+5. **Guard-break recovery:** Test with a valid break montage, no montage, and a montage interrupted by another reaction. Each case exits `GuardBroken` without a Blueprint notify. Repeat through death, finisher, and weapon swap.
+6. **Authored parry window:** Add `Parry Window` to an enemy attack montage. Start guard, press parry, and get hit during the notify. The attacker stops, no normal hit VFX appears, parry damage/poise damage apply, and the attacker-parried montage plays.
+7. **Trace fallback:** Remove the notify state from the attack montage. Parry succeeds only while the attack's melee trace notify is active.
+8. **Parry whiff/cooldown:** Press parry without an incoming parryable attack. The attempt ends at the configured duration, returns to guard, and another attempt is rejected until cooldown expires.
+9. **Successful parry cooldown:** Perform a successful parry. Verify no whiff cooldown is applied. If it lands inside `PerfectParryWindowDuration`, verify the riposte window starts.
+10. **Riposte:** Attack during the perfect-parry riposte window. Guard/parry state exits and the attack receives `RiposteDamageMultiplier`. Wait for the window to expire and confirm attacks from guard are blocked again.
+11. **Parry interruption:** While parrying, get hit by an arrow or spell. The parry attempt ends, the ranged hit does not count as a parry, and the selected hit reaction can replace the parry montage without leaving `Parrying` stuck.
+12. **Ranged guard:** Hold guard against an arrow and a magic projectile from the front. Both are blocked and spend poise; neither grants or preserves parry. Repeat from behind and verify guard break plus health damage.
+13. **Arc boundaries:** Test attacks at the front, both edges of the configured guard/parry half-angles, and behind. Confirm the planar arc behaves consistently on slopes.
+14. **Poise break:** Take repeated blocked hits until poise reaches zero. Guard breaks once and `OnPoiseBroken` broadcasts once. Release guard, wait the regen delay, and verify poise regenerates on the configured timer.
+15. **Unguarded stagger:** Take repeated unguarded poise damage until zero. Combat enters `Staggered`, attack/guard input is rejected, then C++ recovery returns to `Idle`.
+16. **Enemy AI stagger/parry:** Parry or stagger an enemy. Its BT stops issuing movement/attacks during the reaction and resumes after recovery.
+17. **Attack-slot cap:** Put three enemies in range of one target. At most two may reserve attack slots at once; the third waits. Kill, interrupt, or abort one attacker and verify the waiting enemy can acquire the freed slot.
+18. **Guard archetype:** Use an `AGuardEnemyCharacter` child. It enters guard at range, attempts parries during the target's parryable attack window, and can be guard-broken by heavy/rear hits or poise depletion.
+19. **Feedback:** Assign block/parry/guard-break VFX and SFX, camera shake, and force-feedback assets. Verify each event plays the correct response. Confirm a blocked hit does not also play ordinary weapon hit VFX.
+20. **No asset changes:** Confirm the upgrade did not modify or delete any files under `Content/`.
+
+## 13. Defaults and verification status
+
+New defaults are listed in sections 9-11. The only deliberate behavior-default change from the previous implementation is `bCriticalHitsBypassGuard=false`: frontal critical hits are blockable unless explicitly enabled. `bHeavyHitsBypassGuard=true` and a 90-degree guard half-angle preserve the previous heavy-bypass and front-half-plane behavior. All other new defaults establish previously missing timers, stamina, feedback, AI selection, and recovery behavior.
+
+The code has been reviewed against the Unreal Engine 5.8 API for global time dilation and force-feedback parameters, but this environment cannot run the project's Unreal build or PIE session. Compile and runtime verification remain required.
 
 ## 9. Death ragdoll
 
 `DamageReactionComponent.bRagdollOnDeath` enables shared ragdoll behavior for player and enemy characters. The skeletal mesh hands off to physics at the death montage's final blend-out rather than waiting for its end delegate, avoiding the brief return to the AnimBP's standing pose. Ensure the skeleton has a valid Physics Asset and the project has a Ragdoll collision profile. The transition still depends on a valid death montage and compatible collision/physics setup.
+
+
+## 14. Investor-demo acceptance pass
+
+Before recording the demo, run the full manual checklist above with the actual player and enemy AnimBPs. In particular, confirm that every weapon has compatible guard/parry montages and that every heavy AI attack has a readable telegraph. Tune montage blend-outs and feedback assets per weapon rather than relying on shared placeholder values. The feature deliberately does not add dodge/evade.
