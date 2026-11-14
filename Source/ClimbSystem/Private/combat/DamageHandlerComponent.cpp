@@ -83,6 +83,13 @@ void UDamageHandlerComponent::RegeneratePoise()
 	if (CurrentPoise > 0.0f)
 	{
 		bPoiseBroken = false;
+		if (AActor* OwnerActor = GetOwner())
+		{
+			if (UCombatComponent* Combat = OwnerActor->FindComponentByClass<UCombatComponent>())
+			{
+				Combat->ResumeHeldGuard();
+			}
+		}
 	}
 	if (CurrentPoise >= FMath::Max(0.0f, MaxPoise))
 	{
