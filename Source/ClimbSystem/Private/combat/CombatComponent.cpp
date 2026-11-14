@@ -1142,6 +1142,10 @@ bool UCombatComponent::NotifyParrySucceeded()
 
 void UCombatComponent::ResumeHeldGuard()
 {
+	if (const AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
+	{
+		if (Enemy->bIsInDamageReaction) return;
+	}
 	if (!bGuardInputHeld || bRiposteWindowActive || bRiposteAttackActive || bWeaponSwapActive
 		|| !IsValid(CurrentWeapon) || !OwningCharacter.IsValid()
 		|| CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing
