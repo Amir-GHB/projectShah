@@ -54,6 +54,7 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
+		World->GetTimerManager().ClearTimer(StaggerRecoveryTimer);
 	}
 	ClearParryTimers();
 	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon)) Bow->CancelDraw();
@@ -727,6 +728,7 @@ void UCombatComponent::EnterDeadState()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
+		World->GetTimerManager().ClearTimer(StaggerRecoveryTimer);
 	}
 	ClearParryTimers();
 	AnimationState.DefenseState = ECombatDefenseState::None;
@@ -1082,6 +1084,39 @@ void UCombatComponent::EndGuardBreak()
 	}
 	AnimationState.DefenseState = ECombatDefenseState::None;
 	RefreshAnimationState();
+}
+
+void UCombatComponent::EnterStaggered(float RecoveryDuration)
+{
+	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing)
+	{
+		return;
+	}
+
+	StopActiveAttack(true, true, 0.08f);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(StaggerRecoveryTimer);
+		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
+	}
+	ClearParryTimers();
+	AnimationState.DefenseState = ECombatDefenseState::None;
+	SetCombatState(ECombatState::Staggered);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(StaggerRecoveryTimer, this,
+			&UCombatComponent::HandleStaggerRecovery,
+			FMath::Max(0.05f, RecoveryDuration), false);
+	}
+}
+
+void UCombatComponent::HandleStaggerRecovery()
+{
+	if (CurrentCombatState == ECombatState::Staggered)
+	{
+		SetCombatState(ECombatState::Idle);
+	}
 }
 
 void UCombatComponent::SetParryAnimationState(bool bIsParrying)
