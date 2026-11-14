@@ -1101,14 +1101,18 @@ bool UCombatComponent::NotifyParrySucceeded()
 	const bool bPerfect = ParryAttemptStartTime >= 0.0
 		&& (Now - ParryAttemptStartTime) <= FMath::Max(0.0f, PerfectParryWindowDuration);
 	EndParryAttempt(true);
-	if (bPerfect && GetWorld())
+	if (bPerfect && GetWorld() && RiposteWindowDuration > 0.0f)
 	{
 		bRiposteWindowActive = true;
 		GetWorld()->GetTimerManager().ClearTimer(RiposteWindowTimer);
 		GetWorld()->GetTimerManager().SetTimer(RiposteWindowTimer, [this]()
 		{
 			bRiposteWindowActive = false;
-		}, FMath::Max(0.0f, RiposteWindowDuration), false);
+		}, RiposteWindowDuration, false);
+	}
+	else
+	{
+		bRiposteWindowActive = false;
 	}
 	return bPerfect;
 }
