@@ -116,6 +116,28 @@ private:
 	void ReleaseQueuedAICombatAction();
 };
 
+/** Defensive melee archetype that guards and attempts timed parries through CombatComponent. */
+UCLASS()
+class CLIMBSYSTEM_API AGuardEnemyCharacter : public AEnemyCharacter
+{
+	GENERATED_BODY()
+
+public:
+	void UpdateDefensiveCombat(AActor* Target);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Defense", meta = (ClampMin = "50.0"))
+	float GuardEngageRange = 340.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Defense", meta = (ClampMin = "0.05"))
+	float ParryAttemptInterval = 0.75f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Defense", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float ParryAttemptChance = 0.7f;
+
+private:
+	double NextParryAttemptTime = 0.0;
+};
+
 UCLASS()
 class CLIMBSYSTEM_API AMagicEnemyCharacter : public AEnemyCharacter
 {
