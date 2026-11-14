@@ -189,6 +189,9 @@ public:
 	float ParryHitStopDuration = 0.06f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
+	float GuardBreakHitStopDuration = 0.05f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
 	float PerfectParrySlowMotionDuration = 0.18f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.01", ClampMax = "1.0"))
