@@ -358,6 +358,58 @@ void UCombatComponent::HandleAttackInput()
 }
 
 
+void UCombatComponent::HandleAICombatAttack(bool bHeavyAttack)
+{
+	if (!IsValid(CurrentWeapon)) return;
+
+	const FWeaponConfig& Config = CurrentWeapon->GetConfig();
+	int32 AttackCount = 0;
+	if (Config.AttackMontageMode == EAttackMontageMode::IndividualAttackMontages)
+	{
+		AttackCount = Config.IndividualAttackMontages.Num();
+	}
+	else if (IsValid(Config.AttackComboMontage))
+	{
+		AttackCount = Config.AttackComboMontage->CompositeSections.Num();
+	}
+
+	if (AttackCount <= 0)
+	{
+		HandleAttackInput();
+		return;
+	}
+
+	TArray<int32> MatchingAttacks;
+	for (int32 Index = 0; Index < AttackCount; ++Index)
+	{
+		bool bCandidateHeavy = Config.bIsHeavyAttack || !Config.bIsLightAttack;
+		if (Config.AttackDamageConfigs.IsValidIndex(Index))
+		{
+			const FAttackDamageConfig& AttackConfig = Config.AttackDamageConfigs[Index];
+			if (AttackConfig.bOverrideAttackType)
+			{
+				bCandidateHeavy = AttackConfig.bIsHeavyAttack;
+			}
+		}
+		if (bCandidateHeavy == bHeavyAttack)
+		{
+			MatchingAttacks.Add(Index);
+		}
+	}
+
+	if (MatchingAttacks.IsEmpty())
+	{
+		for (int32 Index = 0; Index < AttackCount; ++Index)
+		{
+			MatchingAttacks.Add(Index);
+		}
+	}
+
+	RequestedAIStartingAttackIndex = MatchingAttacks[FMath::RandRange(0, MatchingAttacks.Num() - 1)];
+	HandleAttackInput();
+	RequestedAIStartingAttackIndex = INDEX_NONE;
+}
+
 void UCombatComponent::HandleAttackReleased()
 {
 	if (CurrentCombatState != ECombatState::DrawingBow) return;
@@ -383,10 +435,10 @@ bool UCombatComponent::StartNewCombo()
 	bParryWindowOpen = false;
 	if (!IsValid(CurrentWeapon) || !OwningCharacter.IsValid() || !OwningCharacter->GetMesh()) return false;
 	const FWeaponConfig& Config = CurrentWeapon->GetConfig();
+	const int32 RequestedIndex = RequestedAIStartingAttackIndex;
+	RequestedAIStartingAttackIndex = INDEX_NONE;
 	StopActiveAttack(true, true, 0.1f);
 	ActiveAttackWeapon = CurrentWeapon;
-	ActiveAttackIndex = 0;
-	ActiveAttackWeapon->SetActiveAttackIndex(0);
 	PendingAttackIndex = INDEX_NONE;
 	ActiveSectionIndex = INDEX_NONE;
 	PendingSectionIndex = INDEX_NONE;
@@ -396,13 +448,16 @@ bool UCombatComponent::StartNewCombo()
 
 	if (Config.AttackMontageMode == EAttackMontageMode::IndividualAttackMontages)
 	{
-		if (Config.IndividualAttackMontages.IsEmpty() || !IsValid(Config.IndividualAttackMontages[0]))
+		const int32 StartingAttackIndex = Config.IndividualAttackMontages.IsValidIndex(RequestedIndex)
+			? RequestedIndex : 0;
+		if (!Config.IndividualAttackMontages.IsValidIndex(StartingAttackIndex)
+			|| !IsValid(Config.IndividualAttackMontages[StartingAttackIndex]))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[CombatComponent] Individual montage mode requires at least one valid attack montage."));
+			UE_LOG(LogTemp, Warning, TEXT("[CombatComponent] Individual montage mode requires a valid starting attack montage."));
 			ActiveAttackWeapon.Reset();
 			return false;
 		}
-		return PlayIndividualAttack(0);
+		return PlayIndividualAttack(StartingAttackIndex);
 	}
 
 	UAnimMontage* Montage = Config.AttackComboMontage;
@@ -413,14 +468,17 @@ bool UCombatComponent::StartNewCombo()
 		return false;
 	}
 
+	const int32 StartingSectionIndex = Montage->CompositeSections.IsValidIndex(RequestedIndex)
+		? RequestedIndex : 0;
 	UAnimInstance* Anim = OwningCharacter->GetMesh()->GetAnimInstance();
 	if (!Anim) return false;
 	ActiveAttackMontage = Montage;
 	ActiveAttackToken = ++CurrentAttackToken;
 	TotalSectionsInMontage = Montage->CompositeSections.Num();
-	ActiveSectionIndex = 0;
-	ActiveAttackIndex = 0;
-	const FName FirstSection = Montage->GetSectionName(0);
+	ActiveSectionIndex = StartingSectionIndex;
+	ActiveAttackIndex = StartingSectionIndex;
+	ActiveAttackWeapon->SetActiveAttackIndex(StartingSectionIndex);
+	const FName FirstSection = Montage->GetSectionName(StartingSectionIndex);
 	const float Duration = Anim->Montage_Play(Montage);
 	if (Duration <= 0.0f)
 	{
