@@ -129,6 +129,7 @@ public:
 	/** Called when an incoming hit breaks an active guard. Plays the equipped weapon's break montage. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
 	void TriggerGuardBreak();
+	void EnterStaggered(float RecoveryDuration);
 
 	/** Optional early recovery hook; C++ also ends guard break from its montage/fallback timer. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
@@ -243,6 +244,7 @@ protected:
 	bool bIsStoppingAttack = false;
 	bool bParryWindowOpen = false;
 	FTimerHandle GuardBreakRecoveryTimer;
+	FTimerHandle StaggerRecoveryTimer;
 	FTimerHandle ParryAttemptTimer;
 	FTimerHandle RiposteWindowTimer;
 	double ParryAttemptStartTime = -1.0;
@@ -263,6 +265,7 @@ protected:
 	float GuardBreakFallbackDuration = 1.0f;
 
 	void HandleGuardBreakRecovery();
+	void HandleStaggerRecovery();
 	double LastAttackInputTimestamp = -1.0;
 	bool bHasBufferedAttackInput = false;
 	TOptional<EWeaponType> QueuedWeaponSwitch;
