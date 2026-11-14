@@ -326,7 +326,11 @@ bool UDamageReactionComponent::ResolveIncomingHit(AActor* Attacker,
 		return false;
 	}
 
-	// Front-facing non-bypassing damage is consumed by guard, never reaching health.
+	// Guard stamina is represented by poise. A block consumes poise but no health.
+	if (UDamageHandlerComponent* DamageHandler = GetOwner()->FindComponentByClass<UDamageHandlerComponent>())
+	{
+		DamageHandler->ApplyPoiseDamage(DamageInfo.PoiseDamage, Attacker);
+	}
 	return true;
 }
 
