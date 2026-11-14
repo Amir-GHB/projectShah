@@ -17,7 +17,77 @@ void UDamageHandlerComponent::BeginPlay()
 	Super::BeginPlay();
 	CurrentHealth = FMath::Max(0.0f, MaxHealth);
 	CurrentPoise = FMath::Max(0.0f, MaxPoise);
+	bPoiseBroken = CurrentPoise <= 0.0f;
 	bIsDead = CurrentHealth <= 0.0f;
+}
+
+void UDamageHandlerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PoiseRegenerationTimer);
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void UDamageHandlerComponent::ApplyPoiseDamage(float Amount, AActor* InstigatorActor)
+{
+	if (bIsDead || !FMath::IsFinite(Amount) || Amount <= 0.0f) return;
+
+	const float PreviousPoise = CurrentPoise;
+	CurrentPoise = FMath::Clamp(CurrentPoise - Amount, 0.0f, FMath::Max(0.0f, MaxPoise));
+
+	if (CurrentPoise < PreviousPoise && GetWorld() && PoiseRegenerationRate > 0.0f)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(PoiseRegenerationTimer);
+		GetWorld()->GetTimerManager().SetTimer(PoiseRegenerationTimer, this,
+			&UDamageHandlerComponent::RegeneratePoise,
+			FMath::Max(0.05f, PoiseRegenerationInterval), true,
+			FMath::Max(0.0f, PoiseRegenerationDelay));
+	}
+
+	if (CurrentPoise <= 0.0f && !bPoiseBroken)
+	{
+		bPoiseBroken = true;
+		OnPoiseBroken.Broadcast(InstigatorActor);
+
+		if (AActor* OwnerActor = GetOwner())
+		{
+			if (UCombatComponent* Combat = OwnerActor->FindComponentByClass<UCombatComponent>())
+			{
+				if (Combat->IsGuarding())
+				{
+					Combat->TriggerGuardBreak();
+				}
+				else if (Combat->GetAnimationState().DefenseState != ECombatDefenseState::GuardBroken)
+				{
+					Combat->EnterStaggered(PoiseBreakStaggerDuration);
+				}
+			}
+		}
+	}
+}
+
+void UDamageHandlerComponent::RegeneratePoise()
+{
+	if (bIsDead || PoiseRegenerationRate <= 0.0f)
+	{
+		if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(PoiseRegenerationTimer);
+		return;
+	}
+
+	const float Interval = FMath::Max(0.05f, PoiseRegenerationInterval);
+	CurrentPoise = FMath::Min(FMath::Max(0.0f, MaxPoise),
+		CurrentPoise + PoiseRegenerationRate * Interval);
+
+	if (CurrentPoise > 0.0f)
+	{
+		bPoiseBroken = false;
+	}
+	if (CurrentPoise >= FMath::Max(0.0f, MaxPoise))
+	{
+		if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(PoiseRegenerationTimer);
+	}
 }
 
 float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActor, AActor* TargetActor, const FDamageInfo& DamageInfo, const FHitResult& HitResult)
@@ -67,9 +137,9 @@ float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActo
 	const float MitigationFactor = 100.0f / (100.0f + SafeArmor);
 	const float FinalDamage = FMath::Max(0.0f, RawDamage * MitigationFactor);
 
-	CurrentPoise = FMath::Clamp(CurrentPoise - ResolvedInfo.PoiseDamage, 0.0f, FMath::Max(0.0f, MaxPoise));
 	CurrentHealth = FMath::Clamp(CurrentHealth - FinalDamage, 0.0f, FMath::Max(0.0f, MaxHealth));
 	LastDamageInfo = ResolvedInfo;
+	ApplyPoiseDamage(ResolvedInfo.PoiseDamage, InstigatorActor);
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 	OnDamageTaken.Broadcast(FinalDamage, InstigatorActor, ResolvedInfo, HitResult);
@@ -79,6 +149,7 @@ float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActo
 		bIsDead = true;
 		ActiveDamageOverTimeEffects.Empty();
 		SetComponentTickEnabled(false);
+		if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(PoiseRegenerationTimer);
 		OnDeath.Broadcast(InstigatorActor);
 	}
 	else
@@ -313,9 +384,12 @@ void UDamageHandlerComponent::ResetStats()
 {
 	ActiveDamageOverTimeEffects.Empty();
 	SetComponentTickEnabled(false);
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(PoiseRegenerationTimer);
+	bPoiseBroken = false;
 	bIsDead = false;
 	CurrentHealth = FMath::Max(0.0f, MaxHealth);
 	CurrentPoise = FMath::Max(0.0f, MaxPoise);
+	bPoiseBroken = CurrentPoise <= 0.0f;
 	LastDamageInfo = FDamageInfo();
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 }
