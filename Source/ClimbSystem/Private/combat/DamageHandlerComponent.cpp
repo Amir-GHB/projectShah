@@ -5,6 +5,7 @@
 #include "combat/EnemyCharacter.h"
 #include "GameFramework/Actor.h"
 #include "Components/PrimitiveComponent.h"
+#include "Engine/World.h"
 
 UDamageHandlerComponent::UDamageHandlerComponent()
 {
