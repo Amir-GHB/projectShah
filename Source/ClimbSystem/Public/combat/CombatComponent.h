@@ -100,6 +100,31 @@ public:
 	/** True only while this character's active attack is inside a valid parry window. */
 	bool CanBeParried() const;
 	bool IsParryAttemptActive() const { return AnimationState.DefenseState == ECombatDefenseState::Parrying; }
+	void EndParryAttempt(bool bSuccessful);
+	void NotifyParrySucceeded();
+	bool IsWithinGuardArc(const FVector& DirectionToAttacker) const;
+	bool IsWithinParryArc(const FVector& DirectionToAttacker) const;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0"))
+	float ParryWindowDuration = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0"))
+	float ParryCooldown = 0.6f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0"))
+	float PerfectParryWindowDuration = 0.18f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0", ClampMax = "180.0"))
+	float GuardHalfAngleDegrees = 90.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0", ClampMax = "180.0"))
+	float ParryHalfAngleDegrees = 70.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense")
+	bool bHeavyHitsBypassGuard = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense")
+	bool bCriticalHitsBypassGuard = false;
 
 	/** Called when an incoming hit breaks an active guard. Plays the equipped weapon's break montage. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
@@ -218,6 +243,21 @@ protected:
 	bool bIsStoppingAttack = false;
 	bool bParryWindowOpen = false;
 	FTimerHandle GuardBreakRecoveryTimer;
+	FTimerHandle ParryAttemptTimer;
+	FTimerHandle RiposteWindowTimer;
+	double ParryAttemptStartTime = -1.0;
+	double NextParryAllowedTime = 0.0;
+	bool bRiposteWindowActive = false;
+	bool bRiposteAttackActive = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0"))
+	float RiposteWindowDuration = 1.25f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "1.0"))
+	float RiposteDamageMultiplier = 1.5f;
+
+	void HandleParryAttemptExpired();
+	void ClearParryTimers();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.05"))
 	float GuardBreakFallbackDuration = 1.0f;
