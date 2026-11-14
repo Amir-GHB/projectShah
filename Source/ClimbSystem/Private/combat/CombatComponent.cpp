@@ -726,7 +726,17 @@ void UCombatComponent::OnMontageInstanceEnded(UAnimMontage* Montage, bool bInter
 		if (ActiveAttackWeapon.IsValid()) ActiveAttackWeapon->EndTrace();
 		ActiveAttackToken = 0;
 		ActiveAttackMontage = nullptr;
-		PlayIndividualAttack(NextIndex);
+		if (!PlayIndividualAttack(NextIndex))
+		{
+			StopActiveAttack(true, false, 0.0f);
+			OnAttackEnded.Broadcast();
+			if (QueuedWeaponSwitch.IsSet())
+			{
+				const EWeaponType Target = QueuedWeaponSwitch.GetValue();
+				QueuedWeaponSwitch.Reset();
+				EquipWeapon(Target);
+			}
+		}
 		return;
 	}
 
