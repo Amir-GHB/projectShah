@@ -164,6 +164,11 @@ On the character Blueprint, assign two Enhanced Input actions to `GuardAction` a
 
 `ParryWindowDuration = 0` means the defender parry montage length. A nonzero value overrides it. A whiff or cancelled attempt applies `ParryCooldown`; a successful parry does not. Releasing guard, taking a valid hit, guard break, death, finisher, and weapon swap all clear the active attempt.
 
+## 11. Death ragdoll
+
+`DamageReactionComponent.bRagdollOnDeath` enables shared ragdoll behavior for player and enemy characters. The skeletal mesh hands off to physics at the death montage's final blend-out rather than waiting for its end delegate, avoiding the brief return to the AnimBP's standing pose. Ensure the skeleton has a valid Physics Asset and the project has a Ragdoll collision profile. The transition still depends on a valid death montage and compatible collision/physics setup.
+
+
 ## 12. Guard, poise, and defense tuning
 
 `UCombatComponent` owns the defense state and the following defaults:
@@ -265,11 +270,6 @@ Run these in PIE with a player character and at least two enemy types. Expected 
 New defaults are listed in sections 12-14. The only deliberate behavior-default change from the previous implementation is `bCriticalHitsBypassGuard=false`: frontal critical hits are blockable unless explicitly enabled. `bHeavyHitsBypassGuard=true` and a 90-degree guard half-angle preserve the previous heavy-bypass and front-half-plane behavior. All other new defaults establish previously missing timers, stamina, feedback, AI selection, and recovery behavior.
 
 The code has been reviewed against the Unreal Engine 5.8 API for global time dilation and force-feedback parameters, but this environment cannot run the project's Unreal build or PIE session. Compile and runtime verification remain required.
-
-## 11. Death ragdoll
-
-`DamageReactionComponent.bRagdollOnDeath` enables shared ragdoll behavior for player and enemy characters. The skeletal mesh hands off to physics at the death montage's final blend-out rather than waiting for its end delegate, avoiding the brief return to the AnimBP's standing pose. Ensure the skeleton has a valid Physics Asset and the project has a Ragdoll collision profile. The transition still depends on a valid death montage and compatible collision/physics setup.
-
 
 ## 17. Investor-demo acceptance pass
 
