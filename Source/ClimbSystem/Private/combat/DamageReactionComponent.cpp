@@ -20,6 +20,10 @@
 #include "BrainComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DamageEvents.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Kismet/GameplayStatics.h"
+#include "Camera/CameraShakeBase.h"
+#include "GameFramework/ForceFeedbackEffect.h"
 
 UDamageReactionComponent::UDamageReactionComponent()
 {
@@ -64,7 +68,12 @@ void UDamageReactionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			this, &UDamageReactionComponent::HandleDeath);
 	}
 	EndFinisher(true);
-	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(FinisherCameraDestroyTimer);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(FinisherCameraDestroyTimer);
+		World->GetTimerManager().ClearTimer(DefenseTimeDilationTimer);
+	}
+	RestoreDefenseTimeDilation();
 	DestroyFinisherCamera();
 	Super::EndPlay(EndPlayReason);
 }
@@ -185,6 +194,84 @@ bool UDamageReactionComponent::PlayHitReactionOverride(UAnimMontage* Montage)
 {
 	return !bDeathHandled && IsValid(Montage)
 		&& PlayReaction(Montage, HitReactionBlendOutTime);
+}
+
+void UDamageReactionComponent::PlayDefenseFeedback(AWeaponBase* Weapon,
+	const FVector& ImpactLocation, bool bParry, bool bPerfectParry)
+{
+	if (!IsValid(Weapon) || !GetWorld()) return;
+	const FWeaponConfig& Config = Weapon->GetConfig();
+	UNiagaraSystem* Effect = bParry ? Config.ParryNiagara.Get() : Config.GuardBlockNiagara.Get();
+	USoundBase* Sound = bParry ? Config.ParrySound.Get() : Config.GuardBlockSound.Get();
+	if (IsValid(Effect))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), Effect, ImpactLocation);
+	}
+	if (IsValid(Sound))
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, Sound, ImpactLocation);
+	}
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PlayerController = It->Get();
+		if (!IsValid(PlayerController)) continue;
+		if (DefenseCameraShakeClass)
+		{
+			PlayerController->ClientStartCameraShake(DefenseCameraShakeClass, DefenseCameraShakeScale);
+		}
+		if (IsValid(DefenseForceFeedbackEffect))
+		{
+			PlayerController->ClientPlayForceFeedback(DefenseForceFeedbackEffect, false, NAME_None, false);
+		}
+	}
+
+	if (bPerfectParry)
+	{
+		ApplyDefenseTimeDilation(PerfectParrySlowMotionDuration, PerfectParryTimeDilation);
+	}
+	else
+	{
+		ApplyDefenseTimeDilation(bParry ? ParryHitStopDuration : BlockHitStopDuration, 0.05f);
+	}
+}
+
+void UDamageReactionComponent::PlayGuardBreakFeedback(AWeaponBase* Weapon, const FVector& ImpactLocation)
+{
+	if (!IsValid(Weapon) || !GetWorld()) return;
+	const FWeaponConfig& Config = Weapon->GetConfig();
+	if (IsValid(Config.GuardBreakNiagara))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), Config.GuardBreakNiagara, ImpactLocation);
+	}
+	if (IsValid(Config.GuardBreakSound))
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, Config.GuardBreakSound, ImpactLocation);
+	}
+	ApplyDefenseTimeDilation(BlockHitStopDuration, 0.05f);
+}
+
+void UDamageReactionComponent::ApplyDefenseTimeDilation(float Duration, float TimeDilation)
+{
+	if (!GetWorld() || Duration <= 0.0f) return;
+	const float SafeDilation = FMath::Clamp(TimeDilation, 0.01f, 1.0f);
+	if (!bDefenseTimeDilationActive)
+	{
+		PreviousGlobalTimeDilation = UGameplayStatics::GetGlobalTimeDilation(this);
+		bDefenseTimeDilationActive = true;
+	}
+	UGameplayStatics::SetGlobalTimeDilation(this, SafeDilation);
+	GetWorld()->GetTimerManager().ClearTimer(DefenseTimeDilationTimer);
+	GetWorld()->GetTimerManager().SetTimer(DefenseTimeDilationTimer, this,
+		&UDamageReactionComponent::RestoreDefenseTimeDilation,
+		Duration / SafeDilation, false);
+}
+
+void UDamageReactionComponent::RestoreDefenseTimeDilation()
+{
+	if (!bDefenseTimeDilationActive) return;
+	UGameplayStatics::SetGlobalTimeDilation(this, PreviousGlobalTimeDilation);
+	bDefenseTimeDilationActive = false;
 }
 
 void UDamageReactionComponent::HandleDamageTaken(
