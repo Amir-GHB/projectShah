@@ -168,18 +168,6 @@ void UDamageReactionComponent::HandleReactionMontageEnded(UAnimMontage* Montage,
 {
 	if (Montage != ActiveReactionMontage) return;
 	ActiveReactionMontage = nullptr;
-	if (UCombatComponent* Combat = GetOwner()
-		? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr)
-	{
-		if (Combat->IsParryAttemptActive())
-		{
-			const AWeaponBase* Weapon = Combat->CurrentWeapon;
-			if (IsValid(Weapon) && Weapon->GetConfig().DefenderParryMontage.Get() == Montage)
-			{
-				Combat->SetParryAnimationState(false);
-			}
-		}
-	}
 	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
 	{
 		Enemy->bIsInDamageReaction = false;
@@ -252,7 +240,7 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 		Mage->CancelPendingMagicAttack();
 	}
 
-	DefenderCombat->SetParryAnimationState(false);
+	DefenderCombat->NotifyParrySucceeded();
 
 	const FWeaponConfig& DefenderConfig = DefenderWeapon->GetConfig();
 	const FWeaponConfig& AttackerConfig = AttackingWeapon->GetConfig();
