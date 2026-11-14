@@ -105,6 +105,7 @@ public:
 	bool IsParryAttemptActive() const { return AnimationState.DefenseState == ECombatDefenseState::Parrying; }
 	void EndParryAttempt(bool bSuccessful);
 	bool NotifyParrySucceeded();
+	void ResumeHeldGuard();
 	float GetRiposteDamageMultiplier() const { return bRiposteAttackActive ? FMath::Max(1.0f, RiposteDamageMultiplier) : 1.0f; }
 	bool IsRiposteWindowActive() const { return bRiposteWindowActive; }
 	bool IsWithinGuardArc(const FVector& DirectionToAttacker) const;
@@ -257,6 +258,7 @@ protected:
 	double NextParryAllowedTime = 0.0;
 	bool bRiposteWindowActive = false;
 	bool bRiposteAttackActive = false;
+	bool bGuardInputHeld = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0"))
 	float RiposteWindowDuration = 1.25f;
