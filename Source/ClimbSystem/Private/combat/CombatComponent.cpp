@@ -76,7 +76,8 @@ void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void UCombatComponent::EquipWeapon(EWeaponType NewWeaponType)
 {
-	if (!OwningCharacter.IsValid() || CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing) return;
+	if (!OwningCharacter.IsValid() || CurrentCombatState == ECombatState::Dead ||
+		CurrentCombatState == ECombatState::Finishing || CurrentCombatState == ECombatState::Staggered) return;
 
 	// A weapon change interrupts an in-progress bow draw without releasing a shot.
 	if (CurrentCombatState == ECombatState::DrawingBow)
@@ -119,6 +120,11 @@ void UCombatComponent::EquipWeapon(EWeaponType NewWeaponType)
 
 void UCombatComponent::BeginWeaponSwap(EWeaponType NewWeaponType)
 {
+	ClearParryTimers();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(StaggerRecoveryTimer);
+	}
 	if (AnimationState.DefenseState == ECombatDefenseState::GuardBroken)
 	{
 		EndGuardBreak();
@@ -503,7 +509,7 @@ bool UCombatComponent::StartNewCombo()
 	{
 		Targeting->BeginAttackFocus();
 	}
-	OnComboSectionChanged.Broadcast(0, FirstSection);
+	OnComboSectionChanged.Broadcast(StartingSectionIndex, FirstSection);
 	return true;
 }
 
