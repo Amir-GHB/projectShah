@@ -198,8 +198,8 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	Memory.bHasMoveGoal = false;
 
 	Memory.AttackCooldown = FMath::Max(0.0f, Memory.AttackCooldown - DeltaSeconds);
-	if (Memory.AttackCooldown <= 0.0f && Enemy->CombatComponent &&
-		Enemy->CombatComponent->CurrentCombatState == ECombatState::Idle)
+	if (Memory.AttackCooldown <= 0.0f && !Enemy->HasPendingAICombatAction()
+		&& Enemy->CombatComponent && Enemy->CombatComponent->CurrentCombatState == ECombatState::Idle)
 	{
 		if (Enemy->TryAcquireAttackSlot(Target))
 		{
