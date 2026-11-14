@@ -51,6 +51,10 @@ void UCombatComponent::BeginPlay()
 
 void UCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
+	}
 	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon)) Bow->CancelDraw();
 	StopActiveAttack(true, true, 0.0f);
 	if (bWeaponSwapActive && OwningCharacter.IsValid() && OwningCharacter->GetMesh())
@@ -719,6 +723,10 @@ void UCombatComponent::EnterDeadState()
 	}
 
 	StopActiveAttack(true, true, 0.12f);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
+	}
 	AnimationState.DefenseState = ECombatDefenseState::None;
 	SetCombatState(ECombatState::Dead);
 }
@@ -787,6 +795,10 @@ void UCombatComponent::EnterFinisherState()
 {
 	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing) return;
 	StopActiveAttack(true, true, 0.08f);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
+	}
 	AnimationState.DefenseState = ECombatDefenseState::None;
 	SetCombatState(ECombatState::Finishing);
 }
@@ -940,22 +952,49 @@ void UCombatComponent::TriggerGuardBreak()
 		return;
 	}
 
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
+	}
+
 	AnimationState.DefenseState = ECombatDefenseState::GuardBroken;
 	bParryWindowOpen = false;
 	RefreshAnimationState();
-	if (IsValid(CurrentWeapon))
+
+	UAnimMontage* BreakMontage = IsValid(CurrentWeapon)
+		? CurrentWeapon->GetConfig().BreakGuardMontage.Get() : nullptr;
+	bool bMontageStarted = false;
+	if (IsValid(BreakMontage))
 	{
 		if (UDamageReactionComponent* Reactions = OwningCharacter.IsValid()
 			? OwningCharacter->FindComponentByClass<UDamageReactionComponent>() : nullptr)
 		{
-			Reactions->PlayHitReactionOverride(CurrentWeapon->GetConfig().BreakGuardMontage);
+			bMontageStarted = Reactions->PlayHitReactionOverride(BreakMontage);
 		}
 	}
+
+	const float RecoveryDuration = bMontageStarted
+		? FMath::Max(0.05f, BreakMontage->GetPlayLength())
+		: FMath::Max(0.05f, GuardBreakFallbackDuration);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(GuardBreakRecoveryTimer, this,
+			&UCombatComponent::HandleGuardBreakRecovery, RecoveryDuration, false);
+	}
+}
+
+void UCombatComponent::HandleGuardBreakRecovery()
+{
+	EndGuardBreak();
 }
 
 void UCombatComponent::EndGuardBreak()
 {
 	if (AnimationState.DefenseState != ECombatDefenseState::GuardBroken) return;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
+	}
 	AnimationState.DefenseState = ECombatDefenseState::None;
 	RefreshAnimationState();
 }
