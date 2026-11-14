@@ -1028,7 +1028,7 @@ void UCombatComponent::EndParryAttempt(bool bSuccessful)
 	}
 }
 
-void UCombatComponent::NotifyParrySucceeded()
+bool UCombatComponent::NotifyParrySucceeded()
 {
 	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 	const bool bPerfect = ParryAttemptStartTime >= 0.0
@@ -1043,6 +1043,7 @@ void UCombatComponent::NotifyParrySucceeded()
 			bRiposteWindowActive = false;
 		}, FMath::Max(0.0f, RiposteWindowDuration), false);
 	}
+	return bPerfect;
 }
 
 bool UCombatComponent::IsWithinGuardArc(const FVector& DirectionToAttacker) const
@@ -1105,7 +1106,7 @@ bool UCombatComponent::CanBeParried() const
 	return bHasAuthoredParryWindow ? bParryWindowOpen : ActiveAttackWeapon->IsTracing();
 }
 
-void UCombatComponent::TriggerGuardBreak()
+void UCombatComponent::TriggerGuardBreak(const FVector& ImpactLocation)
 {
 	if (AnimationState.DefenseState != ECombatDefenseState::Guarding &&
 		AnimationState.DefenseState != ECombatDefenseState::Parrying)
@@ -1126,13 +1127,16 @@ void UCombatComponent::TriggerGuardBreak()
 	UAnimMontage* BreakMontage = IsValid(CurrentWeapon)
 		? CurrentWeapon->GetConfig().BreakGuardMontage.Get() : nullptr;
 	bool bMontageStarted = false;
-	if (IsValid(BreakMontage))
+	if (UDamageReactionComponent* Reactions = OwningCharacter.IsValid()
+		? OwningCharacter->FindComponentByClass<UDamageReactionComponent>() : nullptr)
 	{
-		if (UDamageReactionComponent* Reactions = OwningCharacter.IsValid()
-			? OwningCharacter->FindComponentByClass<UDamageReactionComponent>() : nullptr)
+		if (IsValid(BreakMontage))
 		{
 			bMontageStarted = Reactions->PlayHitReactionOverride(BreakMontage);
 		}
+		const FVector FeedbackLocation = ImpactLocation.IsNearlyZero() && OwningCharacter.IsValid()
+			? OwningCharacter->GetActorLocation() : ImpactLocation;
+		Reactions->PlayGuardBreakFeedback(CurrentWeapon, FeedbackLocation);
 	}
 
 	const float RecoveryDuration = bMontageStarted
