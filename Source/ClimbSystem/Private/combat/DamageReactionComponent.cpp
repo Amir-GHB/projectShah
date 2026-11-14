@@ -309,7 +309,14 @@ bool UDamageReactionComponent::ResolveIncomingHit(AActor* Attacker,
 	}
 
 	UCombatComponent* DefenderCombat = GetOwner()->FindComponentByClass<UCombatComponent>();
-	if (!DefenderCombat || !DefenderCombat->IsGuarding()) return false;
+	if (!DefenderCombat) return false;
+
+	// Ranged impacts can block, but cannot extend or preserve a melee parry attempt.
+	if (!bAllowParry && DefenderCombat->IsParryAttemptActive())
+	{
+		DefenderCombat->EndParryAttempt(false);
+	}
+	if (!DefenderCombat->IsGuarding()) return false;
 
 	// DamageDirection is the direction of travel toward the defender.
 	FVector ToAttacker = -DamageInfo.DamageDirection.GetSafeNormal2D();
