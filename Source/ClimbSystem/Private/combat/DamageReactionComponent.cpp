@@ -24,6 +24,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Camera/CameraShakeBase.h"
 #include "GameFramework/ForceFeedbackEffect.h"
+#include "GameFramework/ForceFeedbackParameters.h"
 
 UDamageReactionComponent::UDamageReactionComponent()
 {
@@ -222,7 +223,12 @@ void UDamageReactionComponent::PlayDefenseFeedback(AWeaponBase* Weapon,
 		}
 		if (IsValid(DefenseForceFeedbackEffect))
 		{
-			PlayerController->ClientPlayForceFeedback(DefenseForceFeedbackEffect, false, NAME_None, false);
+			FForceFeedbackParameters FeedbackParameters;
+			FeedbackParameters.bLooping = false;
+			FeedbackParameters.bIgnoreTimeDilation = false;
+			FeedbackParameters.bPlayWhilePaused = false;
+			FeedbackParameters.Tag = TEXT("CombatDefense");
+			PlayerController->ClientPlayForceFeedback(DefenseForceFeedbackEffect, FeedbackParameters);
 		}
 	}
 
