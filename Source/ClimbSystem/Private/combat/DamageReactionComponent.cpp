@@ -309,7 +309,9 @@ bool UDamageReactionComponent::ResolveIncomingMeleeHit(AActor* Attacker,
 
 	// Only bypassing hits or attacks outside the guard arc break the stance.
 	// A normal frontal light hit is fully blocked and leaves the guard intact.
-	const bool bBypassesGuard = DamageInfo.bIsHeavyAttack || DamageInfo.bIsCriticalHit;
+	const bool bBypassesGuard =
+		(DamageInfo.bIsHeavyAttack && DefenderCombat->bHeavyHitsBypassGuard) ||
+		(DamageInfo.bIsCriticalHit && DefenderCombat->bCriticalHitsBypassGuard);
 	if (bBypassesGuard || !bHitFromFront)
 	{
 		DefenderCombat->TriggerGuardBreak();
