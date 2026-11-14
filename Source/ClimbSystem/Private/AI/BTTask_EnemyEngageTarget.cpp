@@ -35,7 +35,10 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 		? Target->FindComponentByClass<UDamageHandlerComponent>() : nullptr;
 	const bool bTargetDead = TargetDamageHandler && TargetDamageHandler->bIsDead;
 
-	if (Controller && Enemy && Enemy->bIsInDamageReaction)
+	if (Controller && Enemy && (Enemy->bIsInDamageReaction ||
+		(Enemy->CombatComponent &&
+			(Enemy->CombatComponent->CurrentCombatState == ECombatState::Staggered ||
+			 Enemy->CombatComponent->GetAnimationState().DefenseState == ECombatDefenseState::GuardBroken))))
 	{
 		Controller->StopMovement();
 		return;
