@@ -203,9 +203,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
 	float DefenseCameraShakeScale = 0.65f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
-	float DefenseForceFeedbackScale = 0.6f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.01", ClampMax = "1.0"))
 	float DefenseHitStopTimeDilation = 0.05f;
 
