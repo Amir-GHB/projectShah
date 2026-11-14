@@ -237,6 +237,17 @@ For ordinary melee enemy Blueprints:
 - Configure the weapon's `AttackDamageConfigs` with `bOverrideAttackType` and `bIsHeavyAttack` to identify heavy entries. AI selects a matching attack entry/section.
 - `MaxAttackersPerTarget` is clamped to 1-2 and defaults to 2. The slot is released when the attack ends, the enemy is damaged, the task aborts, or the actor ends play.
 
+New enemy AI defaults:
+
+| Property | Default |
+| --- | ---: |
+| `HeavyAttackChance` | 0.25 |
+| `HeavyAttackTelegraphDuration` | 0.55 s |
+| `MaxAttackersPerTarget` | 2 (hard maximum) |
+| `GuardEngageRange` | 340 cm |
+| `ParryAttemptInterval` | 0.75 s |
+| `ParryAttemptChance` | 0.7 |
+
 Create a Blueprint child of `AGuardEnemyCharacter` for the defensive archetype. Assign its weapon's guard/parry montages and tune `GuardEngageRange`, `ParryAttemptInterval`, and `ParryAttemptChance`. It enters guard and attempts parries through `SetGuardMode` and `BeginParryAttempt`; its guard can be broken through the same poise system.
 
 Enemy behavior trees pause during guard break and stagger. They resume after the C++ recovery timer or after the active reaction montage ends. Dodge/evade behavior is not part of this upgrade.
