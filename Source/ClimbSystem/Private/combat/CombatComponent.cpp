@@ -384,6 +384,8 @@ void UCombatComponent::HandleAICombatAttack(bool bHeavyAttack)
 
 	if (AttackCount <= 0)
 	{
+		const bool bWeaponIsHeavy = Config.bIsHeavyAttack || !Config.bIsLightAttack;
+		if (bWeaponIsHeavy != bHeavyAttack) return;
 		HandleAttackInput();
 		return;
 	}
@@ -406,13 +408,21 @@ void UCombatComponent::HandleAICombatAttack(bool bHeavyAttack)
 		}
 	}
 
-	if (MatchingAttacks.IsEmpty())
+	if (MatchingAttacks.IsEmpty() && bHeavyAttack)
 	{
+		// If this weapon has no configured heavy entry, fall back to a light entry.
 		for (int32 Index = 0; Index < AttackCount; ++Index)
 		{
-			MatchingAttacks.Add(Index);
+			bool bCandidateHeavy = Config.bIsHeavyAttack || !Config.bIsLightAttack;
+			if (Config.AttackDamageConfigs.IsValidIndex(Index)
+				&& Config.AttackDamageConfigs[Index].bOverrideAttackType)
+			{
+				bCandidateHeavy = Config.AttackDamageConfigs[Index].bIsHeavyAttack;
+			}
+			if (!bCandidateHeavy) MatchingAttacks.Add(Index);
 		}
 	}
+	if (MatchingAttacks.IsEmpty()) return;
 
 	RequestedAIStartingAttackIndex = MatchingAttacks[FMath::RandRange(0, MatchingAttacks.Num() - 1)];
 	HandleAttackInput();
