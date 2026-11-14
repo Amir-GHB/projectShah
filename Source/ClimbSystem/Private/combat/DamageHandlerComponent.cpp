@@ -1,6 +1,7 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/DamageHandlerComponent.h"
+#include "combat/CombatComponent.h"
 #include "combat/EnemyCharacter.h"
 #include "GameFramework/Actor.h"
 #include "Components/PrimitiveComponent.h"
@@ -22,6 +23,19 @@ void UDamageHandlerComponent::BeginPlay()
 float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActor, AActor* TargetActor, const FDamageInfo& DamageInfo, const FHitResult& HitResult)
 {
 	if (bIsDead) return 0.0f;
+
+	// Any real damage reaching health resolution ends an outstanding parry attempt.
+	// The parry resolver clears successful attempts before applying its reward damage.
+	if (AActor* OwnerActor = GetOwner())
+	{
+		if (UCombatComponent* Combat = OwnerActor->FindComponentByClass<UCombatComponent>())
+		{
+			if (Combat->IsParryAttemptActive())
+			{
+				Combat->EndParryAttempt(false);
+			}
+		}
+	}
 
 	// Shared safety net for Blueprint and future damage sources, in addition to
 	// weapon-level filtering that suppresses friendly hit presentation.
