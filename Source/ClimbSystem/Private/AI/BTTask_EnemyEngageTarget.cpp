@@ -54,6 +54,7 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 			Enemy->CombatComponent->CancelAttackInput();
 			Enemy->CombatComponent->StopActiveAttack(true, true, 0.1f);
 		}
+		if (Enemy) Enemy->CancelPendingAICombatAction();
 		if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
 		{
 			Mage->CancelPendingMagicAttack();
@@ -64,6 +65,11 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 		}
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
+	}
+
+	if (AGuardEnemyCharacter* GuardEnemy = Cast<AGuardEnemyCharacter>(Enemy))
+	{
+		GuardEnemy->UpdateDefensiveCombat(Target);
 	}
 
 	float DesiredRange = Enemy->AttackRange;
@@ -191,7 +197,33 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	if (Memory.AttackCooldown <= 0.0f && Enemy->CombatComponent &&
 		Enemy->CombatComponent->CurrentCombatState == ECombatState::Idle)
 	{
-		Enemy->PerformAICombatAction(Target);
+		if (Enemy->TryAcquireAttackSlot(Target))
+		{
+			if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
+			{
+				Mage->PerformAICombatAction(Target);
+				if (!Mage->HasPendingMagicAttack()) Enemy->ReleaseAICombatSlot();
+			}
+			else if (ABowEnemyCharacter* Archer = Cast<ABowEnemyCharacter>(Enemy))
+			{
+				Archer->PerformAICombatAction(Target);
+				if (!Archer->HasPendingBowAttack()) Enemy->ReleaseAICombatSlot();
+			}
+			else if (!Cast<AGuardEnemyCharacter>(Enemy))
+			{
+				const bool bRequestHeavy = FMath::FRand() <= FMath::Clamp(Enemy->HeavyAttackChance, 0.0f, 1.0f);
+				Enemy->QueueAICombatAction(Target, bRequestHeavy);
+				if (!Enemy->HasPendingAICombatAction()
+					&& Enemy->CombatComponent->CurrentCombatState == ECombatState::Idle)
+				{
+					Enemy->ReleaseAICombatSlot();
+				}
+			}
+			else
+			{
+				Enemy->ReleaseAICombatSlot();
+			}
+		}
 		Memory.AttackCooldown = FMath::Max(0.05f, Enemy->AttackRetryInterval);
 	}
 }
@@ -205,6 +237,8 @@ EBTNodeResult::Type UBTTask_EnemyEngageTarget::AbortTask(UBehaviorTreeComponent&
 		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Controller->GetPawn()))
 		{
 			if (Enemy->CombatComponent) Enemy->CombatComponent->CancelAttackInput();
+			Enemy->CancelPendingAICombatAction();
+			Enemy->ReleaseAICombatSlot();
 			if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
 				Mage->CancelPendingMagicAttack();
 		}
