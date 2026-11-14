@@ -248,6 +248,7 @@ New enemy AI defaults:
 | `GuardEngageRange` | 340 cm |
 | `ParryAttemptInterval` | 0.75 s |
 | `ParryAttemptChance` | 0.7 |
+| `MagicProjectileFallbackDelay` | 0 (magic montage length) |
 
 Create a Blueprint child of `AGuardEnemyCharacter` for the defensive archetype. Assign its weapon's guard/parry montages and tune `GuardEngageRange`, `ParryAttemptInterval`, and `ParryAttemptChance`. It enters guard and attempts parries through `SetGuardMode` and `BeginParryAttempt`; its guard can be broken through the same poise system.
 
@@ -273,7 +274,7 @@ Run these in PIE with a player character and at least two enemy types. Expected 
 14. **Poise break:** Take repeated blocked hits until poise reaches zero. Guard breaks once and `OnPoiseBroken` broadcasts once. Release guard, wait the regen delay, and verify poise regenerates on the configured timer.
 15. **Unguarded stagger:** Take repeated unguarded poise damage until zero. Combat enters `Staggered`, attack/guard input is rejected, then C++ recovery returns to `Idle`.
 16. **Enemy AI stagger/parry:** Parry or stagger an enemy. Its BT stops issuing movement/attacks during the reaction and resumes after recovery.
-17. **Attack-slot cap:** Put three enemies in range of one target. At most two may reserve attack slots at once; the third waits. Kill, interrupt, or abort one attacker and verify the waiting enemy can acquire the freed slot.
+17. **Attack-slot cap:** Put three enemies in range of one target. At most two may reserve attack slots at once; the third waits. Kill, interrupt, or abort one attacker and verify the waiting enemy can acquire the freed slot. Remove the mage projectile-release notify and verify its fallback timer still releases exactly one projectile and frees its slot.
 18. **Guard archetype:** Use an `AGuardEnemyCharacter` child. It enters guard at range, attempts parries during the target's parryable attack window, and can be guard-broken by heavy/rear hits or poise depletion.
 19. **Feedback:** Assign block/parry/guard-break VFX and SFX, camera shake, and force-feedback assets. Verify each event plays the correct response. Confirm a blocked hit does not also play ordinary weapon hit VFX.
 20. **No asset changes:** Confirm the upgrade did not modify or delete any files under `Content/`.
