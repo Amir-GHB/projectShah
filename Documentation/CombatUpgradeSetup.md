@@ -160,7 +160,7 @@ On the character Blueprint, assign two Enhanced Input actions to `GuardAction` a
 - Guard/parry state is exposed through `FCombatAnimationState.DefenseState`. Use `Guarding`, `Parrying`, and `GuardBroken` in the AnimBP to drive the equipped weapon's guard blend space and transitions.
 - Add the `Parry Window` notify state to the attacker's attack montage for explicit parryable frames. If a montage has no such notify state, the active melee trace window is the fallback.
 - A successful parry invalidates and stops the attacker's active attack transaction before applying the reward. The ordinary hit VFX and normal hit reaction are suppressed; the attacker's weapon-specific `AttackerParriedMontage` is then played.
-- A perfect parry grants the defender a short riposte window. A melee attack during that window receives `RiposteDamageMultiplier`; attacks from guard outside that window remain blocked.
+- A perfect parry grants the defender a short riposte window. A melee attack during that window receives `RiposteDamageMultiplier`; attacks from guard outside that window remain blocked. A successful non-perfect parry returns to guard immediately. If guard is still held when a perfect-parry riposte window expires, C++ restores guard; releasing guard during the window prevents that re-entry.
 
 `ParryWindowDuration = 0` means the defender parry montage length. A nonzero value overrides it. A whiff or cancelled attempt applies `ParryCooldown`; a successful parry does not. Releasing guard, taking a valid hit, guard break, death, finisher, and weapon swap all clear the active attempt.
 
@@ -267,7 +267,7 @@ Run these in PIE with a player character and at least two enemy types. Expected 
 7. **Trace fallback:** Remove the notify state from the attack montage. Parry succeeds only while the attack's melee trace notify is active.
 8. **Parry whiff/cooldown:** Press parry without an incoming parryable attack. The attempt ends at the configured duration, returns to guard, and another attempt is rejected until cooldown expires.
 9. **Successful parry cooldown:** Perform a successful parry. Verify no whiff cooldown is applied. If it lands inside `PerfectParryWindowDuration`, verify the riposte window starts.
-10. **Riposte:** Attack during the perfect-parry riposte window. Guard/parry state exits and the attack receives `RiposteDamageMultiplier`. Wait for the window to expire and confirm attacks from guard are blocked again.
+10. **Riposte:** Attack during the perfect-parry riposte window. Guard/parry state exits and the attack receives `RiposteDamageMultiplier`. If the player keeps holding guard and does not attack, guard returns when the window expires. Release guard during the window and verify it does not re-enter. Confirm attacks from guard are blocked outside the window.
 11. **Parry interruption:** While parrying, get hit by an arrow or spell. The parry attempt ends, the ranged hit does not count as a parry, and the selected hit reaction can replace the parry montage without leaving `Parrying` stuck.
 12. **Ranged guard:** Hold guard against an arrow and a magic projectile from the front. Both are blocked and spend poise; neither grants or preserves parry. Repeat from behind and verify guard break plus health damage.
 13. **Arc boundaries:** Test attacks at the front, both edges of the configured guard/parry half-angles, and behind. Confirm the planar arc behaves consistently on slopes.
