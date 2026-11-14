@@ -276,6 +276,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0"))
 	float StaggerAttackBlendOutDuration = 0.08f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Defense", meta = (ClampMin = "0.0"))
+	float GuardReleaseBlendOutDuration = 0.08f;
+
 	void HandleGuardBreakRecovery();
 	void HandleStaggerRecovery();
 	double LastAttackInputTimestamp = -1.0;
