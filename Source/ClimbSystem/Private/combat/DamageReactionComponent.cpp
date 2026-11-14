@@ -286,38 +286,47 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	return true;
 }
 
-bool UDamageReactionComponent::ResolveIncomingMeleeHit(AActor* Attacker,
-	AWeaponBase* AttackingWeapon, const FDamageInfo& DamageInfo, const FHitResult& HitResult)
+bool UDamageReactionComponent::ResolveIncomingHit(AActor* Attacker,
+	AWeaponBase* AttackingWeapon, FDamageInfo& DamageInfo, const FHitResult& HitResult, bool bAllowParry)
 {
-	if (!IsValid(Attacker) || !IsValid(AttackingWeapon)) return false;
+	if (!IsValid(Attacker) || !GetOwner() || Attacker == GetOwner()) return false;
 
-	// Parry is valid only while the defender is actively playing its weapon parry attempt
-	// and the attacker's montage is inside its authored/fallback parry window.
-	if (TryParry(Attacker, AttackingWeapon, HitResult)) return true;
+	// All damage sources resolve critical chance before defense, exactly once.
+	DamageInfo.Normalize();
+	if (!DamageInfo.bCriticalRollResolved)
+	{
+		DamageInfo.bIsCriticalHit = DamageInfo.CriticalChance > 0.0f
+			&& FMath::FRand() < DamageInfo.CriticalChance;
+		DamageInfo.bCriticalRollResolved = true;
+	}
 
-	UCombatComponent* DefenderCombat = GetOwner()
-		? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr;
+	if (bAllowParry && IsValid(AttackingWeapon)
+		&& TryParry(Attacker, AttackingWeapon, HitResult))
+	{
+		return true;
+	}
+
+	UCombatComponent* DefenderCombat = GetOwner()->FindComponentByClass<UCombatComponent>();
 	if (!DefenderCombat || !DefenderCombat->IsGuarding()) return false;
 
-	// DamageDirection points from attacker to defender. Its inverse points toward the attacker.
-	FVector ToAttacker = -DamageInfo.DamageDirection.GetSafeNormal();
+	// DamageDirection is the direction of travel toward the defender.
+	FVector ToAttacker = -DamageInfo.DamageDirection.GetSafeNormal2D();
 	if (ToAttacker.IsNearlyZero())
 	{
-		ToAttacker = (Attacker->GetActorLocation() - GetOwner()->GetActorLocation()).GetSafeNormal();
+		ToAttacker = (Attacker->GetActorLocation() - GetOwner()->GetActorLocation()).GetSafeNormal2D();
 	}
 	const bool bHitFromFront = DefenderCombat->IsWithinGuardArc(ToAttacker);
-
-	// Only bypassing hits or attacks outside the guard arc break the stance.
-	// A normal frontal light hit is fully blocked and leaves the guard intact.
 	const bool bBypassesGuard =
 		(DamageInfo.bIsHeavyAttack && DefenderCombat->bHeavyHitsBypassGuard) ||
 		(DamageInfo.bIsCriticalHit && DefenderCombat->bCriticalHitsBypassGuard);
+
 	if (bBypassesGuard || !bHitFromFront)
 	{
 		DefenderCombat->TriggerGuardBreak();
 		return false;
 	}
 
+	// Front-facing non-bypassing damage is consumed by guard, never reaching health.
 	return true;
 }
 
