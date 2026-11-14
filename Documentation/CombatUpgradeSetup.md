@@ -151,7 +151,7 @@ Configure these fields in each weapon Blueprint's `WeaponConfig`:
 
 ## 10. Guard and parry
 
-Guard and parry animations are weapon-owned. Configure `BeginGuardMontage`, `BreakGuardMontage`, `DefenderParryMontage`, and `AttackerParriedMontage` in each weapon's `WeaponConfig`. Tune `ParryDamage` and `ParryPoiseDamage` there as well. Do not assign shared guard/parry montage defaults on `DamageReactionComponent`; those legacy defaults have been removed.
+Guard and parry animations are weapon-owned. Configure `BeginGuardMontage`, `BreakGuardMontage`, `DefenderParryMontage`, and `AttackerParriedMontage` in each weapon's `WeaponConfig`. Tune `ParryDamage` (20) and `ParryPoiseDamage` (100) there as well. `ParryPoiseDamage` is enough to break the default 100-point poise pool, staggering the attacker. Do not assign shared guard/parry montage defaults on `DamageReactionComponent`; those legacy defaults have been removed.
 
 On the character Blueprint, assign two Enhanced Input actions to `GuardAction` and `ParryAction`:
 
@@ -182,6 +182,7 @@ On the character Blueprint, assign two Enhanced Input actions to `GuardAction` a
 | `GuardBreakFallbackDuration` | 1.0 s | C++ recovery if the break montage is missing or cannot play |
 | `ParryCancelBlendOutDuration` | 0.08 s | Blend-out when a parry attempt is cancelled |
 | `StaggerAttackBlendOutDuration` | 0.08 s | Blend-out when poise break interrupts the character's active attack |
+| `GuardReleaseBlendOutDuration` | 0.08 s | Blend-out when guard is released during its begin montage |
 | `ParryWindowDuration` | 0 | Zero uses the defender parry montage length |
 | `ParryCooldown` | 0.6 s | Cooldown after a whiff/cancel only |
 | `PerfectParryWindowDuration` | 0.18 s | Time from parry start in which a successful parry is perfect |
