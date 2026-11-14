@@ -25,6 +25,7 @@
 #include "Camera/CameraShakeBase.h"
 #include "GameFramework/ForceFeedbackEffect.h"
 #include "GameFramework/ForceFeedbackParameters.h"
+#include "GameFramework/PlayerController.h"
 
 UDamageReactionComponent::UDamageReactionComponent()
 {
