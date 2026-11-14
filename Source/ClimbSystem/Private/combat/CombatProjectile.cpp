@@ -159,6 +159,9 @@ void ACombatProjectile::ApplyHitDamage(AActor* HitTargetActor, const FHitResult&
 	DamageInfo.DamageCauser = SourceWeapon.IsValid() ? static_cast<AActor*>(SourceWeapon.Get()) : this;
 	DamageInfo.InstigatorWeapon = SourceWeapon.Get();
 	DamageInfo.Normalize();
+	DamageInfo.bIsCriticalHit = DamageInfo.CriticalChance > 0.0f
+		&& FMath::FRand() < DamageInfo.CriticalChance;
+	DamageInfo.bCriticalRollResolved = true;
 
 	// Ranged hits share guard resolution but never enter the melee parry system.
 	if (UDamageReactionComponent* Reactions = HitTargetActor->FindComponentByClass<UDamageReactionComponent>())
