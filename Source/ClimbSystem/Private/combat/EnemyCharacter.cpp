@@ -255,12 +255,20 @@ void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
 	if (IsValid(MagicAttackMontage) && Anim && Anim->Montage_IsPlaying(MagicAttackMontage)) return;
 	PendingMagicTarget = Target;
 	bNeedsRelocationAfterAttack = false;
-	if (IsValid(MagicAttackMontage) && Anim && Anim->Montage_Play(MagicAttackMontage) > 0.0f) return;
+	if (IsValid(MagicAttackMontage) && Anim && Anim->Montage_Play(MagicAttackMontage) > 0.0f)
+	{
+		const float FallbackDelay = MagicProjectileFallbackDelay > 0.0f
+			? MagicProjectileFallbackDelay : MagicAttackMontage->GetPlayLength();
+		GetWorldTimerManager().SetTimer(MagicProjectileFallbackTimer, this,
+			&AMagicEnemyCharacter::ReleaseMagicProjectile, FMath::Max(0.05f, FallbackDelay), false);
+		return;
+	}
 	ReleaseMagicProjectile();
 }
 
 void AMagicEnemyCharacter::CancelPendingMagicAttack()
 {
+	GetWorldTimerManager().ClearTimer(MagicProjectileFallbackTimer);
 	PendingMagicTarget.Reset();
 	ReleaseAICombatSlot();
 	if (IsValid(MagicAttackMontage) && GetMesh())
@@ -277,6 +285,7 @@ void AMagicEnemyCharacter::CancelPendingMagicAttack()
 
 void AMagicEnemyCharacter::ReleaseMagicProjectile()
 {
+	GetWorldTimerManager().ClearTimer(MagicProjectileFallbackTimer);
 	AActor* Target = PendingMagicTarget.Get();
 	PendingMagicTarget.Reset();
 	if (!IsValid(Target) || !IsValid(MagicProjectileClass) || !GetWorld())
