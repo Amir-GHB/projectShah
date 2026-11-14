@@ -198,7 +198,7 @@ Poise is the guard stamina pool and the stagger meter. Configure these on `UDama
 | `PoiseRegenerationInterval` | 0.1 s | Timer interval while regeneration is active |
 | `PoiseBreakStaggerDuration` | 0.85 s | C++ stagger duration when unguarded poise reaches zero |
 
-Every blocked frontal hit spends its `FDamageInfo.PoiseDamage` and deals no health damage. When guard poise reaches zero, guard breaks. When unguarded poise reaches zero, the character enters `ECombatState::Staggered`. Regeneration uses a delayed timer, not a permanent tick. `OnPoiseBroken` is available for UI, audio, or Blueprint reactions.
+Every blocked frontal hit spends its `FDamageInfo.PoiseDamage` and deals no health damage. When guard poise reaches zero, guard breaks and guard input is rejected until poise regenerates above zero. When unguarded poise reaches zero, the character enters `ECombatState::Staggered`. Regeneration uses a delayed timer, not a permanent tick. `OnPoiseBroken` is available for UI, audio, or Blueprint reactions.
 
 The guard-break montage length owns recovery when it successfully starts. Otherwise `GuardBreakFallbackDuration` owns recovery. Blueprint may still call `EndGuardBreak` for an authored early exit, but gameplay no longer depends on a notify or Blueprint event to leave the state.
 
