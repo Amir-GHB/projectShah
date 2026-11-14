@@ -267,7 +267,7 @@ void UDamageReactionComponent::PlayGuardBreakFeedback(AWeaponBase* Weapon, const
 			PlayerController->ClientPlayForceFeedback(DefenseForceFeedbackEffect, false, NAME_None, false);
 		}
 	}
-	ApplyDefenseTimeDilation(BlockHitStopDuration, DefenseHitStopTimeDilation);
+	ApplyDefenseTimeDilation(GuardBreakHitStopDuration, DefenseHitStopTimeDilation);
 }
 
 void UDamageReactionComponent::ApplyDefenseTimeDilation(float Duration, float TimeDilation)
@@ -934,6 +934,8 @@ void UDamageReactionComponent::ActivateRagdoll()
 void UDamageReactionComponent::ResetReactionState()
 {
 	EndFinisher(true);
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(DefenseTimeDilationTimer);
+	RestoreDefenseTimeDilation();
 	bDeathHandled = false;
 
 	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
