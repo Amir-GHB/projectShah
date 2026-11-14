@@ -69,6 +69,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|Attack")
 	void HandleAttackInput();
 
+	/** Selects a configured light/heavy attack profile for enemy AI before starting the combo. */
+	void HandleAICombatAttack(bool bHeavyAttack);
+
 	/** Completes a held ranged attack and releases its projectile. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Ranged")
 	void HandleAttackReleased();
@@ -240,6 +243,7 @@ protected:
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AWeaponBase> ActiveAttackWeapon = nullptr;
 
+	int32 RequestedAIStartingAttackIndex = INDEX_NONE;
 	uint64 CurrentAttackToken = 0;
 	uint64 ActiveAttackToken = 0;
 	bool bIsStoppingAttack = false;
