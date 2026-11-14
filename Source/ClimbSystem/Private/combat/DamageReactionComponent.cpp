@@ -191,7 +191,7 @@ void UDamageReactionComponent::HandleDamageTaken(
 	float ActualDamage, AActor* InstigatorActor,
 	const FDamageInfo& DamageInfo, const FHitResult& HitResult)
 {
-	if (bDeathHandled || ActualDamage <= 0.0f || DamageInfo.bIsDamageOverTime)
+	if (bDeathHandled || ActualDamage <= 0.0f || DamageInfo.bIsDamageOverTime || DamageInfo.bSuppressHitReaction)
 	{
 		return;
 	}
@@ -248,6 +248,8 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 
 	FDamageInfo ParryDamage;
 	ParryDamage.BaseDamage = DefenderConfig.ParryDamage;
+	ParryDamage.PoiseDamage = DefenderConfig.ParryPoiseDamage;
+	ParryDamage.bSuppressHitReaction = true;
 	ParryDamage.DamageCategory = EDamageCategory::Physical;
 	ParryDamage.DamageCauser = GetOwner();
 	ParryDamage.InstigatorWeapon = DefenderWeapon;
