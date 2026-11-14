@@ -106,6 +106,7 @@ public:
 	void EndParryAttempt(bool bSuccessful);
 	bool NotifyParrySucceeded();
 	float GetRiposteDamageMultiplier() const { return bRiposteAttackActive ? FMath::Max(1.0f, RiposteDamageMultiplier) : 1.0f; }
+	bool IsRiposteWindowActive() const { return bRiposteWindowActive; }
 	bool IsWithinGuardArc(const FVector& DirectionToAttacker) const;
 	bool IsWithinParryArc(const FVector& DirectionToAttacker) const;
 
