@@ -4,12 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "TimerManager.h"
 #include "CombatTypes.h"
 #include "DamageHandlerComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnDamageTakenSignature, float, ActualDamage, AActor*, InstigatorActor, const FDamageInfo&, DamageInfo, const FHitResult&, HitResult);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHealthChangedSignature, float, NewHealth, float, MaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDeathSignature, AActor*, KillerActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPoiseBrokenSignature, AActor*, InstigatorActor);
 
 UCLASS(ClassGroup=(Combat), meta=(BlueprintSpawnableComponent))
 class CLIMBSYSTEM_API UDamageHandlerComponent : public UActorComponent
@@ -34,6 +36,9 @@ protected:
 	};
 
 	TArray<FActiveDamageOverTimeEffect> ActiveDamageOverTimeEffects;
+	FTimerHandle PoiseRegenerationTimer;
+	bool bPoiseBroken = false;
+	void RegeneratePoise();
 
 	void AddDamageOverTimeEffects(const FDamageInfo& DamageInfo, AActor* InstigatorActor);
 	void ApplyDamageOverTimeTick(const FActiveDamageOverTimeEffect& ActiveEffect);
@@ -73,6 +78,21 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stats")
 	float CurrentPoise = 100.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Poise", meta = (ClampMin = "0.0"))
+	float PoiseRegenerationDelay = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Poise", meta = (ClampMin = "0.0"))
+	float PoiseRegenerationRate = 20.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Poise", meta = (ClampMin = "0.05"))
+	float PoiseRegenerationInterval = 0.1f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Poise", meta = (ClampMin = "0.05"))
+	float PoiseBreakStaggerDuration = 0.85f;
+
+	UFUNCTION(BlueprintCallable, Category = "Combat|Poise")
+	void ApplyPoiseDamage(float Amount, AActor* InstigatorActor = nullptr);
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stats")
 	bool bIsDead = false;
 
@@ -101,4 +121,7 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Combat|Events")
 	FOnDeathSignature OnDeath;
+
+	UPROPERTY(BlueprintAssignable, Category = "Combat|Events")
+	FOnPoiseBrokenSignature OnPoiseBroken;
 };
