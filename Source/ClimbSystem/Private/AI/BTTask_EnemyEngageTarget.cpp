@@ -38,7 +38,8 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	if (Controller && Enemy && (Enemy->bIsInDamageReaction ||
 		(Enemy->CombatComponent &&
 			(Enemy->CombatComponent->CurrentCombatState == ECombatState::Staggered ||
-			 Enemy->CombatComponent->GetAnimationState().DefenseState == ECombatDefenseState::GuardBroken))))
+			 Enemy->CombatComponent->GetAnimationState().DefenseState == ECombatDefenseState::GuardBroken ||
+			 Enemy->CombatComponent->IsParryAttemptActive()))))
 	{
 		Controller->StopMovement();
 		return;
