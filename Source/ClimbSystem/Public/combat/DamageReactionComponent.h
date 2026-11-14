@@ -14,6 +14,9 @@ class ACharacter;
 class ACameraActor;
 class APlayerController;
 class UMotionWarpingComponent;
+class UCameraShakeBase;
+class UForceFeedbackEffect;
+class AWeaponBase;
 
 /** A data-driven hit reaction with optional weapon, body-region, and direction filters. */
 USTRUCT(BlueprintType)
@@ -168,6 +171,8 @@ public:
 
 	/** Plays a projectile/demo-supplied hit reaction after damage has been applied. */
 	bool PlayHitReactionOverride(UAnimMontage* Montage);
+	void PlayDefenseFeedback(AWeaponBase* Weapon, const FVector& ImpactLocation, bool bParry, bool bPerfectParry = false);
+	void PlayGuardBreakFeedback(AWeaponBase* Weapon, const FVector& ImpactLocation);
 
 	/** Shared melee/projectile defense resolver. Projectiles pass bAllowParry=false. */
 	bool ResolveIncomingHit(AActor* Attacker, AWeaponBase* AttackingWeapon,
@@ -176,6 +181,30 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Death")
 	bool bRagdollOnDeath = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
+	float BlockHitStopDuration = 0.035f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
+	float ParryHitStopDuration = 0.06f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
+	float PerfectParrySlowMotionDuration = 0.18f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.01", ClampMax = "1.0"))
+	float PerfectParryTimeDilation = 0.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback")
+	TSubclassOf<UCameraShakeBase> DefenseCameraShakeClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback")
+	TObjectPtr<UForceFeedbackEffect> DefenseForceFeedbackEffect = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
+	float DefenseCameraShakeScale = 0.65f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
+	float DefenseForceFeedbackScale = 0.6f;
 
 	/** Clears the death latch and stops the active reaction, e.g. when resetting a test dummy. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Reactions")
@@ -228,6 +257,12 @@ private:
 	bool bAttackerFinisherEnded = false;
 	bool bVictimFinisherEnded = false;
 	FTimerHandle FinisherCameraDestroyTimer;
+	FTimerHandle DefenseTimeDilationTimer;
+	float PreviousGlobalTimeDilation = 1.0f;
+	bool bDefenseTimeDilationActive = false;
+
+	void ApplyDefenseTimeDilation(float Duration, float TimeDilation);
+	void RestoreDefenseTimeDilation();
 
 	bool bDeathHandled = false;
 
