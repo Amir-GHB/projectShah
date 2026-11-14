@@ -430,7 +430,7 @@ void AWeaponBase::ProcessHit(const FHitResult& HitResult)
 	// A successful parry or a front-facing light guard block consumes this hit completely.
 	if (UDamageReactionComponent* TargetReactions = TargetActor->FindComponentByClass<UDamageReactionComponent>())
 	{
-		if (TargetReactions->ResolveIncomingMeleeHit(OwningCharacter.Get(), this, DamageInfo, HitResult))
+		if (TargetReactions->ResolveIncomingHit(OwningCharacter.Get(), this, DamageInfo, HitResult, true))
 			return;
 	}
 
