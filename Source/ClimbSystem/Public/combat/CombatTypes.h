@@ -314,6 +314,10 @@ struct FDamageInfo
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat|Damage")
 	FVector DamageDirection = FVector::ZeroVector;
 
+	/** Suppresses the ordinary hit reaction when a dedicated reaction immediately follows. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
+	bool bSuppressHitReaction = false;
+
 	/** True for periodic effect ticks, which should not trigger ordinary hit reactions. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
 	bool bIsDamageOverTime = false;
@@ -534,6 +538,9 @@ struct FWeaponConfig : public FTableRowBase
 	TObjectPtr<UAnimMontage> AttackerParriedMontage = nullptr;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry", meta = (ClampMin = "0.0"))
 	float ParryDamage = 20.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry", meta = (ClampMin = "0.0"))
+	float ParryPoiseDamage = 100.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Sockets")
 	FName HandSocketName = FName("Hand_R_Socket");
