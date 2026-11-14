@@ -96,7 +96,16 @@ bool AEnemyCharacter::TryAcquireAttackSlot(AActor* Target)
 	{
 		return !Entry.IsValid();
 	});
-	if (Slots.Num() >= FMath::Clamp(MaxAttackersPerTarget, 1, 2))
+	int32 EffectiveCapacity = FMath::Clamp(MaxAttackersPerTarget, 1, 2);
+	for (const TWeakObjectPtr<AEnemyCharacter>& Existing : Slots)
+	{
+		if (AEnemyCharacter* ExistingEnemy = Existing.Get())
+		{
+			EffectiveCapacity = FMath::Min(EffectiveCapacity,
+				FMath::Clamp(ExistingEnemy->MaxAttackersPerTarget, 1, 2));
+		}
+	}
+	if (Slots.Num() >= EffectiveCapacity)
 	{
 		return false;
 	}
