@@ -248,6 +248,19 @@ void UDamageReactionComponent::PlayGuardBreakFeedback(AWeaponBase* Weapon, const
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, Config.GuardBreakSound, ImpactLocation);
 	}
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PlayerController = It->Get();
+		if (!IsValid(PlayerController)) continue;
+		if (DefenseCameraShakeClass)
+		{
+			PlayerController->ClientStartCameraShake(DefenseCameraShakeClass, DefenseCameraShakeScale);
+		}
+		if (IsValid(DefenseForceFeedbackEffect))
+		{
+			PlayerController->ClientPlayForceFeedback(DefenseForceFeedbackEffect, false, NAME_None, false);
+		}
+	}
 	ApplyDefenseTimeDilation(BlockHitStopDuration, DefenseHitStopTimeDilation);
 }
 
@@ -329,8 +342,8 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	}
 
 	const bool bPerfectParry = DefenderCombat->NotifyParrySucceeded();
-	DefenderCombat->FindComponentByClass<UDamageReactionComponent>()->PlayDefenseFeedback(
-		DefenderWeapon, HitResult.ImpactPoint.IsNearlyZero() ? HitResult.Location : HitResult.ImpactPoint,
+	PlayDefenseFeedback(DefenderWeapon,
+		HitResult.ImpactPoint.IsNearlyZero() ? HitResult.Location : HitResult.ImpactPoint,
 		true, bPerfectParry);
 
 	const FWeaponConfig& DefenderConfig = DefenderWeapon->GetConfig();
