@@ -304,8 +304,7 @@ bool UDamageReactionComponent::ResolveIncomingMeleeHit(AActor* Attacker,
 	{
 		ToAttacker = (Attacker->GetActorLocation() - GetOwner()->GetActorLocation()).GetSafeNormal();
 	}
-	const bool bHitFromFront = FVector::DotProduct(
-		GetOwner()->GetActorForwardVector(), ToAttacker) >= 0.0f;
+	const bool bHitFromFront = DefenderCombat->IsWithinGuardArc(ToAttacker);
 
 	// Only bypassing hits or attacks outside the guard arc break the stance.
 	// A normal frontal light hit is fully blocked and leaves the guard intact.
