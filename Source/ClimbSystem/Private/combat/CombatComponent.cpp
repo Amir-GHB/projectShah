@@ -357,6 +357,7 @@ void UCombatComponent::HandleAttackInput()
 		bHasBufferedAttackInput = true;
 		const bool bAttackStarted = StartNewCombo();
 		bRiposteAttackActive = bUseRiposte && bAttackStarted;
+		if (bUseRiposte && !bAttackStarted) ResumeHeldGuard();
 		return;
 	}
 
@@ -817,7 +818,6 @@ void UCombatComponent::EnterDeadState()
 
 	bGuardInputHeld = false;
 	QueuedWeaponSwitch.Reset();
-	bGuardInputHeld = false;
 	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon))
 	{
 		Bow->CancelDraw();
