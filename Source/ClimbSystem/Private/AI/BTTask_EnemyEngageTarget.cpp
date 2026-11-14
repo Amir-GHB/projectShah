@@ -54,6 +54,7 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 		}
 		if (Enemy && Enemy->CombatComponent)
 		{
+			Enemy->ReleaseAICombatSlot();
 			Enemy->CombatComponent->CancelAttackInput();
 			Enemy->CombatComponent->StopActiveAttack(true, true, 0.1f);
 		}
