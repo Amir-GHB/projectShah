@@ -969,7 +969,7 @@ void UCombatComponent::SetGuardMode(bool bEnableGuard)
 		CurrentCombatState == ECombatState::Finishing || CurrentCombatState == ECombatState::Staggered ||
 		bWeaponSwapActive || CurrentCombatState == ECombatState::Attacking ||
 		CurrentCombatState == ECombatState::ComboWindow || CurrentCombatState == ECombatState::SwappingWeapon ||
-		!IsValid(CurrentWeapon)))
+		CurrentCombatState == ECombatState::DrawingBow || !IsValid(CurrentWeapon)))
 	{
 		return;
 	}
