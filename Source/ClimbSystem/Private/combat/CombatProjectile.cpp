@@ -173,10 +173,8 @@ void ACombatProjectile::ApplyHitDamage(AActor* HitTargetActor, const FHitResult&
 	if (UDamageHandlerComponent* Handler = HitTargetActor->FindComponentByClass<UDamageHandlerComponent>())
 	{
 		Handler->ApplyDamage(DamageInstigator.Get(), HitTargetActor, DamageInfo, Hit);
-		if (UDamageReactionComponent* Reactions = HitTargetActor->FindComponentByClass<UDamageReactionComponent>())
-		{
-			Reactions->PlayHitReactionOverride(DemoHitMontage);
-		}
+		// DamageReactionComponent owns the selected reaction. Do not overwrite a guard-break
+		// montage with the projectile's legacy demo override.
 		return;
 	}
 
