@@ -95,8 +95,14 @@ float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActo
 {
 	if (bIsDead) return 0.0f;
 
-	// Any real damage reaching health resolution ends an outstanding parry attempt.
-	// The parry resolver clears successful attempts before applying its reward damage.
+	// Shared safety net for Blueprint and future damage sources, in addition to
+	// weapon-level filtering that suppresses friendly hit presentation.
+	if (Cast<AEnemyCharacter>(InstigatorActor) && Cast<AEnemyCharacter>(TargetActor))
+	{
+		return 0.0f;
+	}
+
+	// Damage that survives source filtering ends a pending parry attempt.
 	if (AActor* OwnerActor = GetOwner())
 	{
 		if (UCombatComponent* Combat = OwnerActor->FindComponentByClass<UCombatComponent>())
@@ -106,13 +112,6 @@ float UDamageHandlerComponent::ApplyDamage_Implementation(AActor* InstigatorActo
 				Combat->EndParryAttempt(false);
 			}
 		}
-	}
-
-	// Shared safety net for Blueprint and future damage sources, in addition to
-	// weapon-level filtering that suppresses friendly hit presentation.
-	if (Cast<AEnemyCharacter>(InstigatorActor) && Cast<AEnemyCharacter>(TargetActor))
-	{
-		return 0.0f;
 	}
 
 	FDamageInfo ResolvedInfo = DamageInfo;
