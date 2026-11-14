@@ -532,10 +532,28 @@ struct FWeaponConfig : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard")
 	TObjectPtr<UAnimMontage> BreakGuardMontage = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard|Feedback")
+	TObjectPtr<UNiagaraSystem> GuardBlockNiagara = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard|Feedback")
+	TObjectPtr<USoundBase> GuardBlockSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard|Feedback")
+	TObjectPtr<UNiagaraSystem> GuardBreakNiagara = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard|Feedback")
+	TObjectPtr<USoundBase> GuardBreakSound = nullptr;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry")
 	TObjectPtr<UAnimMontage> DefenderParryMontage = nullptr;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry")
 	TObjectPtr<UAnimMontage> AttackerParriedMontage = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry|Feedback")
+	TObjectPtr<UNiagaraSystem> ParryNiagara = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry|Feedback")
+	TObjectPtr<USoundBase> ParrySound = nullptr;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Parry", meta = (ClampMin = "0.0"))
 	float ParryDamage = 20.0f;
 
