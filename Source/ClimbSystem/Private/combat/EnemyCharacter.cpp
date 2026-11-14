@@ -133,8 +133,24 @@ void AEnemyCharacter::ReleaseAICombatSlot()
 
 void AEnemyCharacter::QueueAICombatAction(AActor* Target, bool bHeavyAttack)
 {
-	if (!IsValid(Target) || !CombatComponent) return;
+	if (!IsValid(Target) || !CombatComponent || !IsValid(CombatComponent->CurrentWeapon))
+	{
+		ReleaseAICombatSlot();
+		return;
+	}
 	CancelPendingAICombatAction();
+
+	if (bHeavyAttack)
+	{
+		const FWeaponConfig& WeaponConfig = CombatComponent->CurrentWeapon->GetConfig();
+		bool bHasHeavyAttack = WeaponConfig.bIsHeavyAttack || !WeaponConfig.bIsLightAttack;
+		for (const FAttackDamageConfig& AttackConfig : WeaponConfig.AttackDamageConfigs)
+		{
+			bHasHeavyAttack = bHasHeavyAttack
+				|| (AttackConfig.bOverrideAttackType && AttackConfig.bIsHeavyAttack);
+		}
+		bHeavyAttack = bHasHeavyAttack;
+	}
 
 	if (bHeavyAttack)
 	{
