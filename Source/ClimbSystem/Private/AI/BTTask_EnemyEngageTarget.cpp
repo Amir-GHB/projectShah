@@ -252,11 +252,17 @@ EBTNodeResult::Type UBTTask_EnemyEngageTarget::AbortTask(UBehaviorTreeComponent&
 		Controller->ClearFocus(EAIFocusPriority::Gameplay);
 		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Controller->GetPawn()))
 		{
-			if (Enemy->CombatComponent) Enemy->CombatComponent->CancelAttackInput();
+			if (Enemy->CombatComponent)
+			{
+				Enemy->CombatComponent->CancelAttackInput();
+				Enemy->CombatComponent->SetGuardMode(false);
+			}
 			Enemy->CancelPendingAICombatAction();
 			Enemy->ReleaseAICombatSlot();
 			if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
 				Mage->CancelPendingMagicAttack();
+			if (ABowEnemyCharacter* Archer = Cast<ABowEnemyCharacter>(Enemy))
+				Archer->CancelPendingBowAttack();
 		}
 	}
 	return Super::AbortTask(OwnerComp, NodeMemory);
