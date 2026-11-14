@@ -206,6 +206,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.0"))
 	float DefenseForceFeedbackScale = 0.6f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Feedback", meta = (ClampMin = "0.01", ClampMax = "1.0"))
+	float DefenseHitStopTimeDilation = 0.05f;
+
 	/** Clears the death latch and stops the active reaction, e.g. when resetting a test dummy. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Reactions")
 	void ResetReactionState();
