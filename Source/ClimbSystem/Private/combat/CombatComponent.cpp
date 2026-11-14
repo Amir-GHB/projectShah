@@ -891,7 +891,7 @@ bool UCombatComponent::IsLastLivingEncounterEnemy(AActor* Enemy) const
 void UCombatComponent::EnterFinisherState()
 {
 	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing) return;
-	StopActiveAttack(true, true, 0.08f);
+	StopActiveAttack(true, true, StaggerAttackBlendOutDuration);
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(GuardBreakRecoveryTimer);
@@ -1046,7 +1046,7 @@ void UCombatComponent::EndParryAttempt(bool bSuccessful)
 			{
 				if (Anim->Montage_IsPlaying(ParryMontage))
 				{
-					Anim->Montage_Stop(0.08f, ParryMontage);
+					Anim->Montage_Stop(ParryCancelBlendOutDuration, ParryMontage);
 				}
 			}
 		}
