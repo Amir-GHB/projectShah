@@ -16,6 +16,11 @@
 #include "combat/CombatProjectile.h"
 #include "Kismet/GameplayStatics.h"
 
+namespace
+{
+	TMap<TWeakObjectPtr<AActor>, TArray<TWeakObjectPtr<AEnemyCharacter>>> ActiveAttackersByTarget;
+}
+
 AEnemyCharacter::AEnemyCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -40,6 +45,14 @@ AEnemyCharacter::AEnemyCharacter()
 void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (CombatComponent)
+	{
+		CombatComponent->OnAttackEnded.AddDynamic(this, &AEnemyCharacter::HandleAICombatAttackEnded);
+	}
+	if (DamageHandlerComponent)
+	{
+		DamageHandlerComponent->OnDamageTaken.AddDynamic(this, &AEnemyCharacter::HandleAICombatDamageTaken);
+	}
 	if (ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(this, 0))
 	{
 		if (UCombatComponent* PlayerCombat = PlayerCharacter->FindComponentByClass<UCombatComponent>())
@@ -51,6 +64,16 @@ void AEnemyCharacter::BeginPlay()
 
 void AEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	CancelPendingAICombatAction();
+	ReleaseAICombatSlot();
+	if (CombatComponent)
+	{
+		CombatComponent->OnAttackEnded.RemoveDynamic(this, &AEnemyCharacter::HandleAICombatAttackEnded);
+	}
+	if (DamageHandlerComponent)
+	{
+		DamageHandlerComponent->OnDamageTaken.RemoveDynamic(this, &AEnemyCharacter::HandleAICombatDamageTaken);
+	}
 	if (ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(this, 0))
 	{
 		if (UCombatComponent* PlayerCombat = PlayerCharacter->FindComponentByClass<UCombatComponent>())
@@ -59,6 +82,120 @@ void AEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		}
 	}
 	Super::EndPlay(EndPlayReason);
+}
+
+bool AEnemyCharacter::TryAcquireAttackSlot(AActor* Target)
+{
+	if (!IsValid(Target)) return false;
+	if (AttackSlotTarget.Get() == Target) return true;
+	ReleaseAICombatSlot();
+
+	const TWeakObjectPtr<AActor> TargetKey(Target);
+	TArray<TWeakObjectPtr<AEnemyCharacter>>& Slots = ActiveAttackersByTarget.FindOrAdd(TargetKey);
+	Slots.RemoveAll([](const TWeakObjectPtr<AEnemyCharacter>& Entry)
+	{
+		return !Entry.IsValid();
+	});
+	if (Slots.Num() >= FMath::Max(1, MaxAttackersPerTarget))
+	{
+		return false;
+	}
+
+	Slots.AddUnique(TWeakObjectPtr<AEnemyCharacter>(this));
+	AttackSlotTarget = Target;
+	return true;
+}
+
+void AEnemyCharacter::ReleaseAICombatSlot()
+{
+	AActor* Target = AttackSlotTarget.Get();
+	AttackSlotTarget.Reset();
+	if (!IsValid(Target)) return;
+
+	const TWeakObjectPtr<AActor> TargetKey(Target);
+	if (TArray<TWeakObjectPtr<AEnemyCharacter>>* Slots = ActiveAttackersByTarget.Find(TargetKey))
+	{
+		Slots->RemoveAll([this](const TWeakObjectPtr<AEnemyCharacter>& Entry)
+		{
+			return !Entry.IsValid() || Entry.Get() == this;
+		});
+		if (Slots->IsEmpty())
+		{
+			ActiveAttackersByTarget.Remove(TargetKey);
+		}
+	}
+}
+
+void AEnemyCharacter::QueueAICombatAction(AActor* Target, bool bHeavyAttack)
+{
+	if (!IsValid(Target) || !CombatComponent) return;
+	CancelPendingAICombatAction();
+
+	if (bHeavyAttack)
+	{
+		if (!IsValid(HeavyAttackTelegraphMontage) || !DamageReactionComponent
+			|| !DamageReactionComponent->PlayHitReactionOverride(HeavyAttackTelegraphMontage))
+		{
+			// Never issue an untelegraphed guard-bypassing heavy attack.
+			bHeavyAttack = false;
+		}
+		else
+		{
+			PendingAICombatTarget = Target;
+			bPendingAIHeavyAttack = true;
+			const float TelegraphDuration = HeavyAttackTelegraphDuration > 0.0f
+				? HeavyAttackTelegraphDuration : HeavyAttackTelegraphMontage->GetPlayLength();
+			GetWorldTimerManager().SetTimer(HeavyAttackTelegraphTimer, this,
+				&AEnemyCharacter::ReleaseQueuedAICombatAction,
+				FMath::Max(0.05f, TelegraphDuration), false);
+			return;
+		}
+	}
+
+	CombatComponent->HandleAICombatAttack(bHeavyAttack);
+	if (CombatComponent->CurrentCombatState == ECombatState::Idle)
+	{
+		ReleaseAICombatSlot();
+	}
+}
+
+void AEnemyCharacter::ReleaseQueuedAICombatAction()
+{
+	AActor* Target = PendingAICombatTarget.Get();
+	const bool bHeavyAttack = bPendingAIHeavyAttack;
+	PendingAICombatTarget.Reset();
+	bPendingAIHeavyAttack = false;
+
+	if (!IsValid(Target) || !CombatComponent || (DamageHandlerComponent && DamageHandlerComponent->bIsDead))
+	{
+		ReleaseAICombatSlot();
+		return;
+	}
+
+	CombatComponent->HandleAICombatAttack(bHeavyAttack);
+	if (CombatComponent->CurrentCombatState == ECombatState::Idle)
+	{
+		ReleaseAICombatSlot();
+	}
+}
+
+void AEnemyCharacter::CancelPendingAICombatAction()
+{
+	GetWorldTimerManager().ClearTimer(HeavyAttackTelegraphTimer);
+	PendingAICombatTarget.Reset();
+	bPendingAIHeavyAttack = false;
+}
+
+void AEnemyCharacter::HandleAICombatAttackEnded()
+{
+	ReleaseAICombatSlot();
+}
+
+void AEnemyCharacter::HandleAICombatDamageTaken(float ActualDamage, AActor* InstigatorActor,
+	const FDamageInfo& DamageInfo, const FHitResult& HitResult)
+{
+	CancelPendingAICombatAction();
+	ReleaseAICombatSlot();
 }
 
 void AEnemyCharacter::PerformAICombatAction(AActor* Target)
@@ -82,6 +219,7 @@ void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
 void AMagicEnemyCharacter::CancelPendingMagicAttack()
 {
 	PendingMagicTarget.Reset();
+	ReleaseAICombatSlot();
 	if (IsValid(MagicAttackMontage) && GetMesh())
 	{
 		if (UAnimInstance* Anim = GetMesh()->GetAnimInstance())
@@ -98,7 +236,11 @@ void AMagicEnemyCharacter::ReleaseMagicProjectile()
 {
 	AActor* Target = PendingMagicTarget.Get();
 	PendingMagicTarget.Reset();
-	if (!IsValid(Target) || !IsValid(MagicProjectileClass) || !GetWorld()) return;
+	if (!IsValid(Target) || !IsValid(MagicProjectileClass) || !GetWorld())
+	{
+		ReleaseAICombatSlot();
+		return;
+	}
 	const FVector SpawnLocation = GetMesh() && GetMesh()->DoesSocketExist(ProjectileSpawnSocket)
 		? GetMesh()->GetSocketLocation(ProjectileSpawnSocket)
 		: GetActorLocation() + GetActorTransform().TransformVectorNoScale(ProjectileSpawnOffset);
@@ -117,6 +259,7 @@ void AMagicEnemyCharacter::ReleaseMagicProjectile()
 	}
 	NextMagicAttackTime = GetWorld()->GetTimeSeconds() + FMath::Max(0.1f, MagicAttackCooldown);
 	bNeedsRelocationAfterAttack = true;
+	ReleaseAICombatSlot();
 }
 
 void ABowEnemyCharacter::PerformAICombatAction(AActor* Target)
@@ -149,6 +292,7 @@ void ABowEnemyCharacter::PerformAICombatAction(AActor* Target)
 void ABowEnemyCharacter::CancelPendingBowAttack()
 {
 	GetWorldTimerManager().ClearTimer(BowReleaseTimer);
+	ReleaseAICombatSlot();
 	PendingBowTarget.Reset();
 	if (CombatComponent) CombatComponent->CancelAttackInput();
 }
@@ -163,6 +307,7 @@ void ABowEnemyCharacter::ReleaseBowShot()
 		return;
 	}
 	CombatComponent->HandleAttackReleased();
+	ReleaseAICombatSlot();
 }
 
 void ABowEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
