@@ -276,7 +276,7 @@ Run these in PIE with a player character and at least two enemy types. Expected 
 16. **Enemy AI stagger/parry:** Parry or stagger an enemy. Its BT stops issuing movement/attacks during the reaction and resumes after recovery.
 17. **Attack-slot cap:** Put three enemies in range of one target. At most two may reserve attack slots at once; the third waits. Kill, interrupt, or abort one attacker and verify the waiting enemy can acquire the freed slot. Remove the mage projectile-release notify and verify its fallback timer still releases exactly one projectile and frees its slot.
 18. **Guard archetype:** Use an `AGuardEnemyCharacter` child. It enters guard at range, attempts parries during the target's parryable attack window, and can be guard-broken by heavy/rear hits or poise depletion.
-19. **Feedback:** Assign block/parry/guard-break VFX and SFX, camera shake, and force-feedback assets. Verify each event plays the correct response. Confirm a blocked hit does not also play ordinary weapon hit VFX.
+19. **Feedback:** Assign block/parry/guard-break VFX and SFX, camera shake, and force-feedback assets. Verify each event plays the correct response, perfect parry applies the configured short slow motion, and rumble plays on a supported controller. Confirm a blocked hit does not also play ordinary weapon hit VFX.
 20. **No asset changes:** Confirm the upgrade did not modify or delete any files under `Content/`.
 
 ## 16. Defaults and verification status
