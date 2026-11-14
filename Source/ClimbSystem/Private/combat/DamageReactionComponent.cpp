@@ -319,16 +319,16 @@ bool UDamageReactionComponent::ResolveIncomingMeleeHit(AActor* Attacker,
 	const bool bHitFromFront = FVector::DotProduct(
 		GetOwner()->GetActorForwardVector(), ToAttacker) >= 0.0f;
 
-	// Heavy and critical hits bypass the block entirely. They still break the guard and
-	// continue through the ordinary damage path.
-	DefenderCombat->TriggerGuardBreak();
-	if (DamageInfo.bIsHeavyAttack || DamageInfo.bIsCriticalHit)
+	// Only bypassing hits or attacks outside the guard arc break the stance.
+	// A normal frontal light hit is fully blocked and leaves the guard intact.
+	const bool bBypassesGuard = DamageInfo.bIsHeavyAttack || DamageInfo.bIsCriticalHit;
+	if (bBypassesGuard || !bHitFromFront)
 	{
+		DefenderCombat->TriggerGuardBreak();
 		return false;
 	}
 
-	// Light front hits are blocked; rear hits damage the character but still break guard.
-	return bHitFromFront;
+	return true;
 }
 
 void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
