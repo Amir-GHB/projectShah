@@ -96,7 +96,7 @@ bool AEnemyCharacter::TryAcquireAttackSlot(AActor* Target)
 	{
 		return !Entry.IsValid();
 	});
-	if (Slots.Num() >= FMath::Max(1, MaxAttackersPerTarget))
+	if (Slots.Num() >= FMath::Clamp(MaxAttackersPerTarget, 1, 2))
 	{
 		return false;
 	}
@@ -108,20 +108,16 @@ bool AEnemyCharacter::TryAcquireAttackSlot(AActor* Target)
 
 void AEnemyCharacter::ReleaseAICombatSlot()
 {
-	AActor* Target = AttackSlotTarget.Get();
 	AttackSlotTarget.Reset();
-	if (!IsValid(Target)) return;
-
-	const TWeakObjectPtr<AActor> TargetKey(Target);
-	if (TArray<TWeakObjectPtr<AEnemyCharacter>>* Slots = ActiveAttackersByTarget.Find(TargetKey))
+	for (auto It = ActiveAttackersByTarget.CreateIterator(); It; ++It)
 	{
-		Slots->RemoveAll([this](const TWeakObjectPtr<AEnemyCharacter>& Entry)
+		It.Value().RemoveAll([this](const TWeakObjectPtr<AEnemyCharacter>& Entry)
 		{
 			return !Entry.IsValid() || Entry.Get() == this;
 		});
-		if (Slots->IsEmpty())
+		if (It.Value().IsEmpty())
 		{
-			ActiveAttackersByTarget.Remove(TargetKey);
+			It.RemoveCurrent();
 		}
 	}
 }
