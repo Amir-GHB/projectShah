@@ -120,6 +120,7 @@ void UCombatComponent::EquipWeapon(EWeaponType NewWeaponType)
 
 void UCombatComponent::BeginWeaponSwap(EWeaponType NewWeaponType)
 {
+	bGuardInputHeld = false;
 	ClearParryTimers();
 	if (UWorld* World = GetWorld())
 	{
@@ -324,7 +325,8 @@ void UCombatComponent::HandleAttackInput()
 {
 	if (!OwningCharacter.IsValid() || !IsValid(CurrentWeapon) || bWeaponSwapActive
 		|| CurrentCombatState == ECombatState::Dead
-		|| AnimationState.DefenseState != ECombatDefenseState::None) return;
+		|| AnimationState.DefenseState != ECombatDefenseState::None
+		|| (bGuardInputHeld && !bRiposteWindowActive)) return;
 
 	// A successful perfect parry grants one short melee riposte opportunity.
 	bool bUseRiposte = false;
@@ -730,6 +732,7 @@ void UCombatComponent::OnMontageInstanceEnded(UAnimMontage* Montage, bool bInter
 		{
 			StopActiveAttack(true, false, 0.0f);
 			OnAttackEnded.Broadcast();
+			ResumeHeldGuard();
 			if (QueuedWeaponSwitch.IsSet())
 			{
 				const EWeaponType Target = QueuedWeaponSwitch.GetValue();
@@ -742,6 +745,7 @@ void UCombatComponent::OnMontageInstanceEnded(UAnimMontage* Montage, bool bInter
 
 	FinishAttack(bInterrupted, false, 0.0f);
 	OnAttackEnded.Broadcast();
+	if (!bInterrupted) ResumeHeldGuard();
 	if (QueuedWeaponSwitch.IsSet())
 	{
 		const EWeaponType Target = QueuedWeaponSwitch.GetValue();
@@ -811,7 +815,9 @@ void UCombatComponent::EnterDeadState()
 		return;
 	}
 
+	bGuardInputHeld = false;
 	QueuedWeaponSwitch.Reset();
+	bGuardInputHeld = false;
 	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon))
 	{
 		Bow->CancelDraw();
@@ -901,6 +907,7 @@ bool UCombatComponent::IsLastLivingEncounterEnemy(AActor* Enemy) const
 void UCombatComponent::EnterFinisherState()
 {
 	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing) return;
+	bGuardInputHeld = false;
 	StopActiveAttack(true, true, 0.08f);
 	if (UWorld* World = GetWorld())
 	{
@@ -956,6 +963,20 @@ void UCombatComponent::SetNonCombatAnimation(bool bEnableNonCombatAnimation)
 
 void UCombatComponent::SetGuardMode(bool bEnableGuard)
 {
+	if (!bEnableGuard)
+	{
+		bGuardInputHeld = false;
+	}
+	else if (CurrentCombatState != ECombatState::Dead &&
+		CurrentCombatState != ECombatState::Finishing &&
+		CurrentCombatState != ECombatState::Attacking &&
+		CurrentCombatState != ECombatState::ComboWindow &&
+		CurrentCombatState != ECombatState::DrawingBow &&
+		CurrentCombatState != ECombatState::SwappingWeapon && !bWeaponSwapActive)
+	{
+		bGuardInputHeld = true;
+	}
+
 	if (bEnableGuard && OwningCharacter.IsValid())
 	{
 		if (const UDamageHandlerComponent* DamageHandler =
@@ -1108,13 +1129,37 @@ bool UCombatComponent::NotifyParrySucceeded()
 		GetWorld()->GetTimerManager().SetTimer(RiposteWindowTimer, [this]()
 		{
 			bRiposteWindowActive = false;
+			ResumeHeldGuard();
 		}, RiposteWindowDuration, false);
 	}
 	else
 	{
 		bRiposteWindowActive = false;
+		ResumeHeldGuard();
 	}
 	return bPerfect;
+}
+
+void UCombatComponent::ResumeHeldGuard()
+{
+	if (!bGuardInputHeld || bRiposteWindowActive || bRiposteAttackActive || bWeaponSwapActive
+		|| !IsValid(CurrentWeapon) || !OwningCharacter.IsValid()
+		|| CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing
+		|| CurrentCombatState == ECombatState::Staggered || CurrentCombatState == ECombatState::Attacking
+		|| CurrentCombatState == ECombatState::ComboWindow || CurrentCombatState == ECombatState::DrawingBow
+		|| CurrentCombatState == ECombatState::SwappingWeapon
+		|| AnimationState.DefenseState != ECombatDefenseState::None)
+	{
+		return;
+	}
+
+	if (const UDamageHandlerComponent* DamageHandler =
+		OwningCharacter->FindComponentByClass<UDamageHandlerComponent>())
+	{
+		if (DamageHandler->CurrentPoise <= 0.0f) return;
+	}
+
+	SetGuardMode(true);
 }
 
 bool UCombatComponent::IsWithinGuardArc(const FVector& DirectionToAttacker) const
@@ -1244,6 +1289,7 @@ void UCombatComponent::EndGuardBreak()
 	}
 	AnimationState.DefenseState = ECombatDefenseState::None;
 	RefreshAnimationState();
+	ResumeHeldGuard();
 	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
 	{
 		if (!Enemy->bIsInDamageReaction)
@@ -1300,6 +1346,7 @@ void UCombatComponent::HandleStaggerRecovery()
 	if (CurrentCombatState == ECombatState::Staggered)
 	{
 		SetCombatState(ECombatState::Idle);
+		ResumeHeldGuard();
 		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
 		{
 			if (!Enemy->bIsInDamageReaction)
