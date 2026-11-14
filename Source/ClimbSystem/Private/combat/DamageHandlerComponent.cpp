@@ -50,8 +50,6 @@ void UDamageHandlerComponent::ApplyPoiseDamage(float Amount, AActor* InstigatorA
 	if (CurrentPoise <= 0.0f && !bPoiseBroken)
 	{
 		bPoiseBroken = true;
-		OnPoiseBroken.Broadcast(InstigatorActor);
-
 		if (AActor* OwnerActor = GetOwner())
 		{
 			if (UCombatComponent* Combat = OwnerActor->FindComponentByClass<UCombatComponent>())
@@ -66,6 +64,7 @@ void UDamageHandlerComponent::ApplyPoiseDamage(float Amount, AActor* InstigatorA
 				}
 			}
 		}
+		OnPoiseBroken.Broadcast(InstigatorActor);
 	}
 }
 
