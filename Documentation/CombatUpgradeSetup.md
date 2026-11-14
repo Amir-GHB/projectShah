@@ -151,7 +151,7 @@ Configure these fields in each weapon Blueprint's `WeaponConfig`:
 
 ## 8. Guard and parry
 
-Guard and parry animations are weapon-owned. Configure `BeginGuardMontage`, `BreakGuardMontage`, `DefenderParryMontage`, and `AttackerParriedMontage` in each weapon's `WeaponConfig`. Do not assign shared guard/parry montage defaults on `DamageReactionComponent`; those legacy defaults have been removed.
+Guard and parry animations are weapon-owned. Configure `BeginGuardMontage`, `BreakGuardMontage`, `DefenderParryMontage`, and `AttackerParriedMontage` in each weapon's `WeaponConfig`. Tune `ParryDamage` and `ParryPoiseDamage` there as well. Do not assign shared guard/parry montage defaults on `DamageReactionComponent`; those legacy defaults have been removed.
 
 On the character Blueprint, assign two Enhanced Input actions to `GuardAction` and `ParryAction`:
 
@@ -164,7 +164,7 @@ On the character Blueprint, assign two Enhanced Input actions to `GuardAction` a
 
 `ParryWindowDuration = 0` means the defender parry montage length. A nonzero value overrides it. A whiff or cancelled attempt applies `ParryCooldown`; a successful parry does not. Releasing guard, taking a valid hit, guard break, death, finisher, and weapon swap all clear the active attempt.
 
-## 9. Guard, poise, and defense tuning
+## 10. Guard, poise, and defense tuning
 
 `UCombatComponent` owns the defense state and the following defaults:
 
@@ -175,6 +175,8 @@ On the character Blueprint, assign two Enhanced Input actions to `GuardAction` a
 | `bHeavyHitsBypassGuard` | true | Heavy hits break guard and continue to health |
 | `bCriticalHitsBypassGuard` | false | Critical hits are blockable by default |
 | `GuardBreakFallbackDuration` | 1.0 s | C++ recovery if the break montage is missing or cannot play |
+| `ParryCancelBlendOutDuration` | 0.08 s | Blend-out when a parry attempt is cancelled |
+| `StaggerAttackBlendOutDuration` | 0.08 s | Blend-out when poise break interrupts the character's active attack |
 | `ParryWindowDuration` | 0 | Zero uses the defender parry montage length |
 | `ParryCooldown` | 0.6 s | Cooldown after a whiff/cancel only |
 | `PerfectParryWindowDuration` | 0.18 s | Time from parry start in which a successful parry is perfect |
@@ -194,7 +196,7 @@ Every blocked frontal hit spends its `FDamageInfo.PoiseDamage` and deals no heal
 
 The guard-break montage length owns recovery when it successfully starts. Otherwise `GuardBreakFallbackDuration` owns recovery. Blueprint may still call `EndGuardBreak` for an authored early exit, but gameplay no longer depends on a notify or Blueprint event to leave the state.
 
-## 10. Ranged defense and feedback
+## 11. Ranged defense and feedback
 
 Melee and projectiles use `UDamageReactionComponent::ResolveIncomingHit`. Projectiles pass `bAllowParry=false`: they can be blocked by the frontal guard arc and spend poise, but cannot grant or preserve a melee parry. Rear ranged hits break guard and damage health.
 
@@ -212,13 +214,14 @@ On `DamageReactionComponent`, configure optional `DefenseCameraShakeClass` and `
 | `ParryHitStopDuration` | 0.06 s |
 | `GuardBreakHitStopDuration` | 0.05 s |
 | `DefenseHitStopTimeDilation` | 0.05 |
+| `ParryAttackStopBlendOutDuration` | 0.04 s |
 | `PerfectParrySlowMotionDuration` | 0.18 s |
 | `PerfectParryTimeDilation` | 0.25 |
 | `DefenseCameraShakeScale` | 0.65 |
 
 Force-feedback intensity is authored in the `UForceFeedbackEffect` asset. Camera shake and rumble are optional until assets are assigned. No Content assets are created or modified by these code changes.
 
-## 11. Enemy combat setup
+## 12. Enemy combat setup
 
 For ordinary melee enemy Blueprints:
 
@@ -232,7 +235,7 @@ Create a Blueprint child of `AGuardEnemyCharacter` for the defensive archetype. 
 
 Enemy behavior trees pause during guard break and stagger. They resume after the C++ recovery timer or after the active reaction montage ends. Dodge/evade behavior is not part of this upgrade.
 
-## 12. Manual guard/parry verification checklist
+## 13. Manual guard/parry verification checklist
 
 Run these in PIE with a player character and at least two enemy types. Expected results are included so failures are easy to isolate.
 
@@ -257,7 +260,7 @@ Run these in PIE with a player character and at least two enemy types. Expected 
 19. **Feedback:** Assign block/parry/guard-break VFX and SFX, camera shake, and force-feedback assets. Verify each event plays the correct response. Confirm a blocked hit does not also play ordinary weapon hit VFX.
 20. **No asset changes:** Confirm the upgrade did not modify or delete any files under `Content/`.
 
-## 13. Defaults and verification status
+## 14. Defaults and verification status
 
 New defaults are listed in sections 9-11. The only deliberate behavior-default change from the previous implementation is `bCriticalHitsBypassGuard=false`: frontal critical hits are blockable unless explicitly enabled. `bHeavyHitsBypassGuard=true` and a 90-degree guard half-angle preserve the previous heavy-bypass and front-half-plane behavior. All other new defaults establish previously missing timers, stamina, feedback, AI selection, and recovery behavior.
 
@@ -268,6 +271,6 @@ The code has been reviewed against the Unreal Engine 5.8 API for global time dil
 `DamageReactionComponent.bRagdollOnDeath` enables shared ragdoll behavior for player and enemy characters. The skeletal mesh hands off to physics at the death montage's final blend-out rather than waiting for its end delegate, avoiding the brief return to the AnimBP's standing pose. Ensure the skeleton has a valid Physics Asset and the project has a Ragdoll collision profile. The transition still depends on a valid death montage and compatible collision/physics setup.
 
 
-## 14. Investor-demo acceptance pass
+## 15. Investor-demo acceptance pass
 
 Before recording the demo, run the full manual checklist above with the actual player and enemy AnimBPs. In particular, confirm that every weapon has compatible guard/parry montages and that every heavy AI attack has a readable telegraph. Tune montage blend-outs and feedback assets per weapon rather than relying on shared placeholder values. The feature deliberately does not add dodge/evade.
