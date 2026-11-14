@@ -12,6 +12,9 @@
 #include "combat/AnimNotifyState_ParryWindow.h"
 #include "Animation/AnimNotifies/AnimNotifyState.h"
 #include "combat/Weapons/Weapon_Bow.h"
+#include "combat/EnemyCharacter.h"
+#include "AI/EnemyAIController.h"
+#include "BrainComponent.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -1123,6 +1126,16 @@ void UCombatComponent::TriggerGuardBreak(const FVector& ImpactLocation)
 	AnimationState.DefenseState = ECombatDefenseState::GuardBroken;
 	bParryWindowOpen = false;
 	RefreshAnimationState();
+	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
+	{
+		if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Enemy->GetController()))
+		{
+			if (UBrainComponent* Brain = AIController->GetBrainComponent())
+			{
+				Brain->PauseLogic(TEXT("Enemy guard broken"));
+			}
+		}
+	}
 
 	UAnimMontage* BreakMontage = IsValid(CurrentWeapon)
 		? CurrentWeapon->GetConfig().BreakGuardMontage.Get() : nullptr;
@@ -1163,6 +1176,19 @@ void UCombatComponent::EndGuardBreak()
 	}
 	AnimationState.DefenseState = ECombatDefenseState::None;
 	RefreshAnimationState();
+	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
+	{
+		if (!Enemy->bIsInDamageReaction)
+		{
+			if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Enemy->GetController()))
+			{
+				if (UBrainComponent* Brain = AIController->GetBrainComponent())
+				{
+					Brain->ResumeLogic(TEXT("Enemy guard-break recovery complete"));
+				}
+			}
+		}
+	}
 }
 
 void UCombatComponent::EnterStaggered(float RecoveryDuration)
@@ -1181,6 +1207,16 @@ void UCombatComponent::EnterStaggered(float RecoveryDuration)
 	ClearParryTimers();
 	AnimationState.DefenseState = ECombatDefenseState::None;
 	SetCombatState(ECombatState::Staggered);
+	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
+	{
+		if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Enemy->GetController()))
+		{
+			if (UBrainComponent* Brain = AIController->GetBrainComponent())
+			{
+				Brain->PauseLogic(TEXT("Enemy poise broken"));
+			}
+		}
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -1195,6 +1231,19 @@ void UCombatComponent::HandleStaggerRecovery()
 	if (CurrentCombatState == ECombatState::Staggered)
 	{
 		SetCombatState(ECombatState::Idle);
+		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
+		{
+			if (!Enemy->bIsInDamageReaction)
+			{
+				if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Enemy->GetController()))
+				{
+					if (UBrainComponent* Brain = AIController->GetBrainComponent())
+					{
+						Brain->ResumeLogic(TEXT("Enemy stagger recovery complete"));
+					}
+				}
+			}
+		}
 	}
 }
 
