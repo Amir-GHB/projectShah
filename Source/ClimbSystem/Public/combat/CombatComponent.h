@@ -104,7 +104,7 @@ public:
 	bool CanBeParried() const;
 	bool IsParryAttemptActive() const { return AnimationState.DefenseState == ECombatDefenseState::Parrying; }
 	void EndParryAttempt(bool bSuccessful);
-	void NotifyParrySucceeded();
+	bool NotifyParrySucceeded();
 	float GetRiposteDamageMultiplier() const { return bRiposteAttackActive ? FMath::Max(1.0f, RiposteDamageMultiplier) : 1.0f; }
 	bool IsWithinGuardArc(const FVector& DirectionToAttacker) const;
 	bool IsWithinParryArc(const FVector& DirectionToAttacker) const;
@@ -132,7 +132,7 @@ public:
 
 	/** Called when an incoming hit breaks an active guard. Plays the equipped weapon's break montage. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Defense")
-	void TriggerGuardBreak();
+	void TriggerGuardBreak(const FVector& ImpactLocation = FVector::ZeroVector);
 	void EnterStaggered(float RecoveryDuration);
 
 	/** Optional early recovery hook; C++ also ends guard break from its montage/fallback timer. */
