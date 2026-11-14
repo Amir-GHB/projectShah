@@ -178,7 +178,11 @@ void ACombatProjectile::ApplyHitDamage(AActor* HitTargetActor, const FHitResult&
 		return;
 	}
 
-	const float RawDamage = DamageInfo.GetCalculatedRawDamage();
+	float RawDamage = DamageInfo.GetCalculatedRawDamage();
+	if (DamageInfo.bIsCriticalHit)
+	{
+		RawDamage *= DamageInfo.CriticalDamageMultiplier;
+	}
 	FPointDamageEvent DamageEvent(RawDamage, Hit, Hit.ImpactNormal, nullptr);
 	APawn* InstigatorPawn = Cast<APawn>(DamageInstigator.Get());
 	HitTargetActor->TakeDamage(RawDamage, DamageEvent, InstigatorPawn ? InstigatorPawn->GetController() : nullptr, SourceWeapon.IsValid() ? static_cast<AActor*>(SourceWeapon.Get()) : this);
