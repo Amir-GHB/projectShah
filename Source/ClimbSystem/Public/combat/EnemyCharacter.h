@@ -91,7 +91,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Combat", meta = (ClampMin = "0.0"))
 	float HeavyAttackTelegraphDuration = 0.55f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Combat", meta = (ClampMin = "1"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Combat", meta = (ClampMin = "1", ClampMax = "2"))
 	int32 MaxAttackersPerTarget = 2;
 
 	bool TryAcquireAttackSlot(AActor* Target);
