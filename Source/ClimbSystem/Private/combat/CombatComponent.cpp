@@ -946,6 +946,15 @@ void UCombatComponent::SetNonCombatAnimation(bool bEnableNonCombatAnimation)
 
 void UCombatComponent::SetGuardMode(bool bEnableGuard)
 {
+	if (bEnableGuard && OwningCharacter.IsValid())
+	{
+		if (const UDamageHandlerComponent* DamageHandler =
+			OwningCharacter->FindComponentByClass<UDamageHandlerComponent>())
+		{
+			if (DamageHandler->CurrentPoise <= 0.0f) return;
+		}
+	}
+
 	if (bEnableGuard && (CurrentCombatState == ECombatState::Dead ||
 		CurrentCombatState == ECombatState::Finishing || CurrentCombatState == ECombatState::Staggered ||
 		bWeaponSwapActive || CurrentCombatState == ECombatState::Attacking ||
@@ -1251,6 +1260,7 @@ void UCombatComponent::EnterStaggered(float RecoveryDuration)
 	}
 	ClearParryTimers();
 	AnimationState.DefenseState = ECombatDefenseState::None;
+	RefreshAnimationState();
 	SetCombatState(ECombatState::Staggered);
 	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
 	{
