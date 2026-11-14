@@ -1036,6 +1036,21 @@ void UCombatComponent::EndParryAttempt(bool bSuccessful)
 		World->GetTimerManager().ClearTimer(ParryAttemptTimer);
 	}
 	ParryAttemptStartTime = -1.0;
+	if (!bSuccessful && IsValid(CurrentWeapon) && OwningCharacter.IsValid()
+		&& OwningCharacter->GetMesh())
+	{
+		UAnimMontage* ParryMontage = CurrentWeapon->GetConfig().DefenderParryMontage.Get();
+		if (IsValid(ParryMontage))
+		{
+			if (UAnimInstance* Anim = OwningCharacter->GetMesh()->GetAnimInstance())
+			{
+				if (Anim->Montage_IsPlaying(ParryMontage))
+				{
+					Anim->Montage_Stop(0.08f, ParryMontage);
+				}
+			}
+		}
+	}
 	if (AnimationState.DefenseState == ECombatDefenseState::Parrying)
 	{
 		AnimationState.DefenseState = bSuccessful ? ECombatDefenseState::None : ECombatDefenseState::Guarding;
