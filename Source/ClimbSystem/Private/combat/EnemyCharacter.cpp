@@ -218,6 +218,10 @@ void AEnemyCharacter::HandleAICombatAttackEnded()
 void AEnemyCharacter::HandleAICombatDamageTaken(float ActualDamage, AActor* InstigatorActor,
 	const FDamageInfo& DamageInfo, const FHitResult& HitResult)
 {
+	(void)ActualDamage;
+	(void)InstigatorActor;
+	(void)DamageInfo;
+	(void)HitResult;
 	CancelPendingAICombatAction();
 	ReleaseAICombatSlot();
 }
