@@ -13,6 +13,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/DamageReactionComponent.h"
+#include "combat/DamageReactionComponent.h"
 #include "combat/WeaponBase.h"
 
 ACombatProjectile::ACombatProjectile()
@@ -158,6 +159,16 @@ void ACombatProjectile::ApplyHitDamage(AActor* HitTargetActor, const FHitResult&
 	DamageInfo.DamageCauser = SourceWeapon.IsValid() ? static_cast<AActor*>(SourceWeapon.Get()) : this;
 	DamageInfo.InstigatorWeapon = SourceWeapon.Get();
 	DamageInfo.Normalize();
+
+	// Ranged hits share guard resolution but never enter the melee parry system.
+	if (UDamageReactionComponent* Reactions = HitTargetActor->FindComponentByClass<UDamageReactionComponent>())
+	{
+		if (Reactions->ResolveIncomingHit(DamageInstigator.Get(), SourceWeapon.Get(),
+			DamageInfo, Hit, false))
+		{
+			return;
+		}
+	}
 
 	if (UDamageHandlerComponent* Handler = HitTargetActor->FindComponentByClass<UDamageHandlerComponent>())
 	{
