@@ -198,7 +198,7 @@ Poise is the guard stamina pool and the stagger meter. Configure these on `UDama
 | `PoiseRegenerationInterval` | 0.1 s | Timer interval while regeneration is active |
 | `PoiseBreakStaggerDuration` | 0.85 s | C++ stagger duration when unguarded poise reaches zero |
 
-Every blocked frontal hit spends its `FDamageInfo.PoiseDamage` and deals no health damage. When guard poise reaches zero, guard breaks and guard input is rejected until poise regenerates above zero. When unguarded poise reaches zero, the character enters `ECombatState::Staggered`. Regeneration uses a delayed timer, not a permanent tick. `OnPoiseBroken` is available for UI, audio, or Blueprint reactions.
+Every blocked frontal hit spends its `FDamageInfo.PoiseDamage` and deals no health damage. When guard poise reaches zero, guard breaks and guard input is rejected until poise regenerates above zero. If guard is still held, C++ restores the stance after guard-break/stagger recovery and after poise becomes available again; releasing guard during recovery cancels that re-entry. When unguarded poise reaches zero, the character enters `ECombatState::Staggered`. Regeneration uses a delayed timer, not a permanent tick. `OnPoiseBroken` is available for UI, audio, or Blueprint reactions.
 
 The guard-break montage length owns recovery when it successfully starts. Otherwise `GuardBreakFallbackDuration` owns recovery. Blueprint may still call `EndGuardBreak` for an authored early exit, but gameplay no longer depends on a notify or Blueprint event to leave the state.
 
@@ -262,7 +262,7 @@ Run these in PIE with a player character and at least two enemy types. Expected 
 2. **Rear hit:** Hold guard and receive a hit from behind. Health decreases, guard breaks, and the weapon's break montage plays.
 3. **Heavy bypass:** Configure an attack entry as heavy and enable `bHeavyHitsBypassGuard`. A frontal hit breaks guard and deals damage. Confirm the heavy telegraph plays first in AI combat.
 4. **Critical toggle:** Set critical chance to 1.0. With `bCriticalHitsBypassGuard=false`, a frontal critical hit is blocked and spends poise. Toggle it true and verify it breaks guard and deals damage.
-5. **Guard-break recovery:** Test with a valid break montage, no montage, and a montage interrupted by another reaction. Each case exits `GuardBroken` without a Blueprint notify. Repeat through death, finisher, and weapon swap.
+5. **Guard-break recovery:** Test with a valid break montage, no montage, and a montage interrupted by another reaction. Each case exits `GuardBroken` without a Blueprint notify. Keep guard held and verify it returns after recovery when poise is available; release guard during recovery and verify it stays released. Repeat through death, finisher, and weapon swap.
 6. **Authored parry window:** Add `Parry Window` to an enemy attack montage. Start guard, press parry, and get hit during the notify. The attacker stops, no normal hit VFX appears, parry damage/poise damage apply, and the attacker-parried montage plays.
 7. **Trace fallback:** Remove the notify state from the attack montage. Parry succeeds only while the attack's melee trace notify is active.
 8. **Parry whiff/cooldown:** Press parry without an incoming parryable attack. The attempt ends at the configured duration, returns to guard, and another attempt is rejected until cooldown expires.
@@ -271,7 +271,7 @@ Run these in PIE with a player character and at least two enemy types. Expected 
 11. **Parry interruption:** While parrying, get hit by an arrow or spell. The parry attempt ends, the ranged hit does not count as a parry, and the selected hit reaction can replace the parry montage without leaving `Parrying` stuck.
 12. **Ranged guard:** Hold guard against an arrow and a magic projectile from the front. Both are blocked and spend poise; neither grants or preserves parry. Repeat from behind and verify guard break plus health damage.
 13. **Arc boundaries:** Test attacks at the front, both edges of the configured guard/parry half-angles, and behind. Confirm the planar arc behaves consistently on slopes.
-14. **Poise break:** Take repeated blocked hits until poise reaches zero. Guard breaks once and `OnPoiseBroken` broadcasts once. Release guard, wait the regen delay, and verify poise regenerates on the configured timer.
+14. **Poise break:** Take repeated blocked hits until poise reaches zero. Guard breaks once and `OnPoiseBroken` broadcasts once. Verify guard cannot be re-entered at zero poise; if guard remains held, it returns after poise regenerates above zero. Release guard, wait the regen delay, and verify poise regenerates on the configured timer.
 15. **Unguarded stagger:** Take repeated unguarded poise damage until zero. Combat enters `Staggered`, attack/guard input is rejected, then C++ recovery returns to `Idle`.
 16. **Enemy AI stagger/parry:** Parry or stagger an enemy. Its BT stops issuing movement/attacks during the reaction and resumes after recovery.
 17. **Attack-slot cap:** Put three enemies in range of one target. At most two may reserve attack slots at once; the third waits. Kill, interrupt, or abort one attacker and verify the waiting enemy can acquire the freed slot. Remove the mage projectile-release notify and verify its fallback timer still releases exactly one projectile and frees its slot.
