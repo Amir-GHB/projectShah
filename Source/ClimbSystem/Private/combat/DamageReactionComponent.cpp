@@ -392,18 +392,11 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 	ParryHit.Location = Attacker->GetActorLocation();
 	ParryHit.ImpactPoint = Attacker->GetActorLocation();
 
-	if (UDamageHandlerComponent* AttackerDamage = Attacker->FindComponentByClass<UDamageHandlerComponent>())
-	{
-		AttackerDamage->ApplyDamage(GetOwner(), Attacker, ParryDamage, ParryHit);
-	}
-	else
-	{
-		FPointDamageEvent Event(ParryDamage.GetCalculatedRawDamage(), ParryHit, FVector::UpVector, nullptr);
-		Attacker->TakeDamage(ParryDamage.GetCalculatedRawDamage(), Event,
-			GetOwner()->GetInstigatorController(), GetOwner());
-	}
-
-	const UDamageHandlerComponent* AttackerDamageState =
+	// Start the dedicated attacker reaction before applying parry damage. Damage application
+	// can trigger poise-break/death delegates and alter combat state in the same call stack.
+	// The ordinary damage reaction is suppressed on ParryDamage, so this remains the
+	// single presentation path for a successful parry.
+	UDamageHandlerComponent* AttackerDamageState =
 		Attacker->FindComponentByClass<UDamageHandlerComponent>();
 	if ((!AttackerDamageState || !AttackerDamageState->bIsDead)
 		&& IsValid(AttackerConfig.AttackerParriedMontage.Get()))
@@ -411,8 +404,36 @@ bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* Attacking
 		if (UDamageReactionComponent* AttackerReaction =
 			Attacker->FindComponentByClass<UDamageReactionComponent>())
 		{
-			AttackerReaction->PlayHitReactionOverride(AttackerConfig.AttackerParriedMontage.Get());
+			if (!AttackerReaction->PlayHitReactionOverride(AttackerConfig.AttackerParriedMontage.Get()))
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("[DamageReaction] Failed to play AttackerParriedMontage '%s' on '%s'. Check the montage slot/skeleton and the attacker's AnimInstance."),
+					*GetNameSafe(AttackerConfig.AttackerParriedMontage.Get()), *GetNameSafe(Attacker));
+			}
 		}
+		else
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[DamageReaction] '%s' has no DamageReactionComponent; cannot play AttackerParriedMontage."),
+				*GetNameSafe(Attacker));
+		}
+	}
+	else if (!IsValid(AttackerConfig.AttackerParriedMontage.Get()))
+	{
+		UE_LOG(LogTemp, Verbose,
+			TEXT("[DamageReaction] No AttackerParriedMontage configured on weapon '%s'."),
+			*GetNameSafe(AttackingWeapon));
+	}
+
+	if (AttackerDamageState)
+	{
+		AttackerDamageState->ApplyDamage(GetOwner(), Attacker, ParryDamage, ParryHit);
+	}
+	else
+	{
+		FPointDamageEvent Event(ParryDamage.GetCalculatedRawDamage(), ParryHit, FVector::UpVector, nullptr);
+		Attacker->TakeDamage(ParryDamage.GetCalculatedRawDamage(), Event,
+			GetOwner()->GetInstigatorController(), GetOwner());
 	}
 
 	return true;
@@ -466,11 +487,22 @@ bool UDamageReactionComponent::ResolveIncomingHit(AActor* Attacker,
 		return false;
 	}
 
-	// Block feedback is separate from ordinary weapon hit effects, which are intentionally skipped.
+	// A successful block has its own defender-side impact reaction. Keep it weapon-specific
+	// so sword, hammer, spear, and unarmed guards can use different recoil animations.
 	if (UDamageReactionComponent* DefenderReactions = GetOwner()->FindComponentByClass<UDamageReactionComponent>())
 	{
 		DefenderReactions->PlayDefenseFeedback(DefenderCombat->CurrentWeapon,
 			HitResult.ImpactPoint.IsNearlyZero() ? HitResult.Location : HitResult.ImpactPoint, false, false);
+
+		if (IsValid(DefenderCombat->CurrentWeapon))
+		{
+			UAnimMontage* GuardBlockMontage =
+				DefenderCombat->CurrentWeapon->GetConfig().GuardBlockMontage.Get();
+			if (IsValid(GuardBlockMontage))
+			{
+				DefenderReactions->PlayHitReactionOverride(GuardBlockMontage);
+			}
+		}
 	}
 
 	// Guard stamina is represented by poise. A block consumes poise but no health.
