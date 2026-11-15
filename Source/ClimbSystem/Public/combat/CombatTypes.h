@@ -529,6 +529,10 @@ struct FWeaponConfig : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard")
 	TObjectPtr<UAnimMontage> BeginGuardMontage = nullptr;
 
+	/** Played on the defender when a front-facing hit is successfully blocked. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard")
+	TObjectPtr<UAnimMontage> GuardBlockMontage = nullptr;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Guard")
 	TObjectPtr<UAnimMontage> BreakGuardMontage = nullptr;
 
