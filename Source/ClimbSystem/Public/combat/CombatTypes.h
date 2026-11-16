@@ -470,7 +470,7 @@ struct FWeaponConfig : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning", meta = (ClampMin = "0.0"))
 	float AttackPositioningMaxRange = 450.0f;
 
-	/** Name must match the Sync Point Name on the montage's Motion Warping notify window. */
+	/** Name must match the Warp Target Name on the montage's Motion Warping notify state. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning")
 	FName AttackWarpTargetName = FName("CombatAttackTarget");
 
