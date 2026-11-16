@@ -8,8 +8,6 @@
 
 class UDamageHandlerComponent;
 class UDamageReactionComponent;
-class UWidgetComponent;
-class UCombatHealthBarWidget;
 
 /**
  * Character-based training target. Assign a skeletal mesh/AnimBP and reaction
@@ -43,5 +41,4 @@ public:
 	void ResetDummy();
 
 protected:
-	virtual void BeginPlay() override;
 };
