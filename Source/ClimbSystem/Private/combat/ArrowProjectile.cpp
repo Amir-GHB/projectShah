@@ -4,6 +4,8 @@
 
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/Character.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "combat/EnemyCharacter.h"
 
@@ -116,10 +118,66 @@ void AArrowProjectile::EmbedAtImpact(UPrimitiveComponent* OtherComponent, const 
 	if (ProjectileVisual)
 		ProjectileVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	if (bAttachToHitComponent && IsValid(OtherComponent))
+	if (bAttachToHitComponent)
 	{
-		FAttachmentTransformRules AttachRules(EAttachmentRule::KeepWorld, true);
-		AttachToComponent(OtherComponent, AttachRules, Hit.BoneName);
+		USkeletalMeshComponent* TargetSkeletalMesh = Cast<USkeletalMeshComponent>(OtherComponent);
+		if (!TargetSkeletalMesh)
+		{
+			if (ACharacter* HitCharacter = Cast<ACharacter>(Hit.GetActor()))
+			{
+				TargetSkeletalMesh = HitCharacter->GetMesh();
+			}
+			else if (IsValid(Hit.GetActor()))
+			{
+				TArray<USkeletalMeshComponent*> SkeletalMeshes;
+				Hit.GetActor()->GetComponents<USkeletalMeshComponent>(SkeletalMeshes);
+				float BestDistanceSquared = TNumericLimits<float>::Max();
+				for (USkeletalMeshComponent* Candidate : SkeletalMeshes)
+				{
+					if (!IsValid(Candidate)) continue;
+					const float DistanceSquared = FVector::DistSquared(Candidate->GetComponentLocation(), Hit.ImpactPoint);
+					if (DistanceSquared < BestDistanceSquared)
+					{
+						BestDistanceSquared = DistanceSquared;
+						TargetSkeletalMesh = Candidate;
+					}
+				}
+			}
+		}
+
+		USceneComponent* AttachComponent = TargetSkeletalMesh
+			? Cast<USceneComponent>(TargetSkeletalMesh)
+			: OtherComponent;
+		FName AttachBoneName = NAME_None;
+
+		// Capsule collision often reports no bone. Resolve the closest actual mesh
+		// bone so the arrow follows hit reactions and individual ragdoll bodies.
+		if (TargetSkeletalMesh && TargetSkeletalMesh->GetSkeletalMeshAsset())
+		{
+			AttachBoneName = Hit.BoneName;
+			if (AttachBoneName.IsNone() || TargetSkeletalMesh->GetBoneIndex(AttachBoneName) == INDEX_NONE)
+			{
+				float BestBoneDistanceSquared = TNumericLimits<float>::Max();
+				const int32 BoneCount = TargetSkeletalMesh->GetNumBones();
+				for (int32 BoneIndex = 0; BoneIndex < BoneCount; ++BoneIndex)
+				{
+					const FName CandidateBone = TargetSkeletalMesh->GetBoneName(BoneIndex);
+					const FVector BoneLocation = TargetSkeletalMesh->GetBoneLocation(CandidateBone);
+					const float DistanceSquared = FVector::DistSquared(BoneLocation, Hit.ImpactPoint);
+					if (DistanceSquared < BestBoneDistanceSquared)
+					{
+						BestBoneDistanceSquared = DistanceSquared;
+						AttachBoneName = CandidateBone;
+					}
+				}
+			}
+		}
+
+		if (IsValid(AttachComponent))
+		{
+			FAttachmentTransformRules AttachRules(EAttachmentRule::KeepWorld, true);
+			AttachToComponent(AttachComponent, AttachRules, AttachBoneName);
+		}
 	}
 
 	SetLifeSpan(FMath::Max(0.0f, EmbeddedLifeSeconds));
