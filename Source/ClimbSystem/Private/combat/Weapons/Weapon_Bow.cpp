@@ -6,6 +6,7 @@
 #include "combat/CombatProjectile.h"
 #include "combat/ArrowProjectile.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "GameFramework/Character.h"
@@ -63,6 +64,7 @@ bool AWeapon_Bow::BeginDraw()
 	bIsDrawing = true;
 	DrawAlpha = 0.0f;
 	DrawStartTime = GetWorld()->GetTimeSeconds();
+	SpawnInHandArrow();
 	PlayCharacterMontage(DrawMontage);
 	OnBowDrawStateChanged.Broadcast(true, DrawAlpha);
 	return true;
@@ -81,6 +83,7 @@ bool AWeapon_Bow::ReleaseShot()
 
 	const float ChargeAlpha = FMath::Clamp(HeldSeconds / FMath::Max(0.05f, FullDrawTime), 0.0f, 1.0f);
 	const bool bFired = SpawnArrow(ChargeAlpha);
+	DestroyInHandArrow();
 	DrawAlpha = 0.0f;
 	PlayCharacterMontage(ReleaseMontage);
 	//change drawing state after montage is played to pervent flicking between non aim state and release montage
@@ -95,6 +98,7 @@ void AWeapon_Bow::CancelDraw()
 
 	bIsDrawing = false;
 	DrawAlpha = 0.0f;
+	DestroyInHandArrow();
 	if (IsValid(DrawMontage) && OwningCharacter.IsValid() && OwningCharacter->GetMesh())
 	{
 		if (UAnimInstance* Anim = OwningCharacter->GetMesh()->GetAnimInstance())
@@ -103,6 +107,47 @@ void AWeapon_Bow::CancelDraw()
 		}
 	}
 	OnBowDrawStateChanged.Broadcast(false, 0.0f);
+}
+
+void AWeapon_Bow::SpawnInHandArrow()
+{
+	DestroyInHandArrow();
+
+	ACharacter* Character = OwningCharacter.Get();
+	USkeletalMeshComponent* CharacterMesh = IsValid(Character) ? Character->GetMesh() : nullptr;
+	if (!IsValid(CharacterMesh) || !IsValid(InHandArrowMesh))
+		return;
+
+	if (!CharacterMesh->DoesSocketExist(InHandArrowSocketName))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[AWeapon_Bow] In-hand arrow socket/bone '%s' was not found on character mesh '%s'."),
+			*InHandArrowSocketName.ToString(), *GetNameSafe(CharacterMesh->GetSkeletalMeshAsset()));
+		return;
+	}
+
+	ActiveInHandArrow = NewObject<UStaticMeshComponent>(this, TEXT("ActiveInHandArrow"));
+	if (!IsValid(ActiveInHandArrow))
+		return;
+
+	ActiveInHandArrow->SetStaticMesh(InHandArrowMesh);
+	ActiveInHandArrow->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ActiveInHandArrow->SetGenerateOverlapEvents(false);
+	ActiveInHandArrow->SetCastShadow(true);
+	ActiveInHandArrow->RegisterComponent();
+	ActiveInHandArrow->AttachToComponent(
+		CharacterMesh,
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+		InHandArrowSocketName);
+	ActiveInHandArrow->SetRelativeTransform(InHandArrowRelativeTransform);
+}
+
+void AWeapon_Bow::DestroyInHandArrow()
+{
+	if (IsValid(ActiveInHandArrow))
+	{
+		ActiveInHandArrow->DestroyComponent();
+	}
+	ActiveInHandArrow = nullptr;
 }
 
 bool AWeapon_Bow::SpawnArrow(float ChargeAlpha)
