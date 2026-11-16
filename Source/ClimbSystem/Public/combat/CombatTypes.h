@@ -462,6 +462,22 @@ struct FWeaponConfig : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Identification")
 	FText WeaponDisplayName = FText::FromString(TEXT("Default Weapon"));
 
+	/** Preferred attacker-to-target spacing used during attack-time positioning. Set to 0 to disable correction. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning", meta = (ClampMin = "0.0"))
+	float PreferredCombatDistance = 160.0f;
+
+	/** Allowed distance band around PreferredCombatDistance before movement correction begins. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning", meta = (ClampMin = "0.0"))
+	float CombatSpacingTolerance = 20.0f;
+
+	/** Positioning is only applied while the target is within this close-combat range. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning", meta = (ClampMin = "0.0"))
+	float AttackPositioningMaxRange = 450.0f;
+
+	/** Allows this weapon to use attack-time spacing correction. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning")
+	bool bEnableAttackPositioning = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Animation")
 	EAttackMontageMode AttackMontageMode = EAttackMontageMode::SingleComboMontage;
 
