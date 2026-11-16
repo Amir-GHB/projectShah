@@ -2,6 +2,7 @@
 
 #include "combat/CombatComponent.h"
 #include "combat/CombatTargetingComponent.h"
+#include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "GameFramework/Character.h"
 #include "Animation/AnimInstance.h"
@@ -518,10 +519,7 @@ bool UCombatComponent::StartNewCombo()
 	Anim->Montage_JumpToSection(FirstSection, Montage);
 	Anim->Montage_SetNextSection(FirstSection, NAME_None, Montage);
 	SetCombatState(ECombatState::Attacking);
-	if (UCombatTargetingComponent* Targeting = OwningCharacter->FindComponentByClass<UCombatTargetingComponent>())
-	{
-		Targeting->BeginAttackFocus();
-	}
+	BeginAttackPositioning();
 	OnComboSectionChanged.Broadcast(StartingSectionIndex, FirstSection);
 	return true;
 }
@@ -565,10 +563,7 @@ bool UCombatComponent::PlayIndividualAttack(int32 AttackIndex)
 	BlendDelegate.BindUObject(this, &UCombatComponent::OnMontageInstanceBlendingOut, Token);
 	Anim->Montage_SetBlendingOutDelegate(BlendDelegate, ActiveAttackMontage);
 	SetCombatState(ECombatState::Attacking);
-	if (UCombatTargetingComponent* Targeting = OwningCharacter->FindComponentByClass<UCombatTargetingComponent>())
-	{
-		Targeting->BeginAttackFocus();
-	}
+	BeginAttackPositioning();
 	OnComboSectionChanged.Broadcast(AttackIndex, FName(*FString::Printf(TEXT("Attack_%02d"), AttackIndex + 1)));
 	return true;
 }
@@ -755,6 +750,62 @@ void UCombatComponent::OnMontageInstanceEnded(UAnimMontage* Montage, bool bInter
 	}
 }
 
+void UCombatComponent::BeginAttackPositioning()
+{
+	if (!OwningCharacter.IsValid() || !ActiveAttackWeapon.IsValid()) return;
+
+	AActor* Target = nullptr;
+
+	// Player target acquisition remains owned by CombatTargetingComponent.
+	if (UCombatTargetingComponent* Targeting =
+		OwningCharacter->FindComponentByClass<UCombatTargetingComponent>())
+	{
+		Targeting->BeginAttackFocus();
+		Target = Targeting->GetCurrentTarget();
+	}
+
+	// AI supplies its already-selected target through the existing AIController.
+	if (!IsValid(Target))
+	{
+		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(OwningCharacter.Get()))
+		{
+			if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Enemy->GetController()))
+			{
+				Target = AIController->GetCurrentTarget();
+			}
+		}
+	}
+
+	if (UCombatPositioningComponent* Positioning =
+		OwningCharacter->FindComponentByClass<UCombatPositioningComponent>())
+	{
+		const FWeaponConfig& Config = ActiveAttackWeapon->GetConfig();
+		Positioning->BeginAttackPositioning(
+			Target,
+			Config.PreferredCombatDistance,
+			Config.CombatSpacingTolerance,
+			Config.AttackPositioningMaxRange,
+			Config.bEnableAttackPositioning);
+	}
+}
+
+void UCombatComponent::EndAttackPositioning()
+{
+	if (!OwningCharacter.IsValid()) return;
+
+	if (UCombatPositioningComponent* Positioning =
+		OwningCharacter->FindComponentByClass<UCombatPositioningComponent>())
+	{
+		Positioning->EndAttackPositioning();
+	}
+
+	if (UCombatTargetingComponent* Targeting =
+		OwningCharacter->FindComponentByClass<UCombatTargetingComponent>())
+	{
+		Targeting->EndAttackFocus();
+	}
+}
+
 void UCombatComponent::FinishAttack(bool bInterrupted, bool bStopMontage, float BlendOutTime)
 {
 	StopActiveAttack(bInterrupted, bStopMontage, BlendOutTime);
@@ -780,10 +831,7 @@ void UCombatComponent::StopActiveAttack(bool bInterrupted, bool bStopMontage, fl
 	}
 	if (OwningCharacter.IsValid())
 	{
-		if (UCombatTargetingComponent* Targeting = OwningCharacter->FindComponentByClass<UCombatTargetingComponent>())
-		{
-			Targeting->EndAttackFocus();
-		}
+		EndAttackPositioning();
 	}
 	UAnimMontage* Montage = ActiveAttackMontage;
 	if (bStopMontage && Montage && OwningCharacter.IsValid() && OwningCharacter->GetMesh())
