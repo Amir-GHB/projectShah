@@ -9,9 +9,8 @@
 class ACharacter;
 
 /**
- * Attack-scoped target selection and soft focus.
- * A remembered manual target is only a preference: this component never rotates or moves
- * the owner toward a target unless BeginAttackFocus has been called by an active attack.
+ * Player target acquisition, selection and validation.
+ * Attack-time facing and movement are handled by CombatPositioningComponent.
  */
 UCLASS(ClassGroup=(Combat), meta=(BlueprintSpawnableComponent))
 class CLIMBSYSTEM_API UCombatTargetingComponent : public UActorComponent
@@ -21,11 +20,11 @@ class CLIMBSYSTEM_API UCombatTargetingComponent : public UActorComponent
 public:
 	UCombatTargetingComponent();
 
-	/** Begin soft focus for an attack. Safe to call repeatedly across combo steps. */
+	/** Begin attack-scoped target selection/validation. Safe to call repeatedly across combo steps. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Targeting")
 	void BeginAttackFocus();
 
-	/** End all attack-scoped rotation and movement correction immediately. */
+	/** End attack-scoped target refresh immediately. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Targeting")
 	void EndAttackFocus();
 
