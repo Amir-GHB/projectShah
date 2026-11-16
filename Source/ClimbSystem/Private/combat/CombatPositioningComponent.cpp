@@ -4,6 +4,7 @@
 
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "combat/DamageHandlerComponent.h"
 
 UCombatPositioningComponent::UCombatPositioningComponent()
 {
@@ -100,6 +101,15 @@ void UCombatPositioningComponent::TickComponent(
 		return;
 	}
 
+	if (const UDamageHandlerComponent* TargetDamage = Target->FindComponentByClass<UDamageHandlerComponent>())
+	{
+		if (TargetDamage->bIsDead)
+		{
+			EndAttackPositioning();
+			return;
+		}
+	}
+
 	const FVector ToTarget = FVector::VectorPlaneProject(
 		Target->GetActorLocation() - Character->GetActorLocation(), FVector::UpVector);
 	const float Distance = ToTarget.Size();
@@ -134,6 +144,15 @@ void UCombatPositioningComponent::TickComponent(
 
 	const FVector Direction = ToTarget.GetSafeNormal() * (DistanceError > 0.0f ? 1.0f : -1.0f);
 	const float CorrectionAlpha = FMath::Clamp(AbsoluteError / 120.0f, 0.15f, 1.0f);
-	const float InputScale = FMath::Clamp(MaxCorrectionInput, 0.0f, 1.0f) * CorrectionAlpha;
+	const float SpeedAlongCorrection = FVector::DotProduct(Movement->Velocity, Direction);
+	const float SpeedLimit = FMath::Max(1.0f, MaxCorrectionSpeed);
+	if (SpeedAlongCorrection >= SpeedLimit)
+	{
+		return;
+	}
+
+	const float RemainingSpeedAlpha = 1.0f - FMath::Clamp(SpeedAlongCorrection / SpeedLimit, 0.0f, 1.0f);
+	const float InputScale = FMath::Clamp(MaxCorrectionInput, 0.0f, 1.0f)
+		* CorrectionAlpha * RemainingSpeedAlpha;
 	Character->AddMovementInput(Direction, InputScale);
 }
