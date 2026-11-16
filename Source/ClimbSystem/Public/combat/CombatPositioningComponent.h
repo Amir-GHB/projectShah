@@ -43,6 +43,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Positioning", meta = (ClampMin = "0.1"))
 	float RotationInterpSpeed = 12.0f;
 
+	/** Caps the additional spacing correction so it does not turn into a full-speed lunge. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Positioning", meta = (ClampMin = "1.0"))
+	float MaxCorrectionSpeed = 160.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Positioning")
 	bool bRotateToTargetDuringAttack = true;
 
