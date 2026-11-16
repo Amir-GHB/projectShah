@@ -53,23 +53,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting", meta = (ClampMin = "0.02"))
 	float TargetRefreshInterval = 0.15f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting", meta = (ClampMin = "0.1"))
-	float RotationInterpSpeed = 12.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting")
 	bool bRequireLineOfSight = true;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting|Movement", meta = (ClampMin = "0.0"))
-	float CorrectionStartDistance = 160.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting|Movement", meta = (ClampMin = "0.0"))
-	float CorrectionMaxDistance = 300.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting|Movement", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float CorrectionStrength = 0.35f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Targeting|Movement", meta = (ClampMin = "0.0", ClampMax = "0.5"))
-	float CorrectionDuration = 0.12f;
 
 protected:
 	virtual void BeginPlay() override;
@@ -80,11 +67,7 @@ private:
 	TWeakObjectPtr<AActor> CurrentTarget;
 	TWeakObjectPtr<AActor> ManualTarget;
 
-	bool bAttackFocusActive = false;
-	bool bCorrectionApplied = false;
-	bool bPreviousOrientRotationToMovement = true;
-	float TargetRefreshElapsed = 0.0f;
-	float CorrectionTimeRemaining = 0.0f;
+	bool bAttackFocusActive = false;	float TargetRefreshElapsed = 0.0f;
 
 	AActor* FindBestTarget() const;
 	bool IsValidTarget(AActor* Candidate) const;
