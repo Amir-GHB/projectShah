@@ -12,6 +12,7 @@ class UDamageReactionComponent;
 /**
  * Character-based training target. Assign a skeletal mesh/AnimBP and reaction
  * montages in a Blueprint child to test the complete damage and reaction flow.
+ * Its diagnostic health bar is supplied automatically by DamageHandlerComponent.
  */
 UCLASS(Blueprintable)
 class CLIMBSYSTEM_API ACombatDamageDummy : public ACharacter
@@ -27,18 +28,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Damage")
 	TObjectPtr<UDamageReactionComponent> DamageReactionComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UWidgetComponent> HealthBarComponent;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage Dummy|UI")
-	TSubclassOf<UCombatHealthBarWidget> HealthBarWidgetClass;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage Dummy|UI", meta = (ClampMin = "0.0"))
-	FVector HealthBarOffset = FVector(0.0f, 0.0f, 110.0f);
-
 	/** Restores health/poise and allows the dummy to play reactions again. */
 	UFUNCTION(BlueprintCallable, Category = "Damage Dummy")
 	void ResetDummy();
-
-protected:
 };
