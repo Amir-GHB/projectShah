@@ -462,19 +462,19 @@ struct FWeaponConfig : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Identification")
 	FText WeaponDisplayName = FText::FromString(TEXT("Default Weapon"));
 
-	/** Preferred attacker-to-target spacing used during attack-time positioning. Set to 0 to disable correction. */
+	/** Desired attacker-to-target distance used to calculate the Motion Warping destination. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning", meta = (ClampMin = "0.0"))
 	float PreferredCombatDistance = 160.0f;
 
-	/** Allowed distance band around PreferredCombatDistance before movement correction begins. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning", meta = (ClampMin = "0.0"))
-	float CombatSpacingTolerance = 20.0f;
-
-	/** Positioning is only applied while the target is within this close-combat range. */
+	/** Only prepare a warp target when the opponent is inside this close-combat range. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning", meta = (ClampMin = "0.0"))
 	float AttackPositioningMaxRange = 450.0f;
 
-	/** Allows this weapon to use attack-time spacing correction. */
+	/** Name must match the Sync Point Name on the montage's Motion Warping notify window. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning")
+	FName AttackWarpTargetName = FName("CombatAttackTarget");
+
+	/** Allows this weapon to use attack-time Motion Warping. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Combat Positioning")
 	bool bEnableAttackPositioning = true;
 
