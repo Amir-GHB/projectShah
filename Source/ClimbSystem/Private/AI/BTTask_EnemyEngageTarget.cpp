@@ -4,6 +4,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "combat/EnemyCharacter.h"
 #include "combat/CombatComponent.h"
+#include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -90,7 +91,9 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	if (UCharacterMovementComponent* Movement = Enemy->GetCharacterMovement())
 		Movement->MaxWalkSpeed = Enemy->PursuitWalkSpeed;
 	const FVector ToTarget = TargetLocation - EnemyLocation;
-	if (!ToTarget.IsNearlyZero())
+	const UCombatPositioningComponent* Positioning =
+		Enemy->FindComponentByClass<UCombatPositioningComponent>();
+	if (!ToTarget.IsNearlyZero() && (!Positioning || !Positioning->IsAttackPositioningActive()))
 	{
 		const FRotator DesiredRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
 		Enemy->SetActorRotation(FMath::RInterpTo(Enemy->GetActorRotation(), DesiredRotation, DeltaSeconds, 8.0f));
