@@ -785,7 +785,7 @@ void UCombatComponent::BeginAttackPositioning()
 			Config.PreferredCombatDistance,
 			Config.CombatSpacingTolerance,
 			Config.AttackPositioningMaxRange,
-			Config.bEnableAttackPositioning);
+			Config.bEnableAttackPositioning && Config.WeaponType != EWeaponType::Bow);
 	}
 }
 
