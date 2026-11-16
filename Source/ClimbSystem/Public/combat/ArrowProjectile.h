@@ -41,6 +41,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	UFUNCTION()
 	virtual void HandleProjectileHit(
 		UPrimitiveComponent* HitComponent,
 		AActor* OtherActor,
@@ -49,7 +50,7 @@ protected:
 		const FHitResult& Hit) override;
 
 private:
-	void EmbedAtImpact(AActor* OtherActor, UPrimitiveComponent* OtherComponent, const FHitResult& Hit);
+	void EmbedAtImpact(UPrimitiveComponent* OtherComponent, const FHitResult& Hit);
 	bool IsFriendlyEnemyHit(AActor* OtherActor) const;
 	bool bIsEmbedded = false;
 };
