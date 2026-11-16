@@ -4,6 +4,7 @@
 
 #include "AI/EnemyAIController.h"
 #include "combat/CombatComponent.h"
+#include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/DamageReactionComponent.h"
 #include "MotionWarpingComponent.h"
@@ -25,6 +26,7 @@ AEnemyCharacter::AEnemyCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+	CombatPositioningComponent = CreateDefaultSubobject<UCombatPositioningComponent>(TEXT("CombatPositioningComponent"));
 	DamageHandlerComponent = CreateDefaultSubobject<UDamageHandlerComponent>(TEXT("DamageHandlerComponent"));
 	DamageReactionComponent = CreateDefaultSubobject<UDamageReactionComponent>(TEXT("DamageReactionComponent"));
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
