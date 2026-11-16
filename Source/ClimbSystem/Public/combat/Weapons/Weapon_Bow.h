@@ -9,6 +9,8 @@
 
 class ACombatProjectile;
 class USkeletalMeshComponent;
+class UStaticMeshComponent;
+class UStaticMesh;
 class UAnimMontage;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnBowDrawStateChangedSignature, bool, bIsDrawing, float, DrawAlpha);
@@ -33,6 +35,18 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bow|Projectile")
 	FName ArrowSpawnSocketName = FName("Arrow_Spawn_Socket");
+
+	/** Simple visual arrow shown in the archer's hand while drawing/aiming. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bow|Draw|Visual")
+	TObjectPtr<UStaticMesh> InHandArrowMesh = nullptr;
+
+	/** Socket or bone on the character's skeletal mesh where the drawn arrow is held. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bow|Draw|Visual")
+	FName InHandArrowSocketName = FName("hand_r");
+
+	/** Local adjustment for aligning the held arrow with the bow and drawing hand. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bow|Draw|Visual")
+	FTransform InHandArrowRelativeTransform = FTransform::Identity;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bow|Animation")
 	TObjectPtr<UAnimMontage> DrawMontage = nullptr;
@@ -92,5 +106,11 @@ private:
 
 	bool SpawnArrow(float ChargeAlpha);
 	bool GetAimDirectionAndSpawnTransform(FVector& OutDirection, FTransform& OutSpawnTransform) const;
+	void SpawnInHandArrow();
+	void DestroyInHandArrow();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> ActiveInHandArrow = nullptr;
+
 	void PlayCharacterMontage(UAnimMontage* Montage);
 };
