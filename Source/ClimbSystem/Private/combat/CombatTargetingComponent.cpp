@@ -8,7 +8,6 @@
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 
 UCombatTargetingComponent::UCombatTargetingComponent()
@@ -32,14 +31,7 @@ void UCombatTargetingComponent::BeginAttackFocus()
 	}
 
 	bAttackFocusActive = true;
-	bCorrectionApplied = false;
-	CorrectionTimeRemaining = 0.0f;
 	TargetRefreshElapsed = TargetRefreshInterval;
-
-	if (UCharacterMovementComponent* Movement = OwningCharacter->GetCharacterMovement())
-	{
-		bPreviousOrientRotationToMovement = Movement->bOrientRotationToMovement;
-	}
 
 	AActor* InitialTarget = IsValidTarget(ManualTarget.Get())
 		&& IsWithinFocusRange(ManualTarget.Get())
@@ -60,16 +52,7 @@ void UCombatTargetingComponent::EndAttackFocus()
 
 	bAttackFocusActive = false;
 	CurrentTarget.Reset();
-	CorrectionTimeRemaining = 0.0f;
 	TargetRefreshElapsed = 0.0f;
-
-	if (OwningCharacter.IsValid())
-	{
-		if (UCharacterMovementComponent* Movement = OwningCharacter->GetCharacterMovement())
-		{
-			Movement->bOrientRotationToMovement = bPreviousOrientRotationToMovement;
-		}
-	}
 
 	SetComponentTickEnabled(false);
 }
@@ -282,13 +265,6 @@ void UCombatTargetingComponent::SetCurrentTarget(AActor* NewTarget)
 	}
 
 	CurrentTarget = NewTarget;
-
-	if (UCharacterMovementComponent* Movement =
-		OwningCharacter.IsValid() ? OwningCharacter->GetCharacterMovement() : nullptr)
-	{
-		Movement->bOrientRotationToMovement = NewTarget
-			? false : bPreviousOrientRotationToMovement;
-	}
 }
 
 void UCombatTargetingComponent::TickComponent(
@@ -334,50 +310,5 @@ void UCombatTargetingComponent::TickComponent(
 	{
 		TargetRefreshElapsed = 0.0f;
 	}
-	Target = CurrentTarget.Get();
-	if (!IsValidTarget(Target) || !IsWithinFocusRange(Target))
-	{
-		return;
-	}
-
-	const FVector ToTarget = Target->GetActorLocation() - OwningCharacter->GetActorLocation();
-	if (ToTarget.IsNearlyZero())
-	{
-		return;
-	}
-
-	const FRotator DesiredRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
-	const FRotator CurrentRotation = OwningCharacter->GetActorRotation();
-	const FRotator NewRotation = FMath::RInterpTo(
-		CurrentRotation, DesiredRotation, DeltaTime, RotationInterpSpeed);
-	OwningCharacter->SetActorRotation(FRotator(CurrentRotation.Pitch, NewRotation.Yaw, CurrentRotation.Roll));
-
-	// A single, brief, collision-aware movement-input nudge per attack. It is deliberately
-	// omitted at long range, while airborne, or when the character is already moving quickly.
-	if (!bCorrectionApplied)
-	{
-		const float Distance2D = FVector::Dist2D(
-			OwningCharacter->GetActorLocation(), Target->GetActorLocation());
-		UCharacterMovementComponent* Movement = OwningCharacter->GetCharacterMovement();
-		if (Movement && Movement->IsMovingOnGround()
-			&& Distance2D >= CorrectionStartDistance
-			&& Distance2D <= CorrectionMaxDistance
-			&& Movement->Velocity.Size2D() < 180.0f
-			&& CorrectionDuration > 0.0f)
-		{
-			CorrectionTimeRemaining = CorrectionDuration;
-			bCorrectionApplied = true;
-		}
-	}
-
-	if (CorrectionTimeRemaining > 0.0f)
-	{
-		const FVector CorrectionDirection = FVector::VectorPlaneProject(
-			Target->GetActorLocation() - OwningCharacter->GetActorLocation(),
-			FVector::UpVector).GetSafeNormal();
-		OwningCharacter->AddMovementInput(
-			CorrectionDirection,
-			FMath::Clamp(CorrectionStrength, 0.0f, 1.0f));
-		CorrectionTimeRemaining = FMath::Max(0.0f, CorrectionTimeRemaining - DeltaTime);
-	}
+	// This component deliberately stops here: it owns target acquisition and validation only.
 }
