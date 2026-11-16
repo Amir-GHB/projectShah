@@ -8,6 +8,7 @@
 
 class UCombatComponent;
 class UCombatTargetingComponent;
+class UCombatPositioningComponent;
 class UDamageHandlerComponent;
 class UDamageReactionComponent;
 class UInputMappingContext;
@@ -33,6 +34,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 	TObjectPtr<UCombatTargetingComponent> CombatTargetingComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
+	TObjectPtr<UCombatPositioningComponent> CombatPositioningComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 	TObjectPtr<UDamageReactionComponent> DamageReactionComponent;
