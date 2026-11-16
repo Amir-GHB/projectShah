@@ -70,12 +70,13 @@ void AArrowProjectile::HandleProjectileHit(
 	if (OtherActor != GetOwner())
 		ApplyHitDamage(OtherActor, Hit);
 
-	EmbedAtImpact(OtherActor, OtherComponent, Hit);
+	EmbedAtImpact(OtherComponent, Hit);
 }
 
-void AArrowProjectile::EmbedAtImpact(AActor* OtherActor, UPrimitiveComponent* OtherComponent, const FHitResult& Hit)
+void AArrowProjectile::EmbedAtImpact(UPrimitiveComponent* OtherComponent, const FHitResult& Hit)
 {
 	bIsEmbedded = true;
+	SetActorTickEnabled(false);
 
 	const FVector TravelDirection = ProjectileMovement
 		? ProjectileMovement->Velocity.GetSafeNormal()
