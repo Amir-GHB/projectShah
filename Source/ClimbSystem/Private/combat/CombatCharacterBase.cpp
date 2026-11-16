@@ -3,6 +3,7 @@
 #include "combat/CombatCharacterBase.h"
 #include "combat/CombatComponent.h"
 #include "combat/CombatTargetingComponent.h"
+#include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/DamageReactionComponent.h"
 #include "MotionWarpingComponent.h"
@@ -21,6 +22,7 @@ ACombatCharacterBase::ACombatCharacterBase()
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	DamageHandlerComponent = CreateDefaultSubobject<UDamageHandlerComponent>(TEXT("DamageHandlerComponent"));
 	CombatTargetingComponent = CreateDefaultSubobject<UCombatTargetingComponent>(TEXT("CombatTargetingComponent"));
+	CombatPositioningComponent = CreateDefaultSubobject<UCombatPositioningComponent>(TEXT("CombatPositioningComponent"));
 	DamageReactionComponent = CreateDefaultSubobject<UDamageReactionComponent>(TEXT("DamageReactionComponent"));
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 
