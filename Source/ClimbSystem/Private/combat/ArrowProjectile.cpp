@@ -32,8 +32,14 @@ void AArrowProjectile::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// The base class binds its generic destroy-on-hit handler. Replace that
+	// delegate explicitly so this subclass owns the complete impact lifecycle.
 	if (CollisionSphere)
+	{
+		CollisionSphere->OnComponentHit.RemoveDynamic(this, &ACombatProjectile::HandleProjectileHit);
+		CollisionSphere->OnComponentHit.AddDynamic(this, &AArrowProjectile::HandleProjectileHit);
 		CollisionSphere->SetSphereRadius(FMath::Max(1.0f, ProjectileConfig.CollisionRadius));
+	}
 }
 
 bool AArrowProjectile::IsFriendlyEnemyHit(AActor* OtherActor) const
