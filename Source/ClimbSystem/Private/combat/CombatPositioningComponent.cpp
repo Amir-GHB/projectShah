@@ -2,157 +2,88 @@
 
 #include "combat/CombatPositioningComponent.h"
 
-#include "GameFramework/Character.h"
-#include "GameFramework/CharacterMovementComponent.h"
+#include "MotionWarpingComponent.h"
 #include "combat/DamageHandlerComponent.h"
+#include "GameFramework/Character.h"
 
 UCombatPositioningComponent::UCombatPositioningComponent()
 {
-	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.bStartWithTickEnabled = false;
-}
-
-void UCombatPositioningComponent::BeginPlay()
-{
-	Super::BeginPlay();
-	OwningCharacter = Cast<ACharacter>(GetOwner());
-	SetComponentTickEnabled(false);
-}
-
-void UCombatPositioningComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	EndAttackPositioning();
-	Super::EndPlay(EndPlayReason);
+	PrimaryComponentTick.bCanEverTick = false;
 }
 
 void UCombatPositioningComponent::BeginAttackPositioning(
 	AActor* Target,
+	FName WarpTargetName,
 	float InPreferredDistance,
-	float InDistanceTolerance,
 	float InMaxEngagementRange,
 	bool bEnablePositioning)
 {
-	// A new combo step replaces the previous step's positioning operation.
+	// A new combo step replaces the previous step's target transform.
 	EndAttackPositioning();
 
-	if (!bEnablePositioning || !OwningCharacter.IsValid() || !IsValid(Target) ||
-		Target == OwningCharacter.Get() || InPreferredDistance <= 0.0f ||
-		InMaxEngagementRange <= 0.0f)
+	ACharacter* Character = Cast<ACharacter>(GetOwner());
+	if (!bEnablePositioning || !IsValid(Character) || !IsValid(Target) ||
+		Target == Character || WarpTargetName.IsNone() ||
+		InPreferredDistance <= 0.0f || InMaxEngagementRange <= 0.0f)
 	{
 		return;
 	}
 
-	CombatTarget = Target;
-	PreferredDistance = FMath::Max(0.0f, InPreferredDistance);
-	DistanceTolerance = FMath::Max(0.0f, InDistanceTolerance);
-	MaxEngagementRange = FMath::Max(0.0f, InMaxEngagementRange);
-	bAttackPositioningActive = true;
-
-	if (UCharacterMovementComponent* Movement = OwningCharacter->GetCharacterMovement())
-	{
-		bPreviousOrientRotationToMovement = Movement->bOrientRotationToMovement;
-		if (bRotateToTargetDuringAttack)
-		{
-			Movement->bOrientRotationToMovement = false;
-		}
-	}
-
-	SetComponentTickEnabled(true);
-}
-
-void UCombatPositioningComponent::EndAttackPositioning()
-{
-	if (!bAttackPositioningActive)
-	{
-		CombatTarget.Reset();
-		SetComponentTickEnabled(false);
-		return;
-	}
-
-	bAttackPositioningActive = false;
-	CombatTarget.Reset();
-	SetComponentTickEnabled(false);
-	RestoreMovementFacing();
-}
-
-void UCombatPositioningComponent::RestoreMovementFacing()
-{
-	if (OwningCharacter.IsValid())
-	{
-		if (UCharacterMovementComponent* Movement = OwningCharacter->GetCharacterMovement())
-		{
-			Movement->bOrientRotationToMovement = bPreviousOrientRotationToMovement;
-		}
-	}
-}
-
-void UCombatPositioningComponent::TickComponent(
-	float DeltaTime,
-	ELevelTick TickType,
-	FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	ACharacter* Character = OwningCharacter.Get();
-	AActor* Target = CombatTarget.Get();
-	if (!bAttackPositioningActive || !IsValid(Character) || !IsValid(Target) || Target == Character)
-	{
-		EndAttackPositioning();
-		return;
-	}
-
-	if (const UDamageHandlerComponent* TargetDamage = Target->FindComponentByClass<UDamageHandlerComponent>())
+	if (const UDamageHandlerComponent* TargetDamage =
+		Target->FindComponentByClass<UDamageHandlerComponent>())
 	{
 		if (TargetDamage->bIsDead)
 		{
-			EndAttackPositioning();
 			return;
 		}
 	}
 
+	const FVector CharacterLocation = Character->GetActorLocation();
 	const FVector ToTarget = FVector::VectorPlaneProject(
-		Target->GetActorLocation() - Character->GetActorLocation(), FVector::UpVector);
-	const float Distance = ToTarget.Size();
-	if (Distance <= KINDA_SMALL_NUMBER || Distance > MaxEngagementRange)
+		Target->GetActorLocation() - CharacterLocation, FVector::UpVector);
+	const float CurrentDistance = ToTarget.Size();
+
+	if (CurrentDistance <= KINDA_SMALL_NUMBER || CurrentDistance > InMaxEngagementRange)
 	{
 		return;
 	}
 
-	if (bRotateToTargetDuringAttack)
+	UMotionWarpingComponent* MotionWarping = Character->FindComponentByClass<UMotionWarpingComponent>();
+	if (!MotionWarping)
 	{
-		const FRotator CurrentRotation = Character->GetActorRotation();
-		const FRotator DesiredRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
-		const FRotator NewRotation = FMath::RInterpTo(
-			CurrentRotation, DesiredRotation, DeltaTime, RotationInterpSpeed);
-		Character->SetActorRotation(FRotator(CurrentRotation.Pitch, NewRotation.Yaw, CurrentRotation.Roll));
-	}
-
-	UCharacterMovementComponent* Movement = Character->GetCharacterMovement();
-	if (!Movement || !Movement->IsMovingOnGround())
-	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[CombatPositioning] %s has no MotionWarpingComponent; attack warp skipped."),
+			*GetNameSafe(Character));
 		return;
 	}
 
-	// AddMovementInput is additive to player input and remains collision-aware through CharacterMovement.
-	// Positive error approaches; negative error retreats. The tolerance band prevents oscillation.
-	const float DistanceError = Distance - PreferredDistance;
-	const float AbsoluteError = FMath::Abs(DistanceError);
-	if (AbsoluteError <= DistanceTolerance)
+	// Place the attacker at the configured distance from the target.
+	// Z is preserved so ground-height differences do not pull the capsule vertically.
+	const FVector DirectionToTarget = ToTarget.GetSafeNormal();
+	const FVector DesiredLocation = FVector(
+		Target->GetActorLocation().X - DirectionToTarget.X * InPreferredDistance,
+		Target->GetActorLocation().Y - DirectionToTarget.Y * InPreferredDistance,
+		CharacterLocation.Z);
+
+	// The final character orientation faces the target, independently of the translation.
+	const FRotator DesiredRotation(0.0f, DirectionToTarget.Rotation().Yaw, 0.0f);
+	PreparedWarpTransform = FTransform(DesiredRotation, DesiredLocation, FVector::OneVector);
+
+	MotionWarping->AddOrUpdateWarpTargetFromTransform(WarpTargetName, PreparedWarpTransform);
+	MotionWarpingComponent = MotionWarping;
+	ActiveWarpTargetName = WarpTargetName;
+	bAttackPositioningActive = true;
+}
+
+void UCombatPositioningComponent::EndAttackPositioning()
+{
+	if (MotionWarpingComponent.IsValid() && !ActiveWarpTargetName.IsNone())
 	{
-		return;
+		MotionWarpingComponent->RemoveWarpTarget(ActiveWarpTargetName);
 	}
 
-	const FVector Direction = ToTarget.GetSafeNormal() * (DistanceError > 0.0f ? 1.0f : -1.0f);
-	const float CorrectionAlpha = FMath::Clamp(AbsoluteError / 120.0f, 0.15f, 1.0f);
-	const float SpeedAlongCorrection = FVector::DotProduct(Movement->Velocity, Direction);
-	const float SpeedLimit = FMath::Max(1.0f, MaxCorrectionSpeed);
-	if (SpeedAlongCorrection >= SpeedLimit)
-	{
-		return;
-	}
-
-	const float RemainingSpeedAlpha = 1.0f - FMath::Clamp(SpeedAlongCorrection / SpeedLimit, 0.0f, 1.0f);
-	const float InputScale = FMath::Clamp(MaxCorrectionInput, 0.0f, 1.0f)
-		* CorrectionAlpha * RemainingSpeedAlpha;
-	Character->AddMovementInput(Direction, InputScale);
+	MotionWarpingComponent.Reset();
+	ActiveWarpTargetName = NAME_None;
+	PreparedWarpTransform = FTransform::Identity;
+	bAttackPositioningActive = false;
 }
