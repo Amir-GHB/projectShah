@@ -8,6 +8,7 @@
 #include "EnemyCharacter.generated.h"
 
 class UCombatComponent;
+class UCombatPositioningComponent;
 class UDamageHandlerComponent;
 class UDamageReactionComponent;
 class UMotionWarpingComponent;
@@ -30,6 +31,8 @@ protected:
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat")
 	TObjectPtr<UCombatComponent> CombatComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat")
+	TObjectPtr<UCombatPositioningComponent> CombatPositioningComponent;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat")
 	TObjectPtr<UDamageHandlerComponent> DamageHandlerComponent;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat")
