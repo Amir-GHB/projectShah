@@ -4,6 +4,7 @@
 #include "AI/EnemyAIController.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/CombatProjectile.h"
+#include "combat/ArrowProjectile.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -34,7 +35,7 @@ AWeapon_Bow::AWeapon_Bow()
 	SkeletalBowMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SkeletalBowMesh->SetGenerateOverlapEvents(false);
 
-	ProjectileClass = ACombatProjectile::StaticClass();
+	ProjectileClass = AArrowProjectile::StaticClass();
 	ProjectileConfig.BaseDamage = WeaponConfig.BaseDamage;
 	ProjectileConfig.PoiseDamage = WeaponConfig.PoiseDamage;
 	ProjectileConfig.KnockbackImpulse = WeaponConfig.KnockbackImpulse;
@@ -135,17 +136,28 @@ bool AWeapon_Bow::SpawnArrow(float ChargeAlpha)
 	ShotConfig.InitialSpeed *= FMath::Lerp(MinDrawSpeedMultiplier, MaxDrawSpeedMultiplier, ChargeAlpha);
 	ShotConfig.MaxSpeed = FMath::Max(ShotConfig.MaxSpeed, ShotConfig.InitialSpeed);
 
+	// A bow must never fall back to the generic spell projectile. Keep the
+	// configurable base-class property for existing Blueprint defaults, but
+	// transparently replace legacy generic projectile assignments with the
+	// dedicated arrow implementation.
+	TSubclassOf<ACombatProjectile> ResolvedProjectileClass = ProjectileClass;
+	if (!ResolvedProjectileClass || !ResolvedProjectileClass->IsChildOf(AArrowProjectile::StaticClass()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[AWeapon_Bow] ProjectileClass is not an AArrowProjectile. Using the native arrow class instead."));
+		ResolvedProjectileClass = AArrowProjectile::StaticClass();
+	}
+
 	APawn* InstigatorPawn = Cast<APawn>(Character);
-	ACombatProjectile* Projectile = World->SpawnActorDeferred<ACombatProjectile>(
-		ProjectileClass,
+	AArrowProjectile* Arrow = World->SpawnActorDeferred<AArrowProjectile>(
+		ResolvedProjectileClass,
 		SpawnTransform,
 		Character,
 		InstigatorPawn,
-		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
-	if (!Projectile) return false;
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!Arrow) return false;
 
-	Projectile->InitializeProjectile(ShotConfig, Direction, Character, this);
-	UGameplayStatics::FinishSpawningActor(Projectile, SpawnTransform);
+	Arrow->InitializeProjectile(ShotConfig, Direction, Character, this);
+	UGameplayStatics::FinishSpawningActor(Arrow, SpawnTransform);
 	return true;
 }
 
