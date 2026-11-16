@@ -611,6 +611,10 @@ void UCombatComponent::CommitSectionTransition(int32 NewSectionIndex, FName NewS
 	if (ActiveAttackWeapon.IsValid()) ActiveAttackWeapon->SetActiveAttackIndex(NewSectionIndex);
 	PendingSectionIndex = INDEX_NONE;
 	bTransitionCommittedForWindow = false;
+
+	// Refresh the destination for the newly entered combo section before its authored
+	// Motion Warping window is reached.
+	BeginAttackPositioning();
 	OnComboSectionChanged.Broadcast(NewSectionIndex, NewSectionName);
 }
 
@@ -782,8 +786,8 @@ void UCombatComponent::BeginAttackPositioning()
 		const FWeaponConfig& Config = ActiveAttackWeapon->GetConfig();
 		Positioning->BeginAttackPositioning(
 			Target,
+			Config.AttackWarpTargetName,
 			Config.PreferredCombatDistance,
-			Config.CombatSpacingTolerance,
 			Config.AttackPositioningMaxRange,
 			Config.bEnableAttackPositioning && Config.WeaponType != EWeaponType::Bow);
 	}
