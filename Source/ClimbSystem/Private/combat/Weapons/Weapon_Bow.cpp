@@ -148,13 +148,18 @@ bool AWeapon_Bow::SpawnArrow(float ChargeAlpha)
 	}
 
 	APawn* InstigatorPawn = Cast<APawn>(Character);
-	AArrowProjectile* Arrow = World->SpawnActorDeferred<AArrowProjectile>(
+	ACombatProjectile* SpawnedProjectile = World->SpawnActorDeferred<ACombatProjectile>(
 		ResolvedProjectileClass,
 		SpawnTransform,
 		Character,
 		InstigatorPawn,
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-	if (!Arrow) return false;
+	AArrowProjectile* Arrow = Cast<AArrowProjectile>(SpawnedProjectile);
+	if (!Arrow)
+	{
+		if (IsValid(SpawnedProjectile)) SpawnedProjectile->Destroy();
+		return false;
+	}
 
 	Arrow->InitializeProjectile(ShotConfig, Direction, Character, this);
 	UGameplayStatics::FinishSpawningActor(Arrow, SpawnTransform);
