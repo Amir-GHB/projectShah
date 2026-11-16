@@ -48,7 +48,7 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 	UFUNCTION()
-	void HandleProjectileHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit);
+	virtual void HandleProjectileHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit);
 
 	float CalculateFalloffMultiplier() const;
 	void ApplyHitDamage(AActor* TargetActor, const FHitResult& Hit);
