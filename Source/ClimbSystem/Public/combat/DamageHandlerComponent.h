@@ -13,6 +13,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHealthChangedSignature, float, N
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDeathSignature, AActor*, KillerActor);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPoiseBrokenSignature, AActor*, InstigatorActor);
 
+class UWidgetComponent;
+class UCombatHealthBarWidget;
+
 UCLASS(ClassGroup=(Combat), meta=(BlueprintSpawnableComponent))
 class CLIMBSYSTEM_API UDamageHandlerComponent : public UActorComponent
 {
@@ -25,6 +28,8 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	void CreateDiagnosticHealthBar();
 
 	struct FActiveDamageOverTimeEffect
 	{
@@ -49,6 +54,22 @@ protected:
 	float GetHitLocationMultiplier(EDamageHitLocation HitLocation) const;
 
 public:
+	/** Temporary world-space health display for combat debugging. Disable to hide it. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug|Health Bar")
+	bool bShowDiagnosticHealthBar = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug|Health Bar")
+	FVector DiagnosticHealthBarOffset = FVector(0.0f, 0.0f, 110.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug|Health Bar", meta = (ClampMin = "1.0"))
+	FVector2D DiagnosticHealthBarDrawSize = FVector2D(120.0f, 16.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug|Health Bar")
+	TSubclassOf<UCombatHealthBarWidget> DiagnosticHealthBarWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UWidgetComponent> DiagnosticHealthBarComponent = nullptr;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
 	float MaxHealth = 100.0f;
 
