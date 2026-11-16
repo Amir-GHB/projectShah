@@ -6,11 +6,11 @@
 #include "Components/ActorComponent.h"
 #include "CombatPositioningComponent.generated.h"
 
-class ACharacter;
-class UCharacterMovementComponent;
+class UMotionWarpingComponent;
 
 /**
- * Performs short-lived, attack-scoped movement and facing corrections.
+ * Prepares an attack destination for Unreal's Motion Warping system.
+ * The montage's Motion Warping notify window controls when root motion is warped.
  * Target acquisition remains the responsibility of TargetingComponent / AIController.
  */
 UCLASS(ClassGroup=(Combat), meta=(BlueprintSpawnableComponent))
@@ -21,49 +21,32 @@ class CLIMBSYSTEM_API UCombatPositioningComponent : public UActorComponent
 public:
 	UCombatPositioningComponent();
 
-	/** Starts attack-time spacing correction for the supplied target. Replaces any active operation. */
+	/**
+	 * Calculates and registers the destination transform used by the attack montage.
+	 * The montage must contain a Motion Warping notify window using the same target name.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Positioning")
 	void BeginAttackPositioning(
 		AActor* Target,
+		FName WarpTargetName,
 		float PreferredDistance,
-		float DistanceTolerance,
 		float MaxEngagementRange,
 		bool bEnablePositioning = true);
 
-	/** Stops correction and restores the owner's previous movement-facing setting. */
+	/** Removes the registered warp target when the attack ends or is interrupted. */
 	UFUNCTION(BlueprintCallable, Category = "Combat|Positioning")
 	void EndAttackPositioning();
 
 	UFUNCTION(BlueprintPure, Category = "Combat|Positioning")
 	bool IsAttackPositioningActive() const { return bAttackPositioningActive; }
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Positioning", meta = (ClampMin = "0.0"))
-	float MaxCorrectionInput = 0.35f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Positioning", meta = (ClampMin = "0.1"))
-	float RotationInterpSpeed = 12.0f;
-
-	/** Caps the additional spacing correction so it does not turn into a full-speed lunge. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Positioning", meta = (ClampMin = "1.0"))
-	float MaxCorrectionSpeed = 160.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Positioning")
-	bool bRotateToTargetDuringAttack = true;
-
-protected:
-	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	UFUNCTION(BlueprintPure, Category = "Combat|Positioning")
+	FTransform GetPreparedWarpTransform() const { return PreparedWarpTransform; }
 
 private:
-	TWeakObjectPtr<ACharacter> OwningCharacter;
-	TWeakObjectPtr<AActor> CombatTarget;
-
 	bool bAttackPositioningActive = false;
-	bool bPreviousOrientRotationToMovement = true;
-	float PreferredDistance = 160.0f;
-	float DistanceTolerance = 20.0f;
-	float MaxEngagementRange = 450.0f;
+	FName ActiveWarpTargetName = NAME_None;
+	FTransform PreparedWarpTransform = FTransform::Identity;
 
-	void RestoreMovementFacing();
+	TWeakObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
 };
