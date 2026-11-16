@@ -9,6 +9,7 @@
 #include "CombatComponent.generated.h"
 
 class AWeaponBase;
+class UCombatPositioningComponent;
 class UDamageHandlerComponent;
 class UAnimMontage;
 class ACharacter;
@@ -312,6 +313,8 @@ protected:
 	bool TryQueueSectionTransition();
 	void CommitSectionTransition(int32 NewSectionIndex, FName NewSectionName);
 	void FinishAttack(bool bInterrupted, bool bStopMontage, float BlendOutTime);
+	void BeginAttackPositioning();
+	void EndAttackPositioning();
 	void BeginWeaponSwap(EWeaponType NewWeaponType);
 	void PlayUnequipMontageOrContinue();
 	void PlayEquipMontageOrFinish();
