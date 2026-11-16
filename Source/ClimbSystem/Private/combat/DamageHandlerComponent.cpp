@@ -6,11 +6,15 @@
 #include "GameFramework/Actor.h"
 #include "Components/PrimitiveComponent.h"
 #include "Engine/World.h"
+#include "Components/SceneComponent.h"
+#include "Components/WidgetComponent.h"
+#include "combat/CombatHealthBarWidget.h"
 
 UDamageHandlerComponent::UDamageHandlerComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
+	DiagnosticHealthBarWidgetClass = UCombatHealthBarWidget::StaticClass();
 }
 
 void UDamageHandlerComponent::BeginPlay()
@@ -20,6 +24,41 @@ void UDamageHandlerComponent::BeginPlay()
 	CurrentPoise = FMath::Max(0.0f, MaxPoise);
 	bPoiseBroken = CurrentPoise <= 0.0f;
 	bIsDead = CurrentHealth <= 0.0f;
+	CreateDiagnosticHealthBar();
+}
+
+void UDamageHandlerComponent::CreateDiagnosticHealthBar()
+{
+	if (!bShowDiagnosticHealthBar || !IsValid(GetOwner())
+		|| !IsValid(GetOwner()->GetRootComponent()) || !DiagnosticHealthBarWidgetClass)
+	{
+		return;
+	}
+
+	// This component is created by the health handler so any actor using the
+	// handler can opt into the same temporary diagnostic display.
+	DiagnosticHealthBarComponent = NewObject<UWidgetComponent>(
+		GetOwner(), UWidgetComponent::StaticClass(), NAME_None, RF_Transient);
+	if (!DiagnosticHealthBarComponent)
+	{
+		return;
+	}
+
+	GetOwner()->AddInstanceComponent(DiagnosticHealthBarComponent);
+	DiagnosticHealthBarComponent->SetupAttachment(GetOwner()->GetRootComponent());
+	DiagnosticHealthBarComponent->SetWidgetSpace(EWidgetSpace::World);
+	DiagnosticHealthBarComponent->SetDrawSize(DiagnosticHealthBarDrawSize);
+	DiagnosticHealthBarComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	DiagnosticHealthBarComponent->SetRelativeLocation(DiagnosticHealthBarOffset);
+	DiagnosticHealthBarComponent->SetWidgetClass(DiagnosticHealthBarWidgetClass);
+	DiagnosticHealthBarComponent->RegisterComponent();
+	DiagnosticHealthBarComponent->InitWidget();
+
+	if (UCombatHealthBarWidget* HealthWidget = Cast<UCombatHealthBarWidget>(
+		DiagnosticHealthBarComponent->GetUserWidgetObject()))
+	{
+		HealthWidget->BindToDamageHandler(this);
+	}
 }
 
 void UDamageHandlerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -27,6 +66,11 @@ void UDamageHandlerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PoiseRegenerationTimer);
+	}
+	if (IsValid(DiagnosticHealthBarComponent))
+	{
+		DiagnosticHealthBarComponent->DestroyComponent();
+		DiagnosticHealthBarComponent = nullptr;
 	}
 	Super::EndPlay(EndPlayReason);
 }
