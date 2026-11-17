@@ -38,6 +38,9 @@ public:
 
 	/** Called before FinishSpawningActor so config and direction are ready in BeginPlay. */
 	void InitializeProjectile(const FProjectileConfig& InConfig, const FVector& Direction, AActor* InDamageInstigator, AWeaponBase* InSourceWeapon, AActor* InTargetActor = nullptr);
+	
+	UFUNCTION()
+	virtual void HandleProjectileHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit);
 
 	/** Demo-only override for a target hit montage; normal production reactions remain data-driven on the target. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Projectile|Demo")
@@ -46,9 +49,6 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
-
-	UFUNCTION()
-	virtual void HandleProjectileHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit);
 
 	float CalculateFalloffMultiplier() const;
 	void ApplyHitDamage(AActor* TargetActor, const FHitResult& Hit);

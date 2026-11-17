@@ -8,6 +8,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "combat/EnemyCharacter.h"
+#include "combat/WeaponBase.h"
 
 AArrowProjectile::AArrowProjectile()
 {
@@ -60,8 +61,8 @@ void AArrowProjectile::HandleProjectileHit(
 {
 	if (bHasHit || bIsEmbedded || !IsValid(OtherActor))
 		return;
-
-	if (OtherActor == DamageInstigator.Get() || OtherActor == SourceWeapon.Get() || OtherActor == GetOwner())
+AActor* TempSourceWeapon = SourceWeapon.Get();
+	if (OtherActor == DamageInstigator.Get() || OtherActor == TempSourceWeapon || OtherActor == GetOwner())
 		return;
 
 	// Preserve the project's existing no-friendly-fire rule. Ignore allied enemies

@@ -41,7 +41,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	UFUNCTION()
+
 	virtual void HandleProjectileHit(
 		UPrimitiveComponent* HitComponent,
 		AActor* OtherActor,
