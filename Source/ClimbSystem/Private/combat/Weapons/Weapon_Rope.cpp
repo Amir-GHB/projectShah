@@ -60,6 +60,10 @@ void AWeapon_Rope::BeginPlay()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[AWeapon_Rope] SwingMontage is not assigned on %s."), *GetName());
 	}
+	if (!IsValid(RopeSegmentMesh))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[AWeapon_Rope] RopeSegmentMesh is not assigned on %s; the rope will be invisible."), *GetName());
+	}
 
 	for (USplineMeshComponent* Segment : RopeSegments)
 	{
