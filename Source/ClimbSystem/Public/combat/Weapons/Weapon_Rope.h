@@ -11,6 +11,8 @@ class USplineMeshComponent;
 class UAnimMontage;
 class UAnimSequenceBase;
 class UStaticMesh;
+class AEnemyCharacter;
+class UCharacterMovementComponent;
 
 /**
  * Code-driven thrown rope weapon. The hand is a fixed simulation anchor while
@@ -70,6 +72,15 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Collision")
 	TEnumAsByte<ECollisionChannel> RopeTraceChannel = ECC_Visibility;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "100.0"))
+	float EnemyPullSpeed = 1250.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "0.0"))
+	float PullStopPadding = 35.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "1.0"))
+	float RopeContractionSpeed = 8.0f;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rope|State")
 	bool bIsExtending = false;
 
@@ -104,7 +115,20 @@ private:
 	bool bSimulatingRope = false;
 	float TargetThrowDistance = 0.0f;
 
+	TWeakObjectPtr<AEnemyCharacter> PullTarget;
+	TEnumAsByte<EMovementMode> SavedTargetMovementMode = MOVE_Walking;
+	uint8 SavedTargetCustomMovementMode = 0;
+	float SavedTargetMaxWalkSpeed = 0.0f;
+	bool bSavedTargetPauseAnims = false;
+	bool bIsPullingTarget = false;
+	bool bTargetAIWasPaused = false;
+
 	void ResetRopeVisual();
+	bool TryBeginTargetPull();
+	void BeginTargetPull(AEnemyCharacter* Target);
+	void UpdateTargetPull(float DeltaSeconds);
+	void RestorePulledTarget();
+	AActor* GetTargetingActor() const;
 	void InitializeRopeSimulation(const FVector& Direction);
 	void SimulateRopeStep(float StepSeconds);
 	void SolveRopeConstraints();
