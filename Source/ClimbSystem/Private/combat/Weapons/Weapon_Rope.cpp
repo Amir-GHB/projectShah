@@ -21,8 +21,6 @@
 #include "combat/CombatComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/CombatTargetingComponent.h"
-#include "combat/EnemyCharacter.h"
-#include "combat/DamageHandlerComponent.h"
 
 AWeapon_Rope::AWeapon_Rope()
 {
@@ -80,6 +78,12 @@ void AWeapon_Rope::BeginPlay()
 	}
 
 	ResetRopeVisual();
+}
+
+void AWeapon_Rope::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ResetRopeVisual();
+	Super::EndPlay(EndPlayReason);
 }
 
 void AWeapon_Rope::AttachToHand(ACharacter* TargetCharacter)
