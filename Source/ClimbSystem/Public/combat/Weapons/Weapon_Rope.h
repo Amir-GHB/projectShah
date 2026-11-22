@@ -12,7 +12,6 @@ class UAnimMontage;
 class UAnimSequenceBase;
 class UStaticMesh;
 class AEnemyCharacter;
-class AEnemyCharacter;
 class UCharacterMovementComponent;
 
 /**
@@ -72,15 +71,6 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Collision")
 	TEnumAsByte<ECollisionChannel> RopeTraceChannel = ECC_Visibility;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "100.0"))
-	float EnemyPullSpeed = 1200.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "50.0"))
-	float EnemyPullStopDistance = 160.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "100.0"))
-	float RopeRetractSpeed = 1800.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "100.0"))
 	float EnemyPullSpeed = 1250.0f;
@@ -145,7 +135,4 @@ private:
 	void ResolveParticleCollisions();
 	void UpdateRopeVisual();
 	bool ResolveThrowDirection(FVector& OutDirection) const;
-	void TryStartTargetPull();
-	void UpdateRopeLine(const FVector& EndLocation);
-	void BeginRopeRetraction();
 };
