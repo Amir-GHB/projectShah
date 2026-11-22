@@ -11,6 +11,7 @@ class USplineMeshComponent;
 class UAnimMontage;
 class UAnimSequenceBase;
 class UStaticMesh;
+class UStaticMeshComponent;
 class AEnemyCharacter;
 
 /**
@@ -36,6 +37,22 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual")
 	TObjectPtr<UStaticMesh> RopeSegmentMesh = nullptr;
+
+	/** Static mesh displayed at the currently simulated free end of the rope. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual")
+	TObjectPtr<UStaticMesh> HookMesh = nullptr;
+
+	/** World-independent scale applied to the hook mesh component. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual")
+	FVector HookScale = FVector::OneVector;
+
+	/** Rotation adjustment applied after aligning the hook's forward axis to the rope. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual")
+	FRotator HookRotationOffset = FRotator::ZeroRotator;
+
+	/** Position adjustment in the hook's rotated local space. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual")
+	FVector HookPositionOffset = FVector::ZeroVector;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual", meta = (ClampMin = "1", ClampMax = "24"))
 	int32 RopeSegmentCount = 16;
@@ -105,6 +122,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Rope|Components")
 	TObjectPtr<USplineComponent> RopeSpline = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Category = "Rope|Components")
+	TObjectPtr<UStaticMeshComponent> HookMeshComponent = nullptr;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<USplineMeshComponent>> RopeSegments;
