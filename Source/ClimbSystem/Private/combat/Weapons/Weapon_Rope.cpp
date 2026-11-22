@@ -73,6 +73,12 @@ void AWeapon_Rope::BeginPlay()
 	ResetRopeVisual();
 }
 
+void AWeapon_Rope::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ResetRopeVisual();
+	Super::EndPlay(EndPlayReason);
+}
+
 void AWeapon_Rope::AttachToHand(ACharacter* TargetCharacter)
 {
 	ResetRopeVisual();
