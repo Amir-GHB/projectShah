@@ -80,12 +80,6 @@ void AWeapon_Rope::BeginPlay()
 	ResetRopeVisual();
 }
 
-void AWeapon_Rope::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	ResetRopeVisual();
-	Super::EndPlay(EndPlayReason);
-}
-
 void AWeapon_Rope::AttachToHand(ACharacter* TargetCharacter)
 {
 	ResetRopeVisual();
@@ -124,7 +118,6 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 	}
 
 	bSwingActive = false;
-
 	InitializeRopeSimulation(Direction);
 	UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope physically thrown. Max length: %.1f"), MaxRopeLength);
 }
@@ -189,7 +182,8 @@ AActor* AWeapon_Rope::GetTargetingActor() const
 	{
 		return nullptr;
 	}
-	return Targeting->GetCurrentTarget();
+	AActor* Target = Targeting->GetCurrentTarget();
+	return IsValid(Target) ? Target : Targeting->GetManualTarget();
 }
 
 void AWeapon_Rope::InitializeRopeSimulation(const FVector& Direction)
@@ -523,32 +517,10 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 	PullTarget = Target;
 	bIsPullingTarget = true;
 	bIsExtending = false;
-	// Once caught, the whole rope is paid out and contracts toward the captured actor.
-	for (int32 Index = 0; Index < bParticleDeployed.Num(); ++Index)
-	{
-		bParticleDeployed[Index] = true;
-	}
-
-	// Cancel AI/combat activity before freezing the mesh, so montage end delegates
-	// and combat-state cleanup can run normally.
-	Target->CancelPendingAICombatAction();
-	if (Target->CombatComponent)
-	{
-		Target->CombatComponent->StopActiveAttack(true, true, 0.0f);
-	}
-
-	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
-	{
-		if (UBrainComponent* Brain = AIController->GetBrainComponent())
-		{
-			Brain->PauseLogic(TEXT("Rope pull"));
-			bTargetAIWasPaused = true;
-		}
-	}
 
 	if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
 	{
-		SavedTargetMovementMode = static_cast<uint8>(Movement->MovementMode);
+		SavedTargetMovementMode = Movement->MovementMode;
 		SavedTargetCustomMovementMode = Movement->CustomMovementMode;
 		SavedTargetMaxWalkSpeed = Movement->MaxWalkSpeed;
 		Movement->StopMovementImmediately();
@@ -565,6 +537,21 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 		Mesh->bPauseAnims = true;
 	}
 
+	if (Target->CombatComponent)
+	{
+		Target->CombatComponent->StopActiveAttack(true, true, 0.0f);
+	}
+	Target->CancelPendingAICombatAction();
+
+	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
+	{
+		if (UBrainComponent* Brain = AIController->GetBrainComponent())
+		{
+			Brain->PauseLogic(TEXT("Rope pull"));
+			bTargetAIWasPaused = true;
+		}
+	}
+
 	UE_LOG(LogTemp, Log, TEXT("[AWeapon_Rope] Caught enemy %s. Starting root pull."), *GetNameSafe(Target));
 }
 
@@ -578,11 +565,6 @@ void AWeapon_Rope::UpdateTargetPull(float DeltaSeconds)
 	}
 
 	const FVector Anchor = GetActorLocation();
-	if (ParticlePositions.Num() > 0)
-	{
-		ParticlePositions[0] = Anchor;
-		PreviousParticlePositions[0] = Anchor;
-	}
 	const float OwnerRadius = OwningCharacter.IsValid() && OwningCharacter->GetCapsuleComponent()
 		? OwningCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.0f;
 	const float TargetRadius = Target->GetCapsuleComponent()
@@ -636,22 +618,16 @@ void AWeapon_Rope::RestorePulledTarget()
 	AEnemyCharacter* Target = PullTarget.Get();
 	if (IsValid(Target))
 	{
-		const bool bTargetDiedDuringPull = Target->DamageHandlerComponent
-			&& Target->DamageHandlerComponent->bIsDead;
-		if (!bTargetDiedDuringPull)
+		if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
 		{
-			if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
-			{
-				Movement->SetMovementMode(static_cast<EMovementMode>(SavedTargetMovementMode), SavedTargetCustomMovementMode);
-				Movement->MaxWalkSpeed = SavedTargetMaxWalkSpeed;
-			}
+			Movement->SetMovementMode(SavedTargetMovementMode, SavedTargetCustomMovementMode);
+			Movement->MaxWalkSpeed = SavedTargetMaxWalkSpeed;
 		}
 		if (USkeletalMeshComponent* Mesh = Target->GetMesh())
 		{
-			// Always unpause the mesh so a death transition/ragdoll can take over.
 			Mesh->bPauseAnims = bSavedTargetPauseAnims;
 		}
-		if (bTargetAIWasPaused && !bTargetDiedDuringPull)
+		if (bTargetAIWasPaused)
 		{
 			if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
 			{
