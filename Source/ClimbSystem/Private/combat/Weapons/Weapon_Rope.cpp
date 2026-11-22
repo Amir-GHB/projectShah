@@ -122,7 +122,7 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 	// not on a broad collision sweep discovering an enemy by accident.
 	PullTarget = SelectedTarget;
 	bSwingActive = false;
-	InitializeRopeSimulation(Direction, AimLocation, !AimLocation.IsNearlyZero());
+	InitializeRopeSimulation(Direction, AimLocation, true);
 	UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope physically thrown. Max length: %.1f"), MaxRopeLength);
 }
 
