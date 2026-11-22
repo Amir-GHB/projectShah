@@ -578,6 +578,11 @@ void AWeapon_Rope::UpdateTargetPull(float DeltaSeconds)
 	}
 
 	const FVector Anchor = GetActorLocation();
+	if (ParticlePositions.Num() > 0)
+	{
+		ParticlePositions[0] = Anchor;
+		PreviousParticlePositions[0] = Anchor;
+	}
 	const float OwnerRadius = OwningCharacter.IsValid() && OwningCharacter->GetCapsuleComponent()
 		? OwningCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.0f;
 	const float TargetRadius = Target->GetCapsuleComponent()
