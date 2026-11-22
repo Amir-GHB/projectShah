@@ -31,12 +31,12 @@ public:
 	virtual void AttachToHand(ACharacter* TargetCharacter) override;
 	virtual void AttachToHolster(ACharacter* TargetCharacter) override;
 
-	/** Called by the authored release notify on this weapon's SwingMontage. */
+	/** Called by the authored release notify on this weapon's CharacterSwingMontage. */
 	void BeginSwing();
 	void ReleaseRope(const UAnimSequenceBase* SourceAnimation);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Animation")
-	TObjectPtr<UAnimMontage> SwingMontage = nullptr;
+	TObjectPtr<UAnimMontage> CharacterSwingMontage = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual")
 	TObjectPtr<UStaticMesh> RopeSegmentMesh = nullptr;
