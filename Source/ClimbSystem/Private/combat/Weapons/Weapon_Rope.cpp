@@ -282,7 +282,8 @@ void AWeapon_Rope::SimulateRopeStep(float StepSeconds)
 
 			const FVector SpawnPosition = ParticleDeploymentPositions[Index];
 			ParticlePositions[Index] = SpawnPosition;
-			PreviousParticlePositions[Index] = SpawnPosition - RopeDirection * FMath::Max(0.0f, ThrowSpeed) * StepSeconds;
+			const FVector LaunchVelocity = RopeDirection * FMath::Max(0.0f, ThrowSpeed) + AnchorVelocity;
+			PreviousParticlePositions[Index] = SpawnPosition - LaunchVelocity * StepSeconds;
 			bParticleDeployed[Index] = true;
 		}
 
@@ -379,6 +380,11 @@ void AWeapon_Rope::ResolveParticleCollisions()
 
 	const float SafeRadius = FMath::Max(1.0f, RopeCollisionRadius);
 	const FCollisionShape CollisionShape = FCollisionShape::MakeSphere(SafeRadius);
+	int32 LastDeployedIndex = 0;
+	while (bParticleDeployed.IsValidIndex(LastDeployedIndex + 1) && bParticleDeployed[LastDeployedIndex + 1])
+	{
+		++LastDeployedIndex;
+	}
 	for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
 	{
 		if (!bParticleDeployed.IsValidIndex(Index) || !bParticleDeployed[Index])
@@ -407,6 +413,14 @@ void AWeapon_Rope::ResolveParticleCollisions()
 
 			ParticlePositions[Index] = SurfacePosition;
 			PreviousParticlePositions[Index] = SurfacePosition - Velocity;
+
+			// A collision at the currently leading end stops further rope payout.
+			// The endpoint itself remains free and is never attached to the hit actor/world.
+			if (bIsExtending && Index == LastDeployedIndex)
+			{
+				bIsExtending = false;
+				UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope payout stopped by obstruction: %s"), *GetNameSafe(Hit.GetActor()));
+			}
 		}
 	}
 }
