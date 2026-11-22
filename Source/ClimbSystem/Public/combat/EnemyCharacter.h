@@ -133,6 +133,7 @@ private:
 	float PreviousRopePullWalkSpeed = 0.0f;
 	TEnumAsByte<EMovementMode> PreviousRopePullMovementMode = MOVE_Walking;
 	uint8 PreviousRopePullCustomMovementMode = 0;
+	uint8 PreviousRopePullCustomMovementMode = 0;
 	bool bPreviousRopePullPauseAnims = false;
 	bool bWasRopePullBrainPaused = false;
 
