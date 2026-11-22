@@ -6,6 +6,7 @@
 #include "combat/EnemyCharacter.h"
 #include "combat/DamageHandlerComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -42,8 +43,9 @@ bool AThrowableTreeActor::ThrowAtClosestVisibleEnemy(ACombatCharacterBase* Throw
 		return false;
 	}
 
-	FVector ViewLocation = Thrower->GetActorEyesViewPoint().Location;
-	FRotator ViewRotation = Thrower->GetActorEyesViewPoint().Rotation;
+	FVector ViewLocation = FVector::ZeroVector;
+	FRotator ViewRotation = FRotator::ZeroRotator;
+	Thrower->GetActorEyesViewPoint(ViewLocation, ViewRotation);
 	if (IsValid(Thrower->FollowCamera))
 	{
 		ViewLocation = Thrower->FollowCamera->GetComponentLocation();
@@ -160,7 +162,6 @@ void AThrowableTreeActor::StopAfterImpact()
 		return;
 	}
 
-	bHasBeenThrown = false;
 	if (IsValid(MeshComponent))
 	{
 		MeshComponent->SetNotifyRigidBodyCollision(false);
