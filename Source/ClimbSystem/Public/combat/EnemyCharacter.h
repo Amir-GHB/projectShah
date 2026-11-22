@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "TimerManager.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "combat/CombatTypes.h"
 #include "EnemyCharacter.generated.h"
 
@@ -26,6 +27,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
@@ -62,6 +64,14 @@ public:
 	float PatrolMontageMinInterval = 4.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol|Animation", meta = (ClampMin = "0.1"))
 	float PatrolMontageMaxInterval = 9.0f;
+	/** True while the rope weapon temporarily owns this enemy's movement and animation. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Rope")
+	bool bIsBeingRopePulled = false;
+
+	/** Starts a temporary, animation-free pull toward Puller. */
+	bool BeginRopePull(AActor* Puller, float PullSpeed, float StopDistance);
+	void EndRopePull();
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|AI")
 	bool bIsInDamageReaction = false;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol", meta = (ClampMin = "100.0"))
@@ -113,6 +123,13 @@ protected:
 
 private:
 	FTimerHandle HeavyAttackTelegraphTimer;
+	TWeakObjectPtr<AActor> RopePuller;
+	float RopePullSpeed = 1200.0f;
+	float RopePullStopDistance = 160.0f;
+	float PreviousRopePullWalkSpeed = 0.0f;
+	TEnumAsByte<EMovementMode> PreviousRopePullMovementMode = MOVE_Walking;
+	bool bPreviousRopePullPauseAnims = false;
+	bool bWasRopePullBrainPaused = false;
 	TWeakObjectPtr<AActor> AttackSlotTarget;
 	TWeakObjectPtr<AActor> PendingAICombatTarget;
 	bool bPendingAIHeavyAttack = false;
