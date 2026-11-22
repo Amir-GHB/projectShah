@@ -10,15 +10,8 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "Components/SkeletalMeshComponent.h"
-#include "Animation/AnimInstance.h"
-#include "BrainComponent.h"
-#include "AIController.h"
-#include "AI/EnemyAIController.h"
 #include "combat/EnemyCharacter.h"
-#include "combat/CombatComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/CombatTargetingComponent.h"
 
@@ -514,42 +507,23 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 		return;
 	}
 
+	const float OwnerRadius = OwningCharacter.IsValid() && OwningCharacter->GetCapsuleComponent()
+		? OwningCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.0f;
+	const float TargetRadius = Target->GetCapsuleComponent()
+		? Target->GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.0f;
+	const float StopDistance = OwnerRadius + TargetRadius + FMath::Max(0.0f, PullStopPadding);
+	if (!Target->BeginRopePull(this, EnemyPullSpeed, StopDistance))
+	{
+		PullTarget.Reset();
+		return;
+	}
+
 	PullTarget = Target;
 	bIsPullingTarget = true;
 	bIsExtending = false;
-
-	if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
+	for (int32 Index = 0; Index < bParticleDeployed.Num(); ++Index)
 	{
-		SavedTargetMovementMode = Movement->MovementMode;
-		SavedTargetCustomMovementMode = Movement->CustomMovementMode;
-		SavedTargetMaxWalkSpeed = Movement->MaxWalkSpeed;
-		Movement->StopMovementImmediately();
-		Movement->DisableMovement();
-	}
-
-	if (USkeletalMeshComponent* Mesh = Target->GetMesh())
-	{
-		SavedTargetPauseAnims = Mesh->bPauseAnims;
-		if (UAnimInstance* Anim = Mesh->GetAnimInstance())
-		{
-			Anim->StopAllMontages(0.0f);
-		}
-		Mesh->bPauseAnims = true;
-	}
-
-	if (Target->CombatComponent)
-	{
-		Target->CombatComponent->StopActiveAttack(true, true, 0.0f);
-	}
-	Target->CancelPendingAICombatAction();
-
-	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
-	{
-		if (UBrainComponent* Brain = AIController->GetBrainComponent())
-		{
-			Brain->PauseLogic(TEXT("Rope pull"));
-			bTargetAIWasPaused = true;
-		}
+		bParticleDeployed[Index] = true;
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("[AWeapon_Rope] Caught enemy %s. Starting root pull."), *GetNameSafe(Target));
@@ -558,31 +532,19 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 void AWeapon_Rope::UpdateTargetPull(float DeltaSeconds)
 {
 	AEnemyCharacter* Target = PullTarget.Get();
-	if (!IsValid(Target) || (Target->DamageHandlerComponent && Target->DamageHandlerComponent->bIsDead))
+	if (!IsValid(Target) || !Target->bIsBeingRopePulled
+		|| (Target->DamageHandlerComponent && Target->DamageHandlerComponent->bIsDead))
 	{
 		ResetRopeVisual();
 		return;
 	}
 
 	const FVector Anchor = GetActorLocation();
-	const float OwnerRadius = OwningCharacter.IsValid() && OwningCharacter->GetCapsuleComponent()
-		? OwningCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.0f;
-	const float TargetRadius = Target->GetCapsuleComponent()
-		? Target->GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.0f;
-	const float StopDistance = OwnerRadius + TargetRadius + FMath::Max(0.0f, PullStopPadding);
-
-	FVector ToAnchor = Anchor - Target->GetActorLocation();
-	const float Distance = ToAnchor.Size();
-	if (Distance <= StopDistance)
+	if (ParticlePositions.Num() > 0)
 	{
-		ResetRopeVisual();
-		return;
+		ParticlePositions[0] = Anchor;
+		PreviousParticlePositions[0] = Anchor;
 	}
-
-	ToAnchor /= FMath::Max(Distance, KINDA_SMALL_NUMBER);
-	const float StepDistance = FMath::Min(Distance - StopDistance, FMath::Max(0.0f, EnemyPullSpeed) * DeltaSeconds);
-	FHitResult MoveHit;
-	Target->SetActorLocation(Target->GetActorLocation() + ToAnchor * StepDistance, true, &MoveHit, ETeleportType::None);
 
 	const FVector TargetPoint = Target->GetActorLocation() + FVector(0.0f, 0.0f,
 		Target->GetCapsuleComponent() ? Target->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.35f : 35.0f);
@@ -605,47 +567,16 @@ void AWeapon_Rope::UpdateTargetPull(float DeltaSeconds)
 	RopeStartLocation = Anchor;
 	RopeEndLocation = TargetPoint;
 	UpdateRopeVisual();
-
-	if (MoveHit.bBlockingHit && MoveHit.GetActor() != GetOwner())
-	{
-		UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Pull stopped by blocking actor %s."), *GetNameSafe(MoveHit.GetActor()));
-		ResetRopeVisual();
-	}
-}
-
-void AWeapon_Rope::RestorePulledTarget()
-{
-	AEnemyCharacter* Target = PullTarget.Get();
-	if (IsValid(Target))
-	{
-		if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
-		{
-			Movement->SetMovementMode(SavedTargetMovementMode, SavedTargetCustomMovementMode);
-			Movement->MaxWalkSpeed = SavedTargetMaxWalkSpeed;
-		}
-		if (USkeletalMeshComponent* Mesh = Target->GetMesh())
-		{
-			Mesh->bPauseAnims = bSavedTargetPauseAnims;
-		}
-		if (bTargetAIWasPaused)
-		{
-			if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
-			{
-				if (UBrainComponent* Brain = AIController->GetBrainComponent())
-				{
-					Brain->ResumeLogic(TEXT("Rope pull complete"));
-				}
-			}
-		}
-	}
-	bTargetAIWasPaused = false;
-	PullTarget.Reset();
-	bIsPullingTarget = false;
 }
 
 void AWeapon_Rope::ResetRopeVisual()
 {
-	RestorePulledTarget();
+	if (AEnemyCharacter* Target = PullTarget.Get())
+	{
+		Target->EndRopePull();
+	}
+	PullTarget.Reset();
+	bIsPullingTarget = false;
 	bIsExtending = false;
 	bSwingActive = false;
 	bSimulatingRope = false;
