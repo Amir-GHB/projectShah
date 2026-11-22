@@ -1456,6 +1456,7 @@ void UCombatComponent::RefreshAnimationState()
 		case EWeaponType::BullHeadHammer: AnimationState.Style = ECombatAnimationStyle::Hammer; break;
 		case EWeaponType::Spear: AnimationState.Style = ECombatAnimationStyle::Spear; break;
 		case EWeaponType::Bow: AnimationState.Style = ECombatAnimationStyle::Bow; break;
+		case EWeaponType::Rope: AnimationState.Style = ECombatAnimationStyle::Rope; break;
 		default: AnimationState.Style = ECombatAnimationStyle::Custom; break;
 		}
 	}
