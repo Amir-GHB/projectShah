@@ -235,6 +235,12 @@ void AWeapon_Rope::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	if (bIsRetracting)
+	{
+		UpdateRopeRetraction(DeltaSeconds);
+		return;
+	}
+
 	if (bIsPullingTarget)
 	{
 		UpdateTargetPull(DeltaSeconds);
@@ -524,10 +530,18 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 void AWeapon_Rope::UpdateTargetPull(float DeltaSeconds)
 {
 	AEnemyCharacter* Target = PullTarget.Get();
-	if (!IsValid(Target) || !Target->bIsBeingRopePulled
-		|| (Target->DamageHandlerComponent && Target->DamageHandlerComponent->bIsDead))
+	if (!IsValid(Target) || (Target->DamageHandlerComponent && Target->DamageHandlerComponent->bIsDead))
 	{
 		ResetRopeVisual();
+		return;
+	}
+
+	// The enemy ends its temporary pull state when it reaches the player or
+	// encounters an obstruction. Keep the rope visible briefly while it reels
+	// back into the weapon instead of deleting it immediately.
+	if (!Target->bIsBeingRopePulled)
+	{
+		BeginRopeRetraction();
 		return;
 	}
 
@@ -561,6 +575,68 @@ void AWeapon_Rope::UpdateTargetPull(float DeltaSeconds)
 	UpdateRopeVisual();
 }
 
+void AWeapon_Rope::BeginRopeRetraction()
+{
+	if (!bIsPullingTarget)
+	{
+		return;
+	}
+
+	AEnemyCharacter* Target = PullTarget.Get();
+	if (IsValid(Target) && Target->bIsBeingRopePulled)
+	{
+		Target->EndRopePull();
+	}
+
+	const FVector Anchor = GetActorLocation();
+	const FVector EndLocation = ParticlePositions.Num() > 0
+		? ParticlePositions.Last() : RopeEndLocation;
+	const FVector Delta = EndLocation - Anchor;
+	RetractionLength = Delta.Size();
+	RetractionDirection = Delta.GetSafeNormal();
+	bIsPullingTarget = false;
+	bIsRetracting = RetractionLength > KINDA_SMALL_NUMBER;
+	PullTarget.Reset();
+	bIsExtending = false;
+
+	if (!bIsRetracting)
+	{
+		ResetRopeVisual();
+	}
+}
+
+void AWeapon_Rope::UpdateRopeRetraction(float DeltaSeconds)
+{
+	RetractionLength = FMath::Max(0.0f,
+		RetractionLength - FMath::Max(0.0f, RopeRetractSpeed) * DeltaSeconds);
+
+	const FVector Anchor = GetActorLocation();
+	const FVector EndLocation = Anchor + RetractionDirection * RetractionLength;
+	const int32 LastIndex = ParticlePositions.Num() - 1;
+	for (int32 Index = 0; Index <= LastIndex; ++Index)
+	{
+		const float Alpha = LastIndex > 0
+			? static_cast<float>(Index) / static_cast<float>(LastIndex) : 0.0f;
+		const FVector Position = FMath::Lerp(Anchor, EndLocation, Alpha);
+		ParticlePositions[Index] = Position;
+		PreviousParticlePositions[Index] = Position;
+		if (bParticleDeployed.IsValidIndex(Index))
+		{
+			bParticleDeployed[Index] = true;
+		}
+	}
+
+	CurrentRopeLength = RetractionLength;
+	RopeStartLocation = Anchor;
+	RopeEndLocation = EndLocation;
+	UpdateRopeVisual();
+
+	if (RetractionLength <= KINDA_SMALL_NUMBER)
+	{
+		ResetRopeVisual();
+	}
+}
+
 void AWeapon_Rope::ResetRopeVisual()
 {
 	if (AEnemyCharacter* Target = PullTarget.Get())
@@ -569,6 +645,8 @@ void AWeapon_Rope::ResetRopeVisual()
 	}
 	PullTarget.Reset();
 	bIsPullingTarget = false;
+	bIsRetracting = false;
+	RetractionLength = 0.0f;
 	bIsExtending = false;
 	bSwingActive = false;
 	bSimulatingRope = false;
