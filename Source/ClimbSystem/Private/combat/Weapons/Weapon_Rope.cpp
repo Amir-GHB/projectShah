@@ -171,25 +171,50 @@ void AWeapon_Rope::InitializeRopeSimulation(const FVector& Direction)
 	const int32 SegmentCount = FMath::Clamp(RopeSegmentCount, 1, MaxRopeSegments);
 	const int32 ParticleCount = SegmentCount + 1;
 	const FVector Anchor = GetActorLocation();
+	const float SafeMaxLength = FMath::Max(0.0f, MaxRopeLength);
+	const float SegmentRestLength = SafeMaxLength / static_cast<float>(SegmentCount);
 
 	ParticlePositions.Init(Anchor, ParticleCount);
 	PreviousParticlePositions.Init(Anchor, ParticleCount);
+	bParticleDeployed.Init(false, ParticleCount);
+	ParticleDeploymentPositions.SetNum(ParticleCount);
 
 	RopeStartLocation = Anchor;
 	LastAnchorLocation = Anchor;
 	RopeDirection = Direction.GetSafeNormal();
 	RopeEndLocation = Anchor;
-	CurrentRopeLength = FMath::Min(8.0f, FMath::Max(0.0f, MaxRopeLength));
+	CurrentRopeLength = 0.0f;
+	TargetThrowDistance = FMath::Clamp(SafeMaxLength - EndSlackLength, 0.0f, SafeMaxLength);
 	SimulationAccumulator = 0.0f;
-	bTipAnchored = false;
 	bSimulatingRope = true;
-	bIsExtending = CurrentRopeLength < MaxRopeLength;
+	bIsExtending = SafeMaxLength > KINDA_SMALL_NUMBER;
 
-	// Verlet stores velocity as the difference between current and previous position.
-	// This gives the free end an actual launch impulse instead of teleporting it outward.
-	const FVector LaunchVelocity = RopeDirection * FMath::Max(0.0f, ThrowSpeed) + AnchorVelocity;
-	PreviousParticlePositions.Last() = Anchor - LaunchVelocity * SimulationStep;
+	// The deployed portion travels straight. The remaining rope is laid into a
+	// broad U-shaped tail at the end, so unused length gathers at the free end
+	// instead of being distributed uniformly along the entire rope.
+	const float SlackLength = SafeMaxLength - TargetThrowDistance;
+	const float SlackRadius = SlackLength / PI;
+	const FVector Down = FVector::DownVector;
+	for (int32 Index = 0; Index < ParticleCount; ++Index)
+	{
+		const float MaterialDistance = SegmentRestLength * Index;
+		if (MaterialDistance <= TargetThrowDistance || SlackLength <= KINDA_SMALL_NUMBER)
+		{
+			ParticleDeploymentPositions[Index] = Anchor + RopeDirection * FMath::Min(MaterialDistance, TargetThrowDistance);
+		}
+		else
+		{
+			const float SlackArcDistance = FMath::Clamp(MaterialDistance - TargetThrowDistance, 0.0f, SlackLength);
+			const float Angle = SlackRadius > KINDA_SMALL_NUMBER ? SlackArcDistance / SlackRadius : 0.0f;
+			const FVector SlackOffset = RopeDirection * (SlackRadius * FMath::Sin(Angle))
+				+ Down * (SlackRadius * (1.0f - FMath::Cos(Angle)));
+			ParticleDeploymentPositions[Index] = Anchor + RopeDirection * TargetThrowDistance + SlackOffset;
+		}
+	}
 
+	bParticleDeployed[0] = true;
+	ParticlePositions[0] = Anchor;
+	PreviousParticlePositions[0] = Anchor;
 	UpdateRopeVisual();
 }
 
@@ -241,6 +266,26 @@ void AWeapon_Rope::SimulateRopeStep(float StepSeconds)
 			FMath::Max(0.0f, MaxRopeLength),
 			CurrentRopeLength + FMath::Max(0.0f, ExtensionSpeed) * StepSeconds);
 
+		const float SegmentRestLength = FMath::Max(1.0f, MaxRopeLength / FMath::Max(1, ParticlePositions.Num() - 1));
+		for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
+		{
+			if (bParticleDeployed[Index])
+			{
+				continue;
+			}
+
+			const float MaterialDistance = SegmentRestLength * Index;
+			if (MaterialDistance > CurrentRopeLength + KINDA_SMALL_NUMBER)
+			{
+				break;
+			}
+
+			const FVector SpawnPosition = ParticleDeploymentPositions[Index];
+			ParticlePositions[Index] = SpawnPosition;
+			PreviousParticlePositions[Index] = SpawnPosition - RopeDirection * FMath::Max(0.0f, ThrowSpeed) * StepSeconds;
+			bParticleDeployed[Index] = true;
+		}
+
 		if (CurrentRopeLength >= MaxRopeLength)
 		{
 			bIsExtending = false;
@@ -252,16 +297,15 @@ void AWeapon_Rope::SimulateRopeStep(float StepSeconds)
 
 	for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
 	{
-		if (bTipAnchored && Index == ParticlePositions.Num() - 1)
+		if (!bParticleDeployed[Index])
 		{
 			continue;
 		}
 
 		const FVector Current = ParticlePositions[Index];
 		const FVector Velocity = (Current - PreviousParticlePositions[Index]) * Damping;
-		const FVector Next = Current + Velocity + Gravity * (StepSeconds * StepSeconds);
 		PreviousParticlePositions[Index] = Current;
-		ParticlePositions[Index] = Next;
+		ParticlePositions[Index] = Current + Velocity + Gravity * (StepSeconds * StepSeconds);
 	}
 
 	SolveRopeConstraints();
@@ -269,10 +313,6 @@ void AWeapon_Rope::SimulateRopeStep(float StepSeconds)
 	SolveRopeConstraints();
 
 	ParticlePositions[0] = GetActorLocation();
-	if (bTipAnchored && ParticlePositions.Num() > 1)
-	{
-		PreviousParticlePositions.Last() = ParticlePositions.Last();
-	}
 }
 
 void AWeapon_Rope::SolveRopeConstraints()
@@ -283,7 +323,10 @@ void AWeapon_Rope::SolveRopeConstraints()
 		return;
 	}
 
-	const float SegmentRestLength = CurrentRopeLength / static_cast<float>(ParticleCount - 1);
+	// Rope links have a fixed maximum length. They are allowed to compress,
+	// which lets excess rope bunch up at the free end rather than being forced
+	// into evenly spaced particles along the whole line.
+	const float SegmentRestLength = FMath::Max(1.0f, MaxRopeLength / static_cast<float>(ParticleCount - 1));
 	const int32 Iterations = FMath::Clamp(ConstraintIterations, 1, 20);
 
 	for (int32 Iteration = 0; Iteration < Iterations; ++Iteration)
@@ -292,28 +335,26 @@ void AWeapon_Rope::SolveRopeConstraints()
 
 		for (int32 Index = 0; Index < ParticleCount - 1; ++Index)
 		{
+			if (!bParticleDeployed.IsValidIndex(Index + 1) || !bParticleDeployed[Index + 1])
+			{
+				break;
+			}
+
 			FVector& PointA = ParticlePositions[Index];
 			FVector& PointB = ParticlePositions[Index + 1];
 			const FVector Delta = PointB - PointA;
 			const float Distance = Delta.Size();
-			if (Distance <= KINDA_SMALL_NUMBER)
+			if (Distance <= SegmentRestLength || Distance <= KINDA_SMALL_NUMBER)
 			{
 				continue;
 			}
 
 			const FVector Correction = Delta * ((Distance - SegmentRestLength) / Distance);
-			const bool bAIsFixed = Index == 0;
-			const bool bBIsFixed = bTipAnchored && Index + 1 == ParticleCount - 1;
-
-			if (bAIsFixed && !bBIsFixed)
+			if (Index == 0)
 			{
 				PointB -= Correction;
 			}
-			else if (!bAIsFixed && bBIsFixed)
-			{
-				PointA += Correction;
-			}
-			else if (!bAIsFixed && !bBIsFixed)
+			else
 			{
 				PointA += Correction * 0.5f;
 				PointB -= Correction * 0.5f;
@@ -336,12 +377,13 @@ void AWeapon_Rope::ResolveParticleCollisions()
 		QueryParams.AddIgnoredActor(OwningCharacter.Get());
 	}
 
-	const FCollisionShape CollisionShape = FCollisionShape::MakeSphere(FMath::Max(1.0f, RopeCollisionRadius));
+	const float SafeRadius = FMath::Max(1.0f, RopeCollisionRadius);
+	const FCollisionShape CollisionShape = FCollisionShape::MakeSphere(SafeRadius);
 	for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
 	{
-		if (bTipAnchored && Index == ParticlePositions.Num() - 1)
+		if (!bParticleDeployed.IsValidIndex(Index) || !bParticleDeployed[Index])
 		{
-			continue;
+			break;
 		}
 
 		const FVector Previous = PreviousParticlePositions[Index];
@@ -351,15 +393,20 @@ void AWeapon_Rope::ResolveParticleCollisions()
 			Hit, Previous, Current, FQuat::Identity, RopeTraceChannel, CollisionShape, QueryParams)
 			&& Hit.bBlockingHit)
 		{
-			ParticlePositions[Index] = Hit.Location;
-			PreviousParticlePositions[Index] = Hit.Location;
-
-			if (Index == ParticlePositions.Num() - 1)
+			// Resolve against the surface without pinning the particle there.
+			// Keep tangential momentum so the rope can slide and fall away.
+			const FVector Normal = Hit.ImpactNormal.GetSafeNormal();
+			const FVector SurfacePosition = Hit.Location + Normal * 0.5f;
+			FVector Velocity = Current - Previous;
+			const float IntoSurface = FVector::DotProduct(Velocity, Normal);
+			if (IntoSurface < 0.0f)
 			{
-				bTipAnchored = true;
-				bIsExtending = false;
-				UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope tip collided with %s."), *GetNameSafe(Hit.GetActor()));
+				Velocity -= Normal * IntoSurface;
 			}
+			Velocity *= 0.85f;
+
+			ParticlePositions[Index] = SurfacePosition;
+			PreviousParticlePositions[Index] = SurfacePosition - Velocity;
 		}
 	}
 }
@@ -369,11 +416,12 @@ void AWeapon_Rope::ResetRopeVisual()
 	bIsExtending = false;
 	bSwingActive = false;
 	bSimulatingRope = false;
-	bTipAnchored = false;
 	CurrentRopeLength = 0.0f;
 	SimulationAccumulator = 0.0f;
 	ParticlePositions.Empty();
 	PreviousParticlePositions.Empty();
+	bParticleDeployed.Empty();
+	ParticleDeploymentPositions.Empty();
 	RopeStartLocation = GetActorLocation();
 	LastAnchorLocation = RopeStartLocation;
 	AnchorVelocity = FVector::ZeroVector;
@@ -398,7 +446,13 @@ void AWeapon_Rope::ResetRopeVisual()
 
 void AWeapon_Rope::UpdateRopeVisual()
 {
-	if (!IsValid(RopeSpline) || !IsValid(RopeSegmentMesh) || ParticlePositions.Num() < 2)
+	int32 ActiveParticleCount = 0;
+	while (bParticleDeployed.IsValidIndex(ActiveParticleCount) && bParticleDeployed[ActiveParticleCount])
+	{
+		++ActiveParticleCount;
+	}
+
+	if (!IsValid(RopeSpline) || !IsValid(RopeSegmentMesh) || ActiveParticleCount < 2)
 	{
 		for (USplineMeshComponent* Segment : RopeSegments)
 		{
@@ -408,19 +462,19 @@ void AWeapon_Rope::UpdateRopeVisual()
 	}
 
 	RopeSpline->ClearSplinePoints(false);
-	for (const FVector& WorldPosition : ParticlePositions)
+	for (int32 Index = 0; Index < ActiveParticleCount; ++Index)
 	{
-		const FVector LocalPosition = GetActorTransform().InverseTransformPosition(WorldPosition);
+		const FVector LocalPosition = GetActorTransform().InverseTransformPosition(ParticlePositions[Index]);
 		RopeSpline->AddSplinePoint(LocalPosition, ESplineCoordinateSpace::Local, false);
 	}
-	for (int32 Index = 0; Index < ParticlePositions.Num(); ++Index)
+	for (int32 Index = 0; Index < ActiveParticleCount; ++Index)
 	{
 		RopeSpline->SetSplinePointType(Index, ESplinePointType::Curve, false);
 	}
 	RopeSpline->UpdateSpline();
 
 	const float SplineLength = RopeSpline->GetSplineLength();
-	const int32 ActiveSegmentCount = FMath::Min(ParticlePositions.Num() - 1, RopeSegments.Num());
+	const int32 ActiveSegmentCount = FMath::Min(ActiveParticleCount - 1, RopeSegments.Num());
 	const bool bShowRope = SplineLength > KINDA_SMALL_NUMBER;
 
 	for (int32 Index = 0; Index < RopeSegments.Num(); ++Index)
