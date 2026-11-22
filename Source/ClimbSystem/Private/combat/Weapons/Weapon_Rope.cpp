@@ -191,16 +191,36 @@ bool AWeapon_Rope::ResolveThrowDirection(
 		FHitResult AimHit;
 		const FVector TraceEnd = ViewLocation + ViewDirection * 10000.0f;
 		OutAimLocation = TraceEnd;
-		if (World->LineTraceSingleByChannel(AimHit, ViewLocation, TraceEnd, ECC_Visibility, AimParams)
-			&& AimHit.bBlockingHit)
+		const bool bViewHit = World->LineTraceSingleByChannel(
+			AimHit, ViewLocation, TraceEnd, ECC_Visibility, AimParams) && AimHit.bBlockingHit;
+		if (bViewHit)
 		{
 			OutAimLocation = AimHit.ImpactPoint;
+
+			// A center-view hit on an enemy becomes the preselected rope target.
+			// This mirrors the bow's camera trace while keeping the rope's target
+			// locked before its release notify fires.
+			if (AEnemyCharacter* TraceEnemy = Cast<AEnemyCharacter>(AimHit.GetActor()))
+			{
+				const UDamageHandlerComponent* Damage = TraceEnemy->DamageHandlerComponent;
+				const FVector EnemyPoint = TraceEnemy->GetActorLocation() + FVector(0.0f, 0.0f,
+					TraceEnemy->GetCapsuleComponent()
+						? TraceEnemy->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.35f : 35.0f);
+				if ((!Damage || !Damage->bIsDead)
+					&& !TraceEnemy->bIsInDamageReaction
+					&& FVector::Dist(Anchor, EnemyPoint) <= SafeMaximum)
+				{
+					OutTarget = TraceEnemy;
+					OutAimLocation = EnemyPoint;
+				}
+			}
 		}
 
 		const FVector ToAim = OutAimLocation - Anchor;
 		if (ToAim.SizeSquared() > FMath::Square(SafeMaximum))
 		{
 			OutAimLocation = Anchor + ToAim.GetSafeNormal() * SafeMaximum;
+			OutTarget = nullptr;
 		}
 	}
 
@@ -628,22 +648,25 @@ bool AWeapon_Rope::TryBeginTargetPull()
 	}
 	if (LastDeployedIndex < 1) return false;
 
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(RopeTargetCatch), true, this);
-	if (AActor* OwnerActor = GetOwner()) Params.AddIgnoredActor(OwnerActor);
-	Params.AddIgnoredActor(this);
-	const float CatchRadius = FMath::Max(20.0f, RopeCollisionRadius * 3.0f);
-	TArray<FHitResult> Hits;
-	GetWorld()->SweepMultiByChannel(
-		Hits, ParticlePositions[0], ParticlePositions[LastDeployedIndex], FQuat::Identity,
-		ECC_Pawn, FCollisionShape::MakeSphere(CatchRadius), Params);
-
-	for (const FHitResult& Hit : Hits)
+	// The intended target was selected before release. Catch it when the
+	// deployed rope path reaches its stored aim point; no pawn collision sweep
+	// is used to discover or choose the target.
+	const float SegmentRestLength = FMath::Max(
+		1.0f, MaxRopeLength / FMath::Max(1, ParticlePositions.Num() - 1));
+	const float CatchRadius = FMath::Max(25.0f, RopeCollisionRadius * 4.0f)
+		+ SegmentRestLength * 0.75f;
+	float ClosestDistanceSquared = TNumericLimits<float>::Max();
+	for (int32 Index = 1; Index <= LastDeployedIndex; ++Index)
 	{
-		if (Hit.GetActor() == Target)
-		{
-			BeginTargetPull(Target);
-			return bIsPullingTarget;
-		}
+		ClosestDistanceSquared = FMath::Min(
+			ClosestDistanceSquared,
+			FVector::DistSquared(ParticlePositions[Index], ThrowAimLocation));
+	}
+
+	if (ClosestDistanceSquared <= FMath::Square(CatchRadius))
+	{
+		BeginTargetPull(Target);
+		return bIsPullingTarget;
 	}
 	return false;
 }
