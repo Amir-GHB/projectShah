@@ -80,6 +80,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "1.0"))
 	float RopeContractionSpeed = 8.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "100.0"))
+	float RopeRetractSpeed = 1800.0f;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rope|State")
 	bool bIsExtending = false;
 
@@ -120,12 +123,17 @@ private:
 	float SavedTargetMaxWalkSpeed = 0.0f;
 	bool bSavedTargetPauseAnims = false;
 	bool bIsPullingTarget = false;
+	bool bIsRetracting = false;
 	bool bTargetAIWasPaused = false;
+	float RetractionLength = 0.0f;
+	FVector RetractionDirection = FVector::ForwardVector;
 
 	void ResetRopeVisual();
 	bool TryBeginTargetPull();
 	void BeginTargetPull(AEnemyCharacter* Target);
 	void UpdateTargetPull(float DeltaSeconds);
+	void BeginRopeRetraction();
+	void UpdateRopeRetraction(float DeltaSeconds);
 	AActor* GetTargetingActor() const;
 	void InitializeRopeSimulation(const FVector& Direction);
 	void SimulateRopeStep(float StepSeconds);
