@@ -12,7 +12,6 @@ class UAnimMontage;
 class UAnimSequenceBase;
 class UStaticMesh;
 class AEnemyCharacter;
-class UCharacterMovementComponent;
 
 /**
  * Code-driven thrown rope weapon. The hand is a fixed simulation anchor while
@@ -127,7 +126,6 @@ private:
 	bool TryBeginTargetPull();
 	void BeginTargetPull(AEnemyCharacter* Target);
 	void UpdateTargetPull(float DeltaSeconds);
-	void RestorePulledTarget();
 	AActor* GetTargetingActor() const;
 	void InitializeRopeSimulation(const FVector& Direction);
 	void SimulateRopeStep(float StepSeconds);
