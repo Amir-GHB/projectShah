@@ -7,6 +7,7 @@
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
@@ -178,31 +179,120 @@ bool AWeapon_Rope::ResolveThrowDirection(
 	}
 
 	OutTarget = nullptr;
-	AActor* Candidate = GetTargetingActor();
-	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Candidate))
+
+	if (bUseNonAimTargeting)
 	{
-		const UDamageHandlerComponent* Damage = Enemy->DamageHandlerComponent;
-		const FVector CandidatePoint = GetEnemyAimPoint(Enemy);
-		const float CandidateDistance = FVector::Dist(Anchor, CandidatePoint);
+		// Test-friendly acquisition: choose the physically nearest eligible enemy
+		// inside a cone around the player's view direction. No crosshair or
+		// precise center-screen hit is required.
+		const float MinimumViewDot = FMath::Cos(FMath::DegreesToRadians(
+			FMath::Clamp(NonAimTargetingHalfAngle, 1.0f, 60.0f)));
+		float ClosestDistanceSquared = FMath::Square(SafeMaximum);
 
-		FCollisionQueryParams TargetParams(SCENE_QUERY_STAT(RopePreThrowTarget), true, Character);
-		TargetParams.AddIgnoredActor(this);
-		FHitResult VisibilityHit;
-		const bool bBlocked = World->LineTraceSingleByChannel(
-			VisibilityHit, ViewLocation, CandidatePoint, ECC_Visibility, TargetParams);
+		FCollisionQueryParams VisibilityParams(SCENE_QUERY_STAT(RopeNonAimTargetVisibility), true, Character);
+		VisibilityParams.AddIgnoredActor(this);
 
-		if ((!Damage || !Damage->bIsDead)
-			&& !Enemy->bIsInDamageReaction
-			&& CandidateDistance <= SafeMaximum
-			&& (!bBlocked || VisibilityHit.GetActor() == Enemy))
+		for (TActorIterator<AEnemyCharacter> It(World); It; ++It)
 		{
+			AEnemyCharacter* Enemy = *It;
+			if (!IsValid(Enemy) || Enemy->bIsInDamageReaction)
+			{
+				continue;
+			}
+
+			const UDamageHandlerComponent* Damage = Enemy->DamageHandlerComponent;
+			if (Damage && Damage->bIsDead)
+			{
+				continue;
+			}
+
+			const FVector CandidatePoint = GetEnemyAimPoint(Enemy);
+			const FVector ToCandidate = CandidatePoint - ViewLocation;
+			const float DistanceSquared = FVector::DistSquared(Anchor, CandidatePoint);
+			if (DistanceSquared > FMath::Square(SafeMaximum) || ToCandidate.IsNearlyZero())
+			{
+				continue;
+			}
+
+			const float ViewDot = FVector::DotProduct(ViewDirection, ToCandidate.GetSafeNormal());
+			if (ViewDot < MinimumViewDot || DistanceSquared >= ClosestDistanceSquared)
+			{
+				continue;
+			}
+
+			FHitResult VisibilityHit;
+			const bool bBlocked = World->LineTraceSingleByChannel(
+				VisibilityHit, ViewLocation, CandidatePoint, ECC_Visibility, VisibilityParams);
+			if (bBlocked && VisibilityHit.GetActor() != Enemy)
+			{
+				continue;
+			}
+
+			ClosestDistanceSquared = DistanceSquared;
 			OutTarget = Enemy;
 			OutAimLocation = CandidatePoint;
 		}
 	}
+	else
+	{
+		// Preserve the original lock-on/manual-target and center-view trace path.
+		AActor* Candidate = GetTargetingActor();
+		if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Candidate))
+		{
+			const UDamageHandlerComponent* Damage = Enemy->DamageHandlerComponent;
+			const FVector CandidatePoint = GetEnemyAimPoint(Enemy);
+			const float CandidateDistance = FVector::Dist(Anchor, CandidatePoint);
 
-	// If target lock did not provide a valid in-range enemy, use the same
-	// camera-forward visibility trace used by the bow to resolve the aim point.
+			FCollisionQueryParams TargetParams(SCENE_QUERY_STAT(RopePreThrowTarget), true, Character);
+			TargetParams.AddIgnoredActor(this);
+			FHitResult VisibilityHit;
+			const bool bBlocked = World->LineTraceSingleByChannel(
+				VisibilityHit, ViewLocation, CandidatePoint, ECC_Visibility, TargetParams);
+
+			if ((!Damage || !Damage->bIsDead)
+				&& !Enemy->bIsInDamageReaction
+				&& CandidateDistance <= SafeMaximum
+				&& (!bBlocked || VisibilityHit.GetActor() == Enemy))
+			{
+				OutTarget = Enemy;
+				OutAimLocation = CandidatePoint;
+			}
+		}
+
+		// If target lock did not provide a valid in-range enemy, use the same
+		// camera-forward visibility trace used by the bow to resolve the aim point.
+		if (!IsValid(OutTarget))
+		{
+			FCollisionQueryParams AimParams(SCENE_QUERY_STAT(RopeAimTrace), true, Character);
+			AimParams.AddIgnoredActor(this);
+			FHitResult AimHit;
+			const FVector TraceEnd = ViewLocation + ViewDirection * 10000.0f;
+			OutAimLocation = TraceEnd;
+			const bool bViewHit = World->LineTraceSingleByChannel(
+				AimHit, ViewLocation, TraceEnd, ECC_Visibility, AimParams) && AimHit.bBlockingHit;
+			if (bViewHit)
+			{
+				OutAimLocation = AimHit.ImpactPoint;
+
+				if (AEnemyCharacter* TraceEnemy = Cast<AEnemyCharacter>(AimHit.GetActor()))
+				{
+					const UDamageHandlerComponent* Damage = TraceEnemy->DamageHandlerComponent;
+					const FVector EnemyPoint = GetEnemyAimPoint(TraceEnemy);
+					if ((!Damage || !Damage->bIsDead)
+						&& !TraceEnemy->bIsInDamageReaction
+						&& FVector::Dist(Anchor, EnemyPoint) <= SafeMaximum)
+					{
+						OutTarget = TraceEnemy;
+						OutAimLocation = EnemyPoint;
+					}
+				}
+			}
+		}
+	}
+
+	// If the optional cone search found nobody, keep the throw functional as a
+	// free throw along the view ray. In non-aim mode, do not silently fall back
+	// to the old precise-target acquisition path.
 	if (!IsValid(OutTarget))
 	{
 		FCollisionQueryParams AimParams(SCENE_QUERY_STAT(RopeAimTrace), true, Character);
@@ -215,34 +305,15 @@ bool AWeapon_Rope::ResolveThrowDirection(
 		if (bViewHit)
 		{
 			OutAimLocation = AimHit.ImpactPoint;
-
-			// A center-view hit on an enemy becomes the preselected rope target.
-			// This mirrors the bow's camera trace while keeping the rope's target
-			// locked before its release notify fires.
-			if (AEnemyCharacter* TraceEnemy = Cast<AEnemyCharacter>(AimHit.GetActor()))
-			{
-				const UDamageHandlerComponent* Damage = TraceEnemy->DamageHandlerComponent;
-				const FVector EnemyPoint = GetEnemyAimPoint(TraceEnemy);
-				if ((!Damage || !Damage->bIsDead)
-					&& !TraceEnemy->bIsInDamageReaction
-					&& FVector::Dist(Anchor, EnemyPoint) <= SafeMaximum)
-				{
-					OutTarget = TraceEnemy;
-					OutAimLocation = EnemyPoint;
-				}
-			}
 		}
 
-		const FVector ToAim = OutAimLocation - Anchor;
-		// With no blocking point, reserve a little material length for the
-		// upward loft. The curved path still consumes the full available rope.
+		const FVector ToAimPoint = OutAimLocation - Anchor;
 		const float ArcReserve = FMath::Min(150.0f, FMath::Max(0.0f, EndSlackLength * 0.5f));
 		const float FreeAimMaximum = bViewHit
 			? SafeMaximum : FMath::Max(100.0f, SafeMaximum - ArcReserve);
-		if (ToAim.SizeSquared() > FMath::Square(FreeAimMaximum))
+		if (ToAimPoint.SizeSquared() > FMath::Square(FreeAimMaximum))
 		{
-			OutAimLocation = Anchor + ToAim.GetSafeNormal() * FreeAimMaximum;
-			OutTarget = nullptr;
+			OutAimLocation = Anchor + ToAimPoint.GetSafeNormal() * FreeAimMaximum;
 		}
 	}
 
