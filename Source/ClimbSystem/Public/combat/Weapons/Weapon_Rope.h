@@ -105,17 +105,20 @@ private:
 	TArray<FVector> PreviousParticlePositions;
 	TArray<bool> bParticleDeployed;
 	TArray<FVector> ParticleDeploymentPositions;
+	TArray<FVector> ParticleLaunchVelocities;
 
 	FVector RopeStartLocation = FVector::ZeroVector;
 	FVector LastAnchorLocation = FVector::ZeroVector;
 	FVector AnchorVelocity = FVector::ZeroVector;
 	FVector RopeDirection = FVector::ForwardVector;
 	FVector RopeEndLocation = FVector::ZeroVector;
+	FVector ThrowAimLocation = FVector::ZeroVector;
 
 	float CurrentRopeLength = 0.0f;
 	float SimulationAccumulator = 0.0f;
 	bool bSwingActive = false;
 	bool bSimulatingRope = false;
+	bool bHasThrowAimLocation = false;
 	float TargetThrowDistance = 0.0f;
 
 	TWeakObjectPtr<AEnemyCharacter> PullTarget;
@@ -131,10 +134,10 @@ private:
 	void BeginRopeRetraction();
 	void UpdateRopeRetraction(float DeltaSeconds);
 	AActor* GetTargetingActor() const;
-	void InitializeRopeSimulation(const FVector& Direction);
+	void InitializeRopeSimulation(const FVector& Direction, const FVector& AimLocation, bool bHasAimLocation);
 	void SimulateRopeStep(float StepSeconds);
 	void SolveRopeConstraints();
 	void ResolveParticleCollisions();
 	void UpdateRopeVisual();
-	bool ResolveThrowDirection(FVector& OutDirection) const;
+	bool ResolveThrowDirection(FVector& OutDirection, FVector& OutAimLocation, AEnemyCharacter*& OutTarget) const;
 };
