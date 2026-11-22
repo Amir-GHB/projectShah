@@ -165,10 +165,6 @@ public:
 	float MagicAttackCooldown = 1.8f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic|Projectile", meta = (ClampMin = "0.0"))
 	float MagicProjectileFallbackDelay = 0.0f;
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|Magic|Movement", meta = (ClampMin = "1.0"))
-	float PreferredCombatDistanceMultiplier = 2.5f;
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Magic|Movement")
-	bool bNeedsRelocationAfterAttack = false;
 private:
 	FTimerHandle MagicProjectileFallbackTimer;
 	TWeakObjectPtr<AActor> PendingMagicTarget;

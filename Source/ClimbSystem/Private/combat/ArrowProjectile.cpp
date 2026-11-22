@@ -176,7 +176,7 @@ void AArrowProjectile::EmbedAtImpact(UPrimitiveComponent* OtherComponent, const 
 
 		if (IsValid(AttachComponent))
 		{
-			FAttachmentTransformRules AttachRules(EAttachmentRule::KeepWorld, true);
+			FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
 			AttachToComponent(AttachComponent, AttachRules, AttachBoneName);
 		}
 	}

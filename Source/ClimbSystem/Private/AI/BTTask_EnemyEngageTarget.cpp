@@ -79,10 +79,11 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	}
 
 	float DesiredRange = Enemy->AttackRange;
-	if (const AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
-		DesiredRange *= FMath::Max(1.0f, Mage->PreferredCombatDistanceMultiplier);
+
 	if (const ABowEnemyCharacter* Archer = Cast<ABowEnemyCharacter>(Enemy))
+	{
 		DesiredRange *= FMath::Max(1.0f, Archer->PreferredCombatDistanceMultiplier);
+	}
 
 	const FVector EnemyLocation = Enemy->GetActorLocation();
 	const FVector TargetLocation = Target->GetActorLocation();
@@ -97,92 +98,6 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 	{
 		const FRotator DesiredRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
 		Enemy->SetActorRotation(FMath::RInterpTo(Enemy->GetActorRotation(), DesiredRotation, DeltaSeconds, 8.0f));
-	}
-
-	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
-	{
-		if (Mage->bNeedsRelocationAfterAttack)
-		{
-			if (!Memory.bRelocationIssued)
-			{
-				UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Enemy->GetWorld());
-				FNavLocation Candidate;
-				bool bFound = false;
-				const float Tolerance = FMath::Max(100.0f, DesiredRange * 0.25f);
-				for (int32 Attempt = 0; Nav && Attempt < 12; ++Attempt)
-				{
-					if (Nav->GetRandomReachablePointInRadius(EnemyLocation, 420.0f, Candidate) &&
-						FMath::Abs(FVector::Dist2D(Candidate.Location, TargetLocation) - DesiredRange) <= Tolerance)
-					{
-						bFound = true;
-						break;
-					}
-				}
-				if (!bFound && Nav)
-				{
-					const FVector Away = (EnemyLocation - TargetLocation).GetSafeNormal2D();
-					const FVector Projected = EnemyLocation + (Away.IsNearlyZero() ? -Enemy->GetActorForwardVector() : Away) * 300.0f;
-					Nav->ProjectPointToNavigation(Projected, Candidate);
-				}
-				if (!Nav)
-				{
-					Mage->bNeedsRelocationAfterAttack = false;
-					return;
-				}
-				Memory.RelocationDestination = Candidate.Location;
-				Memory.bRelocationIssued = true;
-				Controller->MoveToLocation(Memory.RelocationDestination, 80.0f);
-			}
-			if (FVector::Dist2D(EnemyLocation, Memory.RelocationDestination) <= 100.0f ||
-				Controller->GetMoveStatus() == EPathFollowingStatus::Idle)
-			{
-				Mage->bNeedsRelocationAfterAttack = false;
-				Memory.bRelocationIssued = false;
-				Memory.bHasMoveGoal = false;
-			}
-			return;
-		}
-	}
-
-	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
-	{
-		Memory.StrafeCooldown = FMath::Max(0.0f, Memory.StrafeCooldown - DeltaSeconds);
-		if (Distance <= DesiredRange * 1.15f)
-		{
-			if (Memory.bStrafeMoveIssued)
-			{
-				if (Controller->GetMoveStatus() == EPathFollowingStatus::Idle ||
-					FVector::Dist2D(Enemy->GetActorLocation(), Memory.RelocationDestination) <= 90.0f)
-				{
-					Memory.bStrafeMoveIssued = false;
-					Memory.StrafeCooldown = FMath::FRandRange(0.4f, 1.0f);
-				}
-				return;
-			}
-			if (Memory.StrafeCooldown <= 0.0f)
-			{
-				UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Enemy->GetWorld());
-				if (Nav)
-				{
-					const FVector Away = (EnemyLocation - TargetLocation).GetSafeNormal2D();
-					const FVector Right = FVector::CrossProduct(FVector::UpVector, Away).GetSafeNormal2D();
-					const FVector Direction = Distance < DesiredRange * 0.82f ? Away : (FMath::RandBool() ? Right : -Right);
-					const FVector DesiredPoint = EnemyLocation + Direction * FMath::FRandRange(220.0f, 340.0f);
-					FNavLocation ProjectedPoint;
-					if (Nav->ProjectPointToNavigation(DesiredPoint, ProjectedPoint))
-					{
-						Memory.RelocationDestination = ProjectedPoint.Location;
-						Memory.bStrafeMoveIssued = true;
-						Controller->MoveToLocation(Memory.RelocationDestination, 65.0f);
-						return;
-					}
-				}
-				Memory.StrafeCooldown = 0.8f;
-			}
-			Controller->StopMovement();
-			return;
-		}
-		Memory.bStrafeMoveIssued = false;
 	}
 
 	if (Distance > DesiredRange)
@@ -209,6 +124,7 @@ void UBTTask_EnemyEngageTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint
 		{
 			if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(Enemy))
 			{
+				UE_LOG(LogTemp, Log, TEXT("Task Engage: its mage!!"));
 				Mage->PerformAICombatAction(Target);
 				if (!Mage->HasPendingMagicAttack()) Enemy->ReleaseAICombatSlot();
 			}

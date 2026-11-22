@@ -15,6 +15,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "combat/CombatProjectile.h"
+#include "combat/WeaponBase.h"
 #include "Kismet/GameplayStatics.h"
 
 namespace
@@ -277,15 +278,18 @@ void AGuardEnemyCharacter::UpdateDefensiveCombat(AActor* Target)
 
 void AMagicEnemyCharacter::PerformAICombatAction(AActor* Target)
 {
+	UE_LOG(LogTemp, Log, TEXT("mage enemy: PerformAICombatAction"));
 	if (!IsValid(Target) || !IsValid(MagicProjectileClass) || !GetWorld()) return;
 	const float Now = GetWorld()->GetTimeSeconds();
 	if (Now < NextMagicAttackTime || PendingMagicTarget.IsValid()) return;
 	UAnimInstance* Anim = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
 	if (IsValid(MagicAttackMontage) && Anim && Anim->Montage_IsPlaying(MagicAttackMontage)) return;
 	PendingMagicTarget = Target;
-	bNeedsRelocationAfterAttack = false;
+	//bNeedsRelocationAfterAttack = false;
+	UE_LOG(LogTemp, Log, TEXT("mage enemy: Right before if"));
 	if (IsValid(MagicAttackMontage) && Anim && Anim->Montage_Play(MagicAttackMontage) > 0.0f)
 	{
+		UE_LOG(LogTemp, Log, TEXT("mage enemy: inside if"));
 		const float FallbackDelay = MagicProjectileFallbackDelay > 0.0f
 			? MagicProjectileFallbackDelay : MagicAttackMontage->GetPlayLength();
 		GetWorldTimerManager().SetTimer(MagicProjectileFallbackTimer, this,
@@ -339,7 +343,7 @@ void AMagicEnemyCharacter::ReleaseMagicProjectile()
 		Projectile->FinishSpawning(SpawnTransform);
 	}
 	NextMagicAttackTime = GetWorld()->GetTimeSeconds() + FMath::Max(0.1f, MagicAttackCooldown);
-	bNeedsRelocationAfterAttack = true;
+	//bNeedsRelocationAfterAttack = true;
 	ReleaseAICombatSlot();
 }
 
