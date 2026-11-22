@@ -623,16 +623,22 @@ void AWeapon_Rope::RestorePulledTarget()
 	AEnemyCharacter* Target = PullTarget.Get();
 	if (IsValid(Target))
 	{
-		if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
+		const bool bTargetDiedDuringPull = Target->DamageHandlerComponent
+			&& Target->DamageHandlerComponent->bIsDead;
+		if (!bTargetDiedDuringPull)
 		{
-			Movement->SetMovementMode(static_cast<EMovementMode>(SavedTargetMovementMode), SavedTargetCustomMovementMode);
-			Movement->MaxWalkSpeed = SavedTargetMaxWalkSpeed;
+			if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
+			{
+				Movement->SetMovementMode(static_cast<EMovementMode>(SavedTargetMovementMode), SavedTargetCustomMovementMode);
+				Movement->MaxWalkSpeed = SavedTargetMaxWalkSpeed;
+			}
 		}
 		if (USkeletalMeshComponent* Mesh = Target->GetMesh())
 		{
+			// Always unpause the mesh so a death transition/ragdoll can take over.
 			Mesh->bPauseAnims = bSavedTargetPauseAnims;
 		}
-		if (bTargetAIWasPaused)
+		if (bTargetAIWasPaused && !bTargetDiedDuringPull)
 		{
 			if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
 			{
