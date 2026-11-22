@@ -177,7 +177,6 @@ void AWeapon_Rope::InitializeRopeSimulation(const FVector& Direction)
 
 	RopeStartLocation = Anchor;
 	LastAnchorLocation = Anchor;
-	AnchorVelocity = FVector::ZeroVector;
 	RopeDirection = Direction.GetSafeNormal();
 	RopeEndLocation = Anchor;
 	CurrentRopeLength = FMath::Min(8.0f, FMath::Max(0.0f, MaxRopeLength));
@@ -200,7 +199,11 @@ void AWeapon_Rope::Tick(float DeltaSeconds)
 
 	if (!bSimulatingRope || ParticlePositions.Num() < 2 || !GetWorld())
 	{
-		LastAnchorLocation = GetActorLocation();
+		const FVector IdleAnchor = GetActorLocation();
+		AnchorVelocity = DeltaSeconds > SMALL_NUMBER
+			? (IdleAnchor - LastAnchorLocation) / DeltaSeconds
+			: FVector::ZeroVector;
+		LastAnchorLocation = IdleAnchor;
 		return;
 	}
 
