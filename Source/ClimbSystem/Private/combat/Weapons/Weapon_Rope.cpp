@@ -217,9 +217,14 @@ bool AWeapon_Rope::ResolveThrowDirection(
 		}
 
 		const FVector ToAim = OutAimLocation - Anchor;
-		if (ToAim.SizeSquared() > FMath::Square(SafeMaximum))
+		// With no blocking point, reserve a little material length for the
+		// upward loft. The curved path still consumes the full available rope.
+		const float ArcReserve = FMath::Min(150.0f, FMath::Max(0.0f, EndSlackLength * 0.5f));
+		const float FreeAimMaximum = bViewHit
+			? SafeMaximum : FMath::Max(100.0f, SafeMaximum - ArcReserve);
+		if (ToAim.SizeSquared() > FMath::Square(FreeAimMaximum))
 		{
-			OutAimLocation = Anchor + ToAim.GetSafeNormal() * SafeMaximum;
+			OutAimLocation = Anchor + ToAim.GetSafeNormal() * FreeAimMaximum;
 			OutTarget = nullptr;
 		}
 	}
