@@ -84,6 +84,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> TargetLockAction;
 
+	/** Test interaction: throw a nearby throwable environmental actor. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> ThrowNearbyActorAction;
+
 	void OnMove(const FInputActionValue& Value);
 	void OnLook(const FInputActionValue& Value);
 	void OnJumpStarted(const FInputActionValue& Value);
@@ -96,6 +100,7 @@ protected:
 	void OnParryTriggered(const FInputActionValue& Value);
 	void OnNextWeaponTriggered(const FInputActionValue& Value);
 	void OnTargetLockTriggered(const FInputActionValue& Value);
+	void OnThrowNearbyActorTriggered(const FInputActionValue& Value);
 
 public:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
