@@ -46,9 +46,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Throw", meta = (ClampMin = "100.0"))
 	float ExtensionSpeed = 1800.0f;
 
-	/** Initial velocity imparted to the rope's free end. */
+	/** Initial velocity imparted to newly deployed rope particles. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Throw", meta = (ClampMin = "100.0"))
 	float ThrowSpeed = 2200.0f;
+
+	/** Length deliberately left as loose rope at the end of the throw. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Throw", meta = (ClampMin = "0.0"))
+	float EndSlackLength = 250.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Physics")
 	float GravityScale = 1.0f;
@@ -85,6 +89,8 @@ private:
 
 	TArray<FVector> ParticlePositions;
 	TArray<FVector> PreviousParticlePositions;
+	TArray<bool> bParticleDeployed;
+	TArray<FVector> ParticleDeploymentPositions;
 
 	FVector RopeStartLocation = FVector::ZeroVector;
 	FVector LastAnchorLocation = FVector::ZeroVector;
@@ -96,7 +102,7 @@ private:
 	float SimulationAccumulator = 0.0f;
 	bool bSwingActive = false;
 	bool bSimulatingRope = false;
-	bool bTipAnchored = false;
+	float TargetThrowDistance = 0.0f;
 
 	void ResetRopeVisual();
 	void InitializeRopeSimulation(const FVector& Direction);
