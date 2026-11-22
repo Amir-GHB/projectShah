@@ -42,6 +42,14 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Combat|Motion Warping")
 	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
 
+	/** True while the rope weapon temporarily owns this enemy's movement and animation. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Enemy|Rope")
+	bool bIsBeingRopePulled = false;
+
+	/** Starts a temporary animation-free root pull toward Puller. */
+	bool BeginRopePull(AActor* Puller, float PullSpeed, float StopDistance);
+	void EndRopePull();
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI")
 	TObjectPtr<UBehaviorTree> BehaviorTreeAsset = nullptr;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Enemy|AI|Patrol")
@@ -133,6 +141,16 @@ private:
 	TWeakObjectPtr<AActor> AttackSlotTarget;
 	TWeakObjectPtr<AActor> PendingAICombatTarget;
 	bool bPendingAIHeavyAttack = false;
+
+	TWeakObjectPtr<AActor> RopePuller;
+	float RopePullSpeed = 1200.0f;
+	float RopePullStopDistance = 160.0f;
+	float PreviousRopePullWalkSpeed = 0.0f;
+	TEnumAsByte<EMovementMode> PreviousRopePullMovementMode = MOVE_Walking;
+	uint8 PreviousRopePullCustomMovementMode = 0;
+	bool bPreviousRopePullPauseAnims = false;
+	bool bWasRopePullBrainPaused = false;
+
 	void ReleaseQueuedAICombatAction();
 };
 
