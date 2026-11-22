@@ -6,6 +6,7 @@
 #include "Animation/AnimSequenceBase.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
@@ -32,6 +33,12 @@ AWeapon_Rope::AWeapon_Rope()
 	RopeSpline = CreateDefaultSubobject<USplineComponent>(TEXT("RopeSpline"));
 	RopeSpline->SetupAttachment(RootSceneComponent);
 	RopeSpline->SetClosedLoop(false);
+
+	HookMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RopeHook"));
+	HookMeshComponent->SetupAttachment(RootSceneComponent);
+	HookMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HookMeshComponent->SetGenerateOverlapEvents(false);
+	HookMeshComponent->SetVisibility(false);
 
 	for (int32 Index = 0; Index < MaxRopeSegments; ++Index)
 	{
@@ -64,6 +71,17 @@ void AWeapon_Rope::BeginPlay()
 	if (!IsValid(RopeSegmentMesh))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[AWeapon_Rope] RopeSegmentMesh is not assigned on %s; the rope will be invisible."), *GetName());
+	}
+
+	if (IsValid(HookMeshComponent))
+	{
+		HookMeshComponent->SetStaticMesh(HookMesh);
+		HookMeshComponent->SetRelativeScale3D(HookScale);
+		HookMeshComponent->SetVisibility(false);
+	}
+	if (!IsValid(HookMesh))
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] HookMesh is not assigned on %s; no endpoint hook will be rendered."), *GetName());
 	}
 
 	for (USplineMeshComponent* Segment : RopeSegments)
@@ -953,6 +971,10 @@ void AWeapon_Rope::ResetRopeVisual()
 			Segment->SetVisibility(false);
 		}
 	}
+	if (IsValid(HookMeshComponent))
+	{
+		HookMeshComponent->SetVisibility(false);
+	}
 
 	if (IsValid(RopeSpline))
 	{
@@ -977,6 +999,10 @@ void AWeapon_Rope::UpdateRopeVisual()
 		{
 			if (IsValid(Segment)) Segment->SetVisibility(false);
 		}
+		if (IsValid(HookMeshComponent))
+		{
+			HookMeshComponent->SetVisibility(false);
+		}
 		return;
 	}
 
@@ -991,6 +1017,29 @@ void AWeapon_Rope::UpdateRopeVisual()
 		RopeSpline->SetSplinePointType(Index, ESplinePointType::Curve, false);
 	}
 	RopeSpline->UpdateSpline();
+
+	// Drive the hook directly from the final deployed simulation particle.
+	// It is deliberately independent of the last spline segment, whose mesh
+	// transform is only a rendering approximation of the rope curve.
+	if (IsValid(HookMeshComponent) && IsValid(HookMesh))
+	{
+		const int32 EndParticleIndex = ActiveParticleCount - 1;
+		const FVector HookPosition = ParticlePositions[EndParticleIndex];
+		const FVector RopeTangent = EndParticleIndex > 0
+			? (ParticlePositions[EndParticleIndex] - ParticlePositions[EndParticleIndex - 1]).GetSafeNormal()
+			: RopeDirection.GetSafeNormal();
+		const FRotator HookRotation = (RopeTangent.IsNearlyZero()
+			? RopeDirection.GetSafeNormal() : RopeTangent).Rotation() + HookRotationOffset;
+		const FVector HookWorldPosition = HookPosition + HookRotation.RotateVector(HookPositionOffset);
+
+		HookMeshComponent->SetWorldLocationAndRotation(HookWorldPosition, HookRotation);
+		HookMeshComponent->SetRelativeScale3D(HookScale);
+		HookMeshComponent->SetVisibility(true);
+	}
+	else if (IsValid(HookMeshComponent))
+	{
+		HookMeshComponent->SetVisibility(false);
+	}
 
 	const float SplineLength = RopeSpline->GetSplineLength();
 	const int32 ActiveSegmentCount = FMath::Min(ActiveParticleCount - 1, RopeSegments.Num());
