@@ -13,6 +13,7 @@
 #include "combat/AnimNotifyState_ParryWindow.h"
 #include "Animation/AnimNotifies/AnimNotifyState.h"
 #include "combat/Weapons/Weapon_Bow.h"
+#include "combat/Weapons/Weapon_Rope.h"
 #include "combat/EnemyCharacter.h"
 #include "AI/EnemyAIController.h"
 #include "BrainComponent.h"
@@ -507,6 +508,11 @@ bool UCombatComponent::StartNewCombo()
 	{
 		StopActiveAttack(true, false);
 		return false;
+	}
+
+	if (AWeapon_Rope* Rope = Cast<AWeapon_Rope>(ActiveAttackWeapon.Get()))
+	{
+		Rope->BeginSwing();
 	}
 
 	const uint64 Token = ActiveAttackToken;
