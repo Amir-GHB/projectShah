@@ -11,6 +11,7 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "combat/EnemyCharacter.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/CombatTargetingComponent.h"
@@ -150,6 +151,26 @@ bool AWeapon_Rope::ResolveThrowDirection(
 
 	const FVector Anchor = GetActorLocation();
 	const float SafeMaximum = FMath::Max(100.0f, MaxRopeLength - FMath::Max(0.0f, EndSlackLength));
+	auto GetEnemyAimPoint = [](const AEnemyCharacter* Enemy)
+	{
+		if (IsValid(Enemy) && IsValid(Enemy->GetMesh()))
+		{
+			const FBox MeshBounds = Enemy->GetMesh()->Bounds.GetBox();
+			if (MeshBounds.IsValid)
+			{
+				return FVector(MeshBounds.GetCenter().X, MeshBounds.GetCenter().Y,
+					FMath::Lerp(MeshBounds.Min.Z, MeshBounds.Max.Z, 0.68f));
+			}
+		}
+		if (IsValid(Enemy))
+		{
+			FVector BoundsOrigin;
+			FVector BoundsExtent;
+			Enemy->GetActorBounds(false, BoundsOrigin, BoundsExtent);
+			return BoundsOrigin + FVector(0.0f, 0.0f, BoundsExtent.Z * 0.25f);
+		}
+		return FVector::ZeroVector;
+	};
 	const FVector ViewDirection = ViewRotation.Vector().GetSafeNormal();
 	if (ViewDirection.IsNearlyZero())
 	{
@@ -161,9 +182,7 @@ bool AWeapon_Rope::ResolveThrowDirection(
 	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Candidate))
 	{
 		const UDamageHandlerComponent* Damage = Enemy->DamageHandlerComponent;
-		const FVector CandidatePoint = Enemy->GetActorLocation()
-			+ FVector(0.0f, 0.0f, Enemy->GetCapsuleComponent()
-				? Enemy->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.35f : 35.0f);
+		const FVector CandidatePoint = GetEnemyAimPoint(Enemy);
 		const float CandidateDistance = FVector::Dist(Anchor, CandidatePoint);
 
 		FCollisionQueryParams TargetParams(SCENE_QUERY_STAT(RopePreThrowTarget), true, Character);
@@ -203,9 +222,7 @@ bool AWeapon_Rope::ResolveThrowDirection(
 			if (AEnemyCharacter* TraceEnemy = Cast<AEnemyCharacter>(AimHit.GetActor()))
 			{
 				const UDamageHandlerComponent* Damage = TraceEnemy->DamageHandlerComponent;
-				const FVector EnemyPoint = TraceEnemy->GetActorLocation() + FVector(0.0f, 0.0f,
-					TraceEnemy->GetCapsuleComponent()
-						? TraceEnemy->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.35f : 35.0f);
+				const FVector EnemyPoint = GetEnemyAimPoint(TraceEnemy);
 				if ((!Damage || !Damage->bIsDead)
 					&& !TraceEnemy->bIsInDamageReaction
 					&& FVector::Dist(Anchor, EnemyPoint) <= SafeMaximum)
@@ -821,6 +838,8 @@ void AWeapon_Rope::ResetRopeVisual()
 		Target->EndRopePull();
 	}
 	PullTarget.Reset();
+	ThrowAimLocation = FVector::ZeroVector;
+	bHasThrowAimLocation = false;
 	bIsPullingTarget = false;
 	bIsRetracting = false;
 	RetractionLength = 0.0f;
