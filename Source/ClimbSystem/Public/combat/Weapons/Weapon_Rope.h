@@ -126,7 +126,7 @@ private:
 	float TargetThrowDistance = 0.0f;
 
 	TWeakObjectPtr<AEnemyCharacter> PullTarget;
-	TEnumAsByte<EMovementMode> SavedTargetMovementMode = MOVE_Walking;
+	uint8 SavedTargetMovementMode = 0;
 	uint8 SavedTargetCustomMovementMode = 0;
 	float SavedTargetMaxWalkSpeed = 0.0f;
 	bool bSavedTargetPauseAnims = false;
