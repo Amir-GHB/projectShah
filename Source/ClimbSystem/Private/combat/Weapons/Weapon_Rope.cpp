@@ -529,6 +529,23 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 		bParticleDeployed[Index] = true;
 	}
 
+	// Cancel AI/combat activity before freezing the mesh, so montage end delegates
+	// and combat-state cleanup can run normally.
+	Target->CancelPendingAICombatAction();
+	if (Target->CombatComponent)
+	{
+		Target->CombatComponent->StopActiveAttack(true, true, 0.0f);
+	}
+
+	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
+	{
+		if (UBrainComponent* Brain = AIController->GetBrainComponent())
+		{
+			Brain->PauseLogic(TEXT("Rope pull"));
+			bTargetAIWasPaused = true;
+		}
+	}
+
 	if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
 	{
 		SavedTargetMovementMode = static_cast<uint8>(Movement->MovementMode);
@@ -546,21 +563,6 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 			Anim->StopAllMontages(0.0f);
 		}
 		Mesh->bPauseAnims = true;
-	}
-
-	if (Target->CombatComponent)
-	{
-		Target->CombatComponent->StopActiveAttack(true, true, 0.0f);
-	}
-	Target->CancelPendingAICombatAction();
-
-	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
-	{
-		if (UBrainComponent* Brain = AIController->GetBrainComponent())
-		{
-			Brain->PauseLogic(TEXT("Rope pull"));
-			bTargetAIWasPaused = true;
-		}
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("[AWeapon_Rope] Caught enemy %s. Starting root pull."), *GetNameSafe(Target));
