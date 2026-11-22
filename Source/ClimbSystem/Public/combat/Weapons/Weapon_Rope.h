@@ -118,15 +118,7 @@ private:
 	float TargetThrowDistance = 0.0f;
 
 	TWeakObjectPtr<AEnemyCharacter> PullTarget;
-	TEnumAsByte<EMovementMode> SavedTargetMovementMode = MOVE_Walking;
-	uint8 SavedTargetCustomMovementMode = 0;
-	float SavedTargetMaxWalkSpeed = 0.0f;
-	bool bSavedTargetPauseAnims = false;
 	bool bIsPullingTarget = false;
-	bool bIsRetracting = false;
-	bool bTargetAIWasPaused = false;
-	float RetractionLength = 0.0f;
-	FVector RetractionDirection = FVector::ForwardVector;
 
 	void ResetRopeVisual();
 	bool TryBeginTargetPull();
