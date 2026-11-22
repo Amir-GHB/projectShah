@@ -6,7 +6,6 @@
 #include "Animation/AnimSequenceBase.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
-#include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
@@ -22,8 +21,6 @@ AWeapon_Rope::AWeapon_Rope()
 	WeaponConfig.HandSocketName = FName("Hand_R_Socket");
 	WeaponConfig.TraceSocketNames.Empty();
 	WeaponConfig.bEnableAttackPositioning = false;
-
-	// The rope is carried in the hand and has no separate holster mesh/socket.
 	bNoHolster = true;
 
 	RopeSpline = CreateDefaultSubobject<USplineComponent>(TEXT("RopeSpline"));
@@ -48,8 +45,6 @@ void AWeapon_Rope::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Reuse the existing attack lifecycle, combo state and montage callbacks,
-	// while exposing a weapon-specific CharacterSwingMontage property to designers.
 	WeaponConfig.WeaponType = EWeaponType::Rope;
 	WeaponConfig.AttackMontageMode = EAttackMontageMode::SingleComboMontage;
 	WeaponConfig.AttackComboMontage = CharacterSwingMontage;
@@ -72,10 +67,6 @@ void AWeapon_Rope::BeginPlay()
 		Segment->SetVisibility(false);
 	}
 
-	RopeSpline->ClearSplinePoints(false);
-	RopeSpline->AddSplinePoint(FVector::ZeroVector, ESplineCoordinateSpace::Local, false);
-	RopeSpline->AddSplinePoint(FVector::ZeroVector, ESplineCoordinateSpace::Local, false);
-	RopeSpline->UpdateSpline();
 	ResetRopeVisual();
 }
 
@@ -83,6 +74,7 @@ void AWeapon_Rope::AttachToHand(ACharacter* TargetCharacter)
 {
 	ResetRopeVisual();
 	Super::AttachToHand(TargetCharacter);
+	LastAnchorLocation = GetActorLocation();
 }
 
 void AWeapon_Rope::AttachToHolster(ACharacter* TargetCharacter)
@@ -95,6 +87,7 @@ void AWeapon_Rope::BeginSwing()
 {
 	ResetRopeVisual();
 	bSwingActive = true;
+	LastAnchorLocation = GetActorLocation();
 }
 
 void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
@@ -113,14 +106,8 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 	}
 
 	bSwingActive = false;
-	bIsExtending = true;
-	RopeStartLocation = GetActorLocation();
-	RopeEndLocation = RopeStartLocation;
-	RopeDirection = Direction;
-	CurrentRopeLength = 0.0f;
-	UpdateRopeVisual();
-
-	UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope released. Max length: %.1f"), MaxRopeLength);
+	InitializeRopeSimulation(Direction);
+	UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope physically thrown. Max length: %.1f"), MaxRopeLength);
 }
 
 bool AWeapon_Rope::ResolveThrowDirection(FVector& OutDirection) const
@@ -179,69 +166,214 @@ bool AWeapon_Rope::ResolveThrowDirection(FVector& OutDirection) const
 	return !OutDirection.IsNearlyZero();
 }
 
+void AWeapon_Rope::InitializeRopeSimulation(const FVector& Direction)
+{
+	const int32 SegmentCount = FMath::Clamp(RopeSegmentCount, 1, MaxRopeSegments);
+	const int32 ParticleCount = SegmentCount + 1;
+	const FVector Anchor = GetActorLocation();
+
+	ParticlePositions.Init(Anchor, ParticleCount);
+	PreviousParticlePositions.Init(Anchor, ParticleCount);
+
+	RopeStartLocation = Anchor;
+	LastAnchorLocation = Anchor;
+	AnchorVelocity = FVector::ZeroVector;
+	RopeDirection = Direction.GetSafeNormal();
+	RopeEndLocation = Anchor;
+	CurrentRopeLength = FMath::Min(8.0f, FMath::Max(0.0f, MaxRopeLength));
+	SimulationAccumulator = 0.0f;
+	bTipAnchored = false;
+	bSimulatingRope = true;
+	bIsExtending = CurrentRopeLength < MaxRopeLength;
+
+	// Verlet stores velocity as the difference between current and previous position.
+	// This gives the free end an actual launch impulse instead of teleporting it outward.
+	const FVector LaunchVelocity = RopeDirection * FMath::Max(0.0f, ThrowSpeed) + AnchorVelocity;
+	PreviousParticlePositions.Last() = Anchor - LaunchVelocity * SimulationStep;
+
+	UpdateRopeVisual();
+}
+
 void AWeapon_Rope::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (!bIsExtending || !GetWorld())
+	if (!bSimulatingRope || ParticlePositions.Num() < 2 || !GetWorld())
 	{
+		LastAnchorLocation = GetActorLocation();
 		return;
 	}
 
-	const float SafeMaxLength = FMath::Max(0.0f, MaxRopeLength);
-	// Keep the rope's root anchored to the animated hand socket as the character moves.
-	const FVector CurrentStart = GetActorLocation();
-	const FVector HandDelta = CurrentStart - RopeStartLocation;
-	RopeStartLocation = CurrentStart;
-	RopeEndLocation += HandDelta;
-
-	const float NextLength = FMath::Min(
-		SafeMaxLength,
-		CurrentRopeLength + FMath::Max(0.0f, ExtensionSpeed) * DeltaSeconds);
-	const FVector DesiredEnd = RopeStartLocation + RopeDirection * NextLength;
-
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RopeExtension), true, this);
-	if (OwningCharacter.IsValid())
+	const FVector CurrentAnchor = GetActorLocation();
+	if (DeltaSeconds > SMALL_NUMBER)
 	{
-		QueryParams.AddIgnoredActor(OwningCharacter.Get());
-	}
-
-	FHitResult Hit;
-	const bool bHit = GetWorld()->SweepSingleByChannel(
-		Hit,
-		RopeEndLocation,
-		DesiredEnd,
-		FQuat::Identity,
-		RopeTraceChannel,
-		FCollisionShape::MakeSphere(FMath::Max(1.0f, RopeCollisionRadius)),
-		QueryParams);
-
-	if (bHit && Hit.bBlockingHit)
-	{
-		RopeEndLocation = Hit.ImpactPoint.IsNearlyZero() ? Hit.Location : Hit.ImpactPoint;
-		CurrentRopeLength = FVector::Distance(RopeStartLocation, RopeEndLocation);
-		bIsExtending = false;
-		UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope extension stopped by hit: %s"), *GetNameSafe(Hit.GetActor()));
+		AnchorVelocity = (CurrentAnchor - LastAnchorLocation) / DeltaSeconds;
 	}
 	else
 	{
-		RopeEndLocation = DesiredEnd;
-		CurrentRopeLength = NextLength;
-		if (CurrentRopeLength >= SafeMaxLength)
+		AnchorVelocity = FVector::ZeroVector;
+	}
+	LastAnchorLocation = CurrentAnchor;
+	ParticlePositions[0] = CurrentAnchor;
+	PreviousParticlePositions[0] = CurrentAnchor;
+
+	// Fixed-step simulation keeps the rope stable across variable frame rates.
+	SimulationAccumulator += FMath::Min(DeltaSeconds, 0.1f);
+	while (SimulationAccumulator >= SimulationStep)
+	{
+		SimulateRopeStep(SimulationStep);
+		SimulationAccumulator -= SimulationStep;
+	}
+
+	RopeStartLocation = CurrentAnchor;
+	RopeEndLocation = ParticlePositions.Last();
+	UpdateRopeVisual();
+}
+
+void AWeapon_Rope::SimulateRopeStep(float StepSeconds)
+{
+	if (bIsExtending)
+	{
+		CurrentRopeLength = FMath::Min(
+			FMath::Max(0.0f, MaxRopeLength),
+			CurrentRopeLength + FMath::Max(0.0f, ExtensionSpeed) * StepSeconds);
+
+		if (CurrentRopeLength >= MaxRopeLength)
 		{
 			bIsExtending = false;
 		}
 	}
 
-	UpdateRopeVisual();
+	const FVector Gravity(0.0f, 0.0f, GetWorld()->GetGravityZ() * GravityScale);
+	const float Damping = FMath::Clamp(1.0f - VelocityDamping, 0.0f, 1.0f);
+
+	for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
+	{
+		if (bTipAnchored && Index == ParticlePositions.Num() - 1)
+		{
+			continue;
+		}
+
+		const FVector Current = ParticlePositions[Index];
+		const FVector Velocity = (Current - PreviousParticlePositions[Index]) * Damping;
+		const FVector Next = Current + Velocity + Gravity * (StepSeconds * StepSeconds);
+		PreviousParticlePositions[Index] = Current;
+		ParticlePositions[Index] = Next;
+	}
+
+	SolveRopeConstraints();
+	ResolveParticleCollisions();
+	SolveRopeConstraints();
+
+	ParticlePositions[0] = GetActorLocation();
+	if (bTipAnchored && ParticlePositions.Num() > 1)
+	{
+		PreviousParticlePositions.Last() = ParticlePositions.Last();
+	}
+}
+
+void AWeapon_Rope::SolveRopeConstraints()
+{
+	const int32 ParticleCount = ParticlePositions.Num();
+	if (ParticleCount < 2)
+	{
+		return;
+	}
+
+	const float SegmentRestLength = CurrentRopeLength / static_cast<float>(ParticleCount - 1);
+	const int32 Iterations = FMath::Clamp(ConstraintIterations, 1, 20);
+
+	for (int32 Iteration = 0; Iteration < Iterations; ++Iteration)
+	{
+		ParticlePositions[0] = GetActorLocation();
+
+		for (int32 Index = 0; Index < ParticleCount - 1; ++Index)
+		{
+			FVector& PointA = ParticlePositions[Index];
+			FVector& PointB = ParticlePositions[Index + 1];
+			const FVector Delta = PointB - PointA;
+			const float Distance = Delta.Size();
+			if (Distance <= KINDA_SMALL_NUMBER)
+			{
+				continue;
+			}
+
+			const FVector Correction = Delta * ((Distance - SegmentRestLength) / Distance);
+			const bool bAIsFixed = Index == 0;
+			const bool bBIsFixed = bTipAnchored && Index + 1 == ParticleCount - 1;
+
+			if (bAIsFixed && !bBIsFixed)
+			{
+				PointB -= Correction;
+			}
+			else if (!bAIsFixed && bBIsFixed)
+			{
+				PointA += Correction;
+			}
+			else if (!bAIsFixed && !bBIsFixed)
+			{
+				PointA += Correction * 0.5f;
+				PointB -= Correction * 0.5f;
+			}
+		}
+	}
+}
+
+void AWeapon_Rope::ResolveParticleCollisions()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RopeParticleCollision), true, this);
+	if (OwningCharacter.IsValid())
+	{
+		QueryParams.AddIgnoredActor(OwningCharacter.Get());
+	}
+
+	const FCollisionShape CollisionShape = FCollisionShape::MakeSphere(FMath::Max(1.0f, RopeCollisionRadius));
+	for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
+	{
+		if (bTipAnchored && Index == ParticlePositions.Num() - 1)
+		{
+			continue;
+		}
+
+		const FVector Previous = PreviousParticlePositions[Index];
+		const FVector Current = ParticlePositions[Index];
+		FHitResult Hit;
+		if (World->SweepSingleByChannel(
+			Hit, Previous, Current, FQuat::Identity, RopeTraceChannel, CollisionShape, QueryParams)
+			&& Hit.bBlockingHit)
+		{
+			ParticlePositions[Index] = Hit.Location;
+			PreviousParticlePositions[Index] = Hit.Location;
+
+			if (Index == ParticlePositions.Num() - 1)
+			{
+				bTipAnchored = true;
+				bIsExtending = false;
+				UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope tip collided with %s."), *GetNameSafe(Hit.GetActor()));
+			}
+		}
+	}
 }
 
 void AWeapon_Rope::ResetRopeVisual()
 {
 	bIsExtending = false;
 	bSwingActive = false;
+	bSimulatingRope = false;
+	bTipAnchored = false;
 	CurrentRopeLength = 0.0f;
+	SimulationAccumulator = 0.0f;
+	ParticlePositions.Empty();
+	PreviousParticlePositions.Empty();
 	RopeStartLocation = GetActorLocation();
+	LastAnchorLocation = RopeStartLocation;
+	AnchorVelocity = FVector::ZeroVector;
 	RopeEndLocation = RopeStartLocation;
 
 	for (USplineMeshComponent* Segment : RopeSegments)
@@ -254,15 +386,16 @@ void AWeapon_Rope::ResetRopeVisual()
 
 	if (IsValid(RopeSpline))
 	{
-		RopeSpline->SetLocationAtSplinePoint(0, FVector::ZeroVector, ESplineCoordinateSpace::Local, false);
-		RopeSpline->SetLocationAtSplinePoint(1, FVector::ZeroVector, ESplineCoordinateSpace::Local, false);
+		RopeSpline->ClearSplinePoints(false);
+		RopeSpline->AddSplinePoint(FVector::ZeroVector, ESplineCoordinateSpace::Local, false);
+		RopeSpline->AddSplinePoint(FVector::ZeroVector, ESplineCoordinateSpace::Local, false);
 		RopeSpline->UpdateSpline();
 	}
 }
 
 void AWeapon_Rope::UpdateRopeVisual()
 {
-	if (!IsValid(RopeSpline) || !IsValid(RopeSegmentMesh))
+	if (!IsValid(RopeSpline) || !IsValid(RopeSegmentMesh) || ParticlePositions.Num() < 2)
 	{
 		for (USplineMeshComponent* Segment : RopeSegments)
 		{
@@ -271,13 +404,20 @@ void AWeapon_Rope::UpdateRopeVisual()
 		return;
 	}
 
-	const FVector LocalEnd = GetActorTransform().InverseTransformPosition(RopeEndLocation);
-	RopeSpline->SetLocationAtSplinePoint(0, FVector::ZeroVector, ESplineCoordinateSpace::Local, false);
-	RopeSpline->SetLocationAtSplinePoint(1, LocalEnd, ESplineCoordinateSpace::Local, false);
+	RopeSpline->ClearSplinePoints(false);
+	for (const FVector& WorldPosition : ParticlePositions)
+	{
+		const FVector LocalPosition = GetActorTransform().InverseTransformPosition(WorldPosition);
+		RopeSpline->AddSplinePoint(LocalPosition, ESplineCoordinateSpace::Local, false);
+	}
+	for (int32 Index = 0; Index < ParticlePositions.Num(); ++Index)
+	{
+		RopeSpline->SetSplinePointType(Index, ESplinePointType::Curve, false);
+	}
 	RopeSpline->UpdateSpline();
 
 	const float SplineLength = RopeSpline->GetSplineLength();
-	const int32 ActiveSegmentCount = FMath::Clamp(RopeSegmentCount, 1, RopeSegments.Num());
+	const int32 ActiveSegmentCount = FMath::Min(ParticlePositions.Num() - 1, RopeSegments.Num());
 	const bool bShowRope = SplineLength > KINDA_SMALL_NUMBER;
 
 	for (int32 Index = 0; Index < RopeSegments.Num(); ++Index)
