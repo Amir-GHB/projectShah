@@ -32,6 +32,7 @@ public:
 	virtual void AttachToHolster(ACharacter* TargetCharacter) override;
 
 	/** Called by the authored release notify on this weapon's SwingMontage. */
+	void BeginSwing();
 	void ReleaseRope(const UAnimSequenceBase* SourceAnimation);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Animation")
@@ -75,7 +76,7 @@ private:
 	FVector RopeEndLocation = FVector::ZeroVector;
 	FVector RopeDirection = FVector::ForwardVector;
 	float CurrentRopeLength = 0.0f;
-	bool bHasReleasedThisSwing = false;
+	bool bSwingActive = false;
 
 	void ResetRopeVisual();
 	void UpdateRopeVisual();
