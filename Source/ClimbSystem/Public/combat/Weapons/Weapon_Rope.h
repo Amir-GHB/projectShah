@@ -86,7 +86,6 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
@@ -117,7 +116,7 @@ private:
 	float TargetThrowDistance = 0.0f;
 
 	TWeakObjectPtr<AEnemyCharacter> PullTarget;
-	uint8 SavedTargetMovementMode = 0;
+	TEnumAsByte<EMovementMode> SavedTargetMovementMode = MOVE_Walking;
 	uint8 SavedTargetCustomMovementMode = 0;
 	float SavedTargetMaxWalkSpeed = 0.0f;
 	bool bSavedTargetPauseAnims = false;
