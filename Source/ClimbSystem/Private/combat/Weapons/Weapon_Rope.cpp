@@ -525,7 +525,7 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 
 	if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
 	{
-		SavedTargetMovementMode = Movement->MovementMode;
+		SavedTargetMovementMode = static_cast<uint8>(Movement->MovementMode);
 		SavedTargetCustomMovementMode = Movement->CustomMovementMode;
 		SavedTargetMaxWalkSpeed = Movement->MaxWalkSpeed;
 		Movement->StopMovementImmediately();
@@ -625,7 +625,7 @@ void AWeapon_Rope::RestorePulledTarget()
 	{
 		if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
 		{
-			Movement->SetMovementMode(SavedTargetMovementMode, SavedTargetCustomMovementMode);
+			Movement->SetMovementMode(static_cast<EMovementMode>(SavedTargetMovementMode), SavedTargetCustomMovementMode);
 			Movement->MaxWalkSpeed = SavedTargetMaxWalkSpeed;
 		}
 		if (USkeletalMeshComponent* Mesh = Target->GetMesh())
