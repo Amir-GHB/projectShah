@@ -189,8 +189,7 @@ AActor* AWeapon_Rope::GetTargetingActor() const
 	{
 		return nullptr;
 	}
-	AActor* Target = Targeting->GetCurrentTarget();
-	return IsValid(Target) ? Target : Targeting->GetManualTarget();
+	return Targeting->GetCurrentTarget();
 }
 
 void AWeapon_Rope::InitializeRopeSimulation(const FVector& Direction)
