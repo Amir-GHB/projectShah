@@ -185,6 +185,12 @@ void AWeapon_Rope::Tick(float DeltaSeconds)
 	}
 
 	const float SafeMaxLength = FMath::Max(0.0f, MaxRopeLength);
+	// Keep the rope's root anchored to the animated hand socket as the character moves.
+	const FVector CurrentStart = GetActorLocation();
+	const FVector HandDelta = CurrentStart - RopeStartLocation;
+	RopeStartLocation = CurrentStart;
+	RopeEndLocation += HandDelta;
+
 	const float NextLength = FMath::Min(
 		SafeMaxLength,
 		CurrentRopeLength + FMath::Max(0.0f, ExtensionSpeed) * DeltaSeconds);
