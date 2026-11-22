@@ -113,7 +113,14 @@ void AEnemyCharacter::Tick(float DeltaSeconds)
 bool AEnemyCharacter::BeginRopePull(AActor* Puller, float PullSpeed, float StopDistance)
 {
 	if (!IsValid(Puller) || Puller == this || bIsBeingRopePulled
-		|| (DamageHandlerComponent && DamageHandlerComponent->bIsDead))
+		|| bIsInDamageReaction || (DamageHandlerComponent && DamageHandlerComponent->bIsDead))
+	{
+		return false;
+	}
+	if (CombatComponent &&
+		(CombatComponent->CurrentCombatState == ECombatState::Dead ||
+		 CombatComponent->CurrentCombatState == ECombatState::Finishing ||
+		 CombatComponent->CurrentCombatState == ECombatState::Staggered))
 	{
 		return false;
 	}
@@ -152,6 +159,7 @@ bool AEnemyCharacter::BeginRopePull(AActor* Puller, float PullSpeed, float StopD
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
 		PreviousRopePullMovementMode = Movement->MovementMode;
+		PreviousRopePullCustomMovementMode = Movement->CustomMovementMode;
 		PreviousRopePullWalkSpeed = Movement->MaxWalkSpeed;
 		Movement->StopMovementImmediately();
 		Movement->DisableMovement();
@@ -187,22 +195,27 @@ void AEnemyCharacter::EndRopePull()
 		GetMesh()->bPauseAnims = bPreviousRopePullPauseAnims;
 	}
 
-	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	const bool bDiedDuringPull = DamageHandlerComponent && DamageHandlerComponent->bIsDead;
+	if (!bDiedDuringPull)
 	{
-		Movement->SetMovementMode(PreviousRopePullMovementMode);
-		Movement->MaxWalkSpeed = PreviousRopePullWalkSpeed;
-	}
-
-	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(GetController()))
-	{
-		if (!bWasRopePullBrainPaused)
+		if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 		{
-			if (UBrainComponent* Brain = AIController->GetBrainComponent())
+			Movement->SetMovementMode(PreviousRopePullMovementMode, PreviousRopePullCustomMovementMode);
+			Movement->MaxWalkSpeed = PreviousRopePullWalkSpeed;
+		}
+
+		if (AEnemyAIController* AIController = Cast<AEnemyAIController>(GetController()))
+		{
+			if (!bWasRopePullBrainPaused)
 			{
-				Brain->ResumeLogic(TEXT("Rope pull finished"));
+				if (UBrainComponent* Brain = AIController->GetBrainComponent())
+				{
+					Brain->ResumeLogic(TEXT("Rope pull finished"));
+				}
 			}
 		}
 	}
+	bWasRopePullBrainPaused = false;
 
 	SetActorTickEnabled(false);
 }
