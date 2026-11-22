@@ -503,16 +503,15 @@ bool UCombatComponent::StartNewCombo()
 	ActiveAttackIndex = StartingSectionIndex;
 	ActiveAttackWeapon->SetActiveAttackIndex(StartingSectionIndex);
 	const FName FirstSection = Montage->GetSectionName(StartingSectionIndex);
+	if (AWeapon_Rope* Rope = Cast<AWeapon_Rope>(ActiveAttackWeapon.Get()))
+	{
+		Rope->BeginSwing();
+	}
 	const float Duration = Anim->Montage_Play(Montage);
 	if (Duration <= 0.0f)
 	{
 		StopActiveAttack(true, false);
 		return false;
-	}
-
-	if (AWeapon_Rope* Rope = Cast<AWeapon_Rope>(ActiveAttackWeapon.Get()))
-	{
-		Rope->BeginSwing();
 	}
 
 	const uint64 Token = ActiveAttackToken;
