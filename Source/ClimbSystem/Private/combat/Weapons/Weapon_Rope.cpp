@@ -499,14 +499,6 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 
 	const UDamageHandlerComponent* Damage = Target->DamageHandlerComponent;
 	if ((Damage && Damage->bIsDead) || Target->bIsInDamageReaction) return;
-	if (Target->CombatComponent &&
-		(Target->CombatComponent->CurrentCombatState == ECombatState::Dead ||
-		 Target->CombatComponent->CurrentCombatState == ECombatState::Finishing ||
-		 Target->CombatComponent->CurrentCombatState == ECombatState::Staggered))
-	{
-		return;
-	}
-
 	const float OwnerRadius = OwningCharacter.IsValid() && OwningCharacter->GetCapsuleComponent()
 		? OwningCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.0f;
 	const float TargetRadius = Target->GetCapsuleComponent()
