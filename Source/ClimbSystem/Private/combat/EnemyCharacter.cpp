@@ -189,13 +189,13 @@ void AEnemyCharacter::EndRopePull()
 
 	bIsBeingRopePulled = false;
 	RopePuller.Reset();
+	const bool bDiedDuringPull = DamageHandlerComponent && DamageHandlerComponent->bIsDead;
 
 	if (GetMesh())
 	{
-		GetMesh()->bPauseAnims = bPreviousRopePullPauseAnims;
+		// Do not leave a dead character's skeletal mesh paused when ragdoll/death takes over.
+		GetMesh()->bPauseAnims = bDiedDuringPull ? false : bPreviousRopePullPauseAnims;
 	}
-
-	const bool bDiedDuringPull = DamageHandlerComponent && DamageHandlerComponent->bIsDead;
 	if (!bDiedDuringPull)
 	{
 		if (UCharacterMovementComponent* Movement = GetCharacterMovement())
