@@ -21,6 +21,8 @@
 #include "combat/CombatComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/CombatTargetingComponent.h"
+#include "combat/EnemyCharacter.h"
+#include "combat/DamageHandlerComponent.h"
 
 AWeapon_Rope::AWeapon_Rope()
 {
@@ -118,6 +120,35 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 	}
 
 	bSwingActive = false;
+
+	// Only a currently selected, living enemy can be pulled. The targeting
+	// component remains the authority for which enemy the player selected.
+	IntendedTarget.Reset();
+	TargetDistance = 0.0f;
+	if (const UCombatTargetingComponent* Targeting =
+		Character->FindComponentByClass<UCombatTargetingComponent>())
+	{
+		if (AEnemyCharacter* Candidate = Cast<AEnemyCharacter>(Targeting->GetCurrentTarget()))
+		{
+			const UDamageHandlerComponent* Damage = Candidate->DamageHandlerComponent;
+			const FVector CandidateAim = Candidate->GetActorLocation() + FVector(0.0f, 0.0f, 60.0f);
+			const float CandidateDistance = FVector::Dist(GetActorLocation(), CandidateAim);
+			if ((!Damage || !Damage->bIsDead) && CandidateDistance <= FMath::Max(0.0f, MaxRopeLength))
+			{
+				FCollisionQueryParams TargetParams(SCENE_QUERY_STAT(RopeTargetValidation), true, Character);
+				TargetParams.AddIgnoredActor(this);
+				FHitResult TargetHit;
+				const bool bBlocked = GetWorld()->LineTraceSingleByChannel(
+					TargetHit, GetActorLocation(), CandidateAim, RopeTraceChannel, TargetParams);
+				if (!bBlocked || TargetHit.GetActor() == Candidate)
+				{
+					IntendedTarget = Candidate;
+					TargetDistance = CandidateDistance;
+				}
+			}
+		}
+	}
+
 	InitializeRopeSimulation(Direction);
 	UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope physically thrown. Max length: %.1f"), MaxRopeLength);
 }
@@ -660,6 +691,12 @@ void AWeapon_Rope::ResetRopeVisual()
 	bIsExtending = false;
 	bSwingActive = false;
 	bSimulatingRope = false;
+	bPullingTarget = false;
+	bRetracting = false;
+	IntendedTarget.Reset();
+	PulledEnemy.Reset();
+	TargetDistance = 0.0f;
+	RetractionLength = 0.0f;
 	CurrentRopeLength = 0.0f;
 	SimulationAccumulator = 0.0f;
 	ParticlePositions.Empty();
