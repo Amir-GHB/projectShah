@@ -24,8 +24,8 @@ enum class EWeaponType : uint8
 	BullHeadHammer UMETA(DisplayName = "Bull Head Hammer"),
 	Spear          UMETA(DisplayName = "Spear"),
 	Bow            UMETA(DisplayName = "Bow (Ranged)"),
-	Rope           UMETA(DisplayName = "Rope Weapon"),
-	CustomWeapon   UMETA(DisplayName = "Custom Extensible Weapon")
+	CustomWeapon   UMETA(DisplayName = "Custom Extensible Weapon"),
+	Rope           UMETA(DisplayName = "Rope Weapon")
 };
 
 /**
@@ -65,8 +65,8 @@ enum class ECombatAnimationStyle : uint8
 	Hammer    UMETA(DisplayName = "Hammer"),
 	Spear     UMETA(DisplayName = "Spear"),
 	Bow       UMETA(DisplayName = "Bow"),
-	Rope      UMETA(DisplayName = "Rope"),
-	Custom    UMETA(DisplayName = "Custom")
+	Custom    UMETA(DisplayName = "Custom"),
+	Rope      UMETA(DisplayName = "Rope")
 };
 
 /** Shared action label for AnimBP transitions. */
