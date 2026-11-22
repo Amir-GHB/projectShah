@@ -6,7 +6,9 @@
 #include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/DamageReactionComponent.h"
+#include "combat/ThrowableTreeActor.h"
 #include "MotionWarpingComponent.h"
+#include "EngineUtils.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -113,6 +115,10 @@ void ACombatCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		{
 			EnhancedInput->BindAction(TargetLockAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnTargetLockTriggered);
 		}
+		if (ThrowNearbyActorAction)
+		{
+			EnhancedInput->BindAction(ThrowNearbyActorAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnThrowNearbyActorTriggered);
+		}
 	}
 }
 
@@ -207,6 +213,38 @@ void ACombatCharacterBase::OnTargetLockTriggered(const FInputActionValue& Value)
 	if (CombatTargetingComponent)
 	{
 		CombatTargetingComponent->ToggleManualLock();
+	}
+}
+
+void ACombatCharacterBase::OnThrowNearbyActorTriggered(const FInputActionValue& Value)
+{
+	if (!GetWorld() || (CombatComponent && (CombatComponent->CurrentCombatState == ECombatState::Dead
+		|| CombatComponent->CurrentCombatState == ECombatState::Finishing)))
+	{
+		return;
+	}
+
+	AThrowableTreeActor* NearbyTree = nullptr;
+	float BestDistanceSquared = FMath::Square(300.0f);
+	for (TActorIterator<AThrowableTreeActor> It(GetWorld()); It; ++It)
+	{
+		AThrowableTreeActor* Candidate = *It;
+		if (!IsValid(Candidate) || !Candidate->CanBeThrown())
+		{
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared(GetActorLocation(), Candidate->GetActorLocation());
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			NearbyTree = Candidate;
+		}
+	}
+
+	if (IsValid(NearbyTree))
+	{
+		NearbyTree->ThrowAtClosestVisibleEnemy(this);
 	}
 }
 
