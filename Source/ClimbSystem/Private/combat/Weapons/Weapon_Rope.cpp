@@ -107,21 +107,28 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 		return;
 	}
 
-	PullTarget = Cast<AEnemyCharacter>(GetTargetingActor());
-
 	FVector Direction;
-	if (!ResolveThrowDirection(Direction))
+	FVector AimLocation;
+	AEnemyCharacter* SelectedTarget = nullptr;
+	if (!ResolveThrowDirection(Direction, AimLocation, SelectedTarget))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[AWeapon_Rope] Could not resolve a valid throw direction."));
 		return;
 	}
 
+	// Lock the intended enemy before the rope leaves the hand. Catching the
+	// target is now based on the deployed endpoint reaching this aim point,
+	// not on a broad collision sweep discovering an enemy by accident.
+	PullTarget = SelectedTarget;
 	bSwingActive = false;
-	InitializeRopeSimulation(Direction);
+	InitializeRopeSimulation(Direction, AimLocation, !AimLocation.IsNearlyZero());
 	UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope physically thrown. Max length: %.1f"), MaxRopeLength);
 }
 
-bool AWeapon_Rope::ResolveThrowDirection(FVector& OutDirection) const
+bool AWeapon_Rope::ResolveThrowDirection(
+	FVector& OutDirection,
+	FVector& OutAimLocation,
+	AEnemyCharacter*& OutTarget) const
 {
 	ACharacter* Character = OwningCharacter.Get();
 	UWorld* World = GetWorld();
@@ -129,8 +136,6 @@ bool AWeapon_Rope::ResolveThrowDirection(FVector& OutDirection) const
 	{
 		return false;
 	}
-
-	AActor* Target = GetTargetingActor();
 
 	FVector ViewLocation = Character->GetPawnViewLocation();
 	FRotator ViewRotation = Character->GetActorRotation();
@@ -143,31 +148,79 @@ bool AWeapon_Rope::ResolveThrowDirection(FVector& OutDirection) const
 		ViewRotation = Controller->GetControlRotation();
 	}
 
-	FVector AimLocation = ViewLocation + ViewRotation.Vector() * MaxRopeLength;
-	if (IsValid(Target))
+	const FVector Anchor = GetActorLocation();
+	const float SafeMaximum = FMath::Max(100.0f, MaxRopeLength - FMath::Max(0.0f, EndSlackLength));
+	const FVector ViewDirection = ViewRotation.Vector().GetSafeNormal();
+	if (ViewDirection.IsNearlyZero())
 	{
-		FVector BoundsOrigin;
-		FVector BoundsExtent;
-		Target->GetActorBounds(false, BoundsOrigin, BoundsExtent);
-		AimLocation = BoundsOrigin + FVector(0.0f, 0.0f, BoundsExtent.Z * 0.25f);
+		return false;
 	}
-	else
+
+	OutTarget = nullptr;
+	AActor* Candidate = GetTargetingActor();
+	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Candidate))
+	{
+		const UDamageHandlerComponent* Damage = Enemy->DamageHandlerComponent;
+		const FVector CandidatePoint = Enemy->GetActorLocation()
+			+ FVector(0.0f, 0.0f, Enemy->GetCapsuleComponent()
+				? Enemy->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.35f : 35.0f);
+		const float CandidateDistance = FVector::Dist(Anchor, CandidatePoint);
+
+		FCollisionQueryParams TargetParams(SCENE_QUERY_STAT(RopePreThrowTarget), true, Character);
+		TargetParams.AddIgnoredActor(this);
+		FHitResult VisibilityHit;
+		const bool bBlocked = World->LineTraceSingleByChannel(
+			VisibilityHit, ViewLocation, CandidatePoint, ECC_Visibility, TargetParams);
+
+		if ((!Damage || !Damage->bIsDead)
+			&& !Enemy->bIsInDamageReaction
+			&& CandidateDistance <= SafeMaximum
+			&& (!bBlocked || VisibilityHit.GetActor() == Enemy))
+		{
+			OutTarget = Enemy;
+			OutAimLocation = CandidatePoint;
+		}
+	}
+
+	// If target lock did not provide a valid in-range enemy, use the same
+	// camera-forward visibility trace used by the bow to resolve the aim point.
+	if (!IsValid(OutTarget))
 	{
 		FCollisionQueryParams AimParams(SCENE_QUERY_STAT(RopeAimTrace), true, Character);
 		AimParams.AddIgnoredActor(this);
 		FHitResult AimHit;
-		const FVector AimEnd = ViewLocation + ViewRotation.Vector() * MaxRopeLength;
-		if (World->LineTraceSingleByChannel(AimHit, ViewLocation, AimEnd, RopeTraceChannel, AimParams)
+		const FVector TraceEnd = ViewLocation + ViewDirection * 10000.0f;
+		OutAimLocation = TraceEnd;
+		if (World->LineTraceSingleByChannel(AimHit, ViewLocation, TraceEnd, ECC_Visibility, AimParams)
 			&& AimHit.bBlockingHit)
 		{
-			AimLocation = AimHit.ImpactPoint;
+			OutAimLocation = AimHit.ImpactPoint;
+		}
+
+		const FVector ToAim = OutAimLocation - Anchor;
+		if (ToAim.SizeSquared() > FMath::Square(SafeMaximum))
+		{
+			OutAimLocation = Anchor + ToAim.GetSafeNormal() * SafeMaximum;
 		}
 	}
 
-	OutDirection = (AimLocation - GetActorLocation()).GetSafeNormal();
-	if (OutDirection.IsNearlyZero())
+	const FVector ToAim = OutAimLocation - Anchor;
+	if (ToAim.IsNearlyZero())
 	{
-		OutDirection = Character->GetActorForwardVector().GetSafeNormal();
+		return false;
+	}
+
+	// The rope follows a lofted path that still terminates at the selected
+	// point. The spare rope length is used for the upward arc; at maximum
+	// reach the arc naturally flattens rather than overshooting the target.
+	const FVector Horizontal = FVector(ToAim.X, ToAim.Y, 0.0f);
+	if (Horizontal.IsNearlyZero())
+	{
+		OutDirection = ToAim.GetSafeNormal();
+	}
+	else
+	{
+		OutDirection = (Horizontal.GetSafeNormal() + FVector::UpVector * 0.25f).GetSafeNormal();
 	}
 	return !OutDirection.IsNearlyZero();
 }
@@ -185,7 +238,10 @@ AActor* AWeapon_Rope::GetTargetingActor() const
 	return IsValid(Target) ? Target : Targeting->GetManualTarget();
 }
 
-void AWeapon_Rope::InitializeRopeSimulation(const FVector& Direction)
+void AWeapon_Rope::InitializeRopeSimulation(
+	const FVector& Direction,
+	const FVector& AimLocation,
+	bool bHasAimLocation)
 {
 	const int32 SegmentCount = FMath::Clamp(RopeSegmentCount, 1, MaxRopeSegments);
 	const int32 ParticleCount = SegmentCount + 1;
@@ -197,40 +253,126 @@ void AWeapon_Rope::InitializeRopeSimulation(const FVector& Direction)
 	PreviousParticlePositions.Init(Anchor, ParticleCount);
 	bParticleDeployed.Init(false, ParticleCount);
 	ParticleDeploymentPositions.SetNum(ParticleCount);
+	ParticleLaunchVelocities.SetNum(ParticleCount);
 
 	RopeStartLocation = Anchor;
 	LastAnchorLocation = Anchor;
-	RopeDirection = Direction.GetSafeNormal();
+	ThrowAimLocation = bHasAimLocation ? AimLocation : Anchor + Direction.GetSafeNormal() * SafeMaxLength;
+	bHasThrowAimLocation = bHasAimLocation;
 	RopeEndLocation = Anchor;
 	CurrentRopeLength = 0.0f;
-	TargetThrowDistance = FMath::Clamp(SafeMaxLength - EndSlackLength, 0.0f, SafeMaxLength);
 	SimulationAccumulator = 0.0f;
 	bSimulatingRope = true;
 	bIsExtending = SafeMaxLength > KINDA_SMALL_NUMBER;
 
-	// The deployed portion travels straight. The remaining rope is laid into a
-	// broad U-shaped tail at the end, so unused length gathers at the free end
-	// instead of being distributed uniformly along the entire rope.
-	const float SlackLength = SafeMaxLength - TargetThrowDistance;
-	const float SlackRadius = SlackLength / PI;
-	const FVector Down = FVector::DownVector;
-	for (int32 Index = 0; Index < ParticleCount; ++Index)
+	const float SlackLength = FMath::Clamp(EndSlackLength, 0.0f, SafeMaxLength);
+	const float MaximumPathLength = FMath::Max(0.0f, SafeMaxLength - SlackLength);
+	const FVector ToAim = ThrowAimLocation - Anchor;
+	const float ChordLength = FMath::Min(ToAim.Size(), MaximumPathLength);
+	const FVector EndPoint = ToAim.IsNearlyZero()
+		? Anchor + Direction.GetSafeNormal() * ChordLength
+		: Anchor + ToAim.GetSafeNormal() * ChordLength;
+
+	// Use a quadratic Bezier path. Its control point is lifted above the
+	// midpoint, and the lift is limited by the spare rope length so the path
+	// plus the loose end slack never exceeds MaxRopeLength.
+	const float DesiredPathLength = FMath::Min(
+		MaximumPathLength,
+		ChordLength + FMath::Min(150.0f, ChordLength * 0.20f));
+	const FVector MidPoint = (Anchor + EndPoint) * 0.5f;
+	auto BuildCurve = [&](float Height, TArray<FVector>& OutPoints, TArray<float>& OutDistances)
 	{
-		const float MaterialDistance = SegmentRestLength * Index;
-		if (MaterialDistance <= TargetThrowDistance || SlackLength <= KINDA_SMALL_NUMBER)
+		OutPoints.Reset();
+		OutDistances.Reset();
+		const FVector Control = MidPoint + FVector::UpVector * Height;
+		constexpr int32 CurveSamples = 64;
+		float TotalLength = 0.0f;
+		for (int32 Sample = 0; Sample <= CurveSamples; ++Sample)
 		{
-			ParticleDeploymentPositions[Index] = Anchor + RopeDirection * FMath::Min(MaterialDistance, TargetThrowDistance);
+			const float T = static_cast<float>(Sample) / static_cast<float>(CurveSamples);
+			const float OneMinusT = 1.0f - T;
+			const FVector Point = Anchor * (OneMinusT * OneMinusT)
+				+ Control * (2.0f * OneMinusT * T)
+				+ EndPoint * (T * T);
+			if (!OutPoints.IsEmpty())
+			{
+				TotalLength += FVector::Distance(OutPoints.Last(), Point);
+			}
+			OutPoints.Add(Point);
+			OutDistances.Add(TotalLength);
+		}
+		return TotalLength;
+	};
+
+	TArray<FVector> CurvePoints;
+	TArray<float> CurveDistances;
+	float LowHeight = 0.0f;
+	float HighHeight = FMath::Max(1.0f, SafeMaxLength);
+	for (int32 Iteration = 0; Iteration < 20; ++Iteration)
+	{
+		const float TestHeight = (LowHeight + HighHeight) * 0.5f;
+		TArray<FVector> TestPoints;
+		TArray<float> TestDistances;
+		const float TestLength = BuildCurve(TestHeight, TestPoints, TestDistances);
+		if (TestLength > DesiredPathLength)
+		{
+			HighHeight = TestHeight;
 		}
 		else
 		{
-			const float SlackArcDistance = FMath::Clamp(MaterialDistance - TargetThrowDistance, 0.0f, SlackLength);
-			const float Angle = SlackRadius > KINDA_SMALL_NUMBER ? SlackArcDistance / SlackRadius : 0.0f;
-			const FVector SlackOffset = RopeDirection * (SlackRadius * FMath::Sin(Angle))
-				+ Down * (SlackRadius * (1.0f - FMath::Cos(Angle)));
-			ParticleDeploymentPositions[Index] = Anchor + RopeDirection * TargetThrowDistance + SlackOffset;
+			LowHeight = TestHeight;
 		}
 	}
+	TargetThrowDistance = BuildCurve(LowHeight, CurvePoints, CurveDistances);
+	TargetThrowDistance = FMath::Min(TargetThrowDistance, MaximumPathLength);
+	const float ActualSlackLength = FMath::Max(0.0f, SafeMaxLength - TargetThrowDistance);
+	const float SlackRadius = ActualSlackLength / PI;
+	const FVector EndTangent = (CurvePoints.Last() - CurvePoints[CurvePoints.Num() - 2]).GetSafeNormal();
 
+	for (int32 Index = 0; Index < ParticleCount; ++Index)
+	{
+		const float MaterialDistance = SegmentRestLength * Index;
+		FVector Position = Anchor;
+		FVector Tangent = Direction.GetSafeNormal();
+
+		if (MaterialDistance <= TargetThrowDistance && CurvePoints.Num() > 1)
+		{
+			int32 SampleIndex = 1;
+			while (SampleIndex < CurveDistances.Num() && CurveDistances[SampleIndex] < MaterialDistance)
+			{
+				++SampleIndex;
+			}
+			SampleIndex = FMath::Clamp(SampleIndex, 1, CurvePoints.Num() - 1);
+			const float SegmentDistance = CurveDistances[SampleIndex] - CurveDistances[SampleIndex - 1];
+			const float Alpha = SegmentDistance > KINDA_SMALL_NUMBER
+				? FMath::Clamp((MaterialDistance - CurveDistances[SampleIndex - 1]) / SegmentDistance, 0.0f, 1.0f)
+				: 0.0f;
+			Position = FMath::Lerp(CurvePoints[SampleIndex - 1], CurvePoints[SampleIndex], Alpha);
+			Tangent = (CurvePoints[SampleIndex] - CurvePoints[SampleIndex - 1]).GetSafeNormal();
+		}
+		else if (ActualSlackLength > KINDA_SMALL_NUMBER)
+		{
+			const float SlackDistance = FMath::Clamp(MaterialDistance - TargetThrowDistance, 0.0f, ActualSlackLength);
+			const float Angle = SlackRadius > KINDA_SMALL_NUMBER ? SlackDistance / SlackRadius : 0.0f;
+			Position = EndPoint
+				+ EndTangent * (SlackRadius * FMath::Sin(Angle))
+				+ FVector::DownVector * (SlackRadius * (1.0f - FMath::Cos(Angle)));
+			Tangent = (EndTangent * FMath::Cos(Angle) + FVector::DownVector * FMath::Sin(Angle)).GetSafeNormal();
+		}
+		else
+		{
+			Position = EndPoint;
+			Tangent = EndTangent;
+		}
+
+		ParticleDeploymentPositions[Index] = Position;
+		ParticleLaunchVelocities[Index] = Tangent * FMath::Max(0.0f, ThrowSpeed);
+	}
+
+	RopeDirection = CurvePoints.Num() > 1
+		? (CurvePoints[1] - CurvePoints[0]).GetSafeNormal()
+		: Direction.GetSafeNormal();
+	RopeEndLocation = ParticleDeploymentPositions.Last();
 	bParticleDeployed[0] = true;
 	ParticlePositions[0] = Anchor;
 	PreviousParticlePositions[0] = Anchor;
@@ -319,7 +461,8 @@ void AWeapon_Rope::SimulateRopeStep(float StepSeconds)
 
 			const FVector SpawnPosition = ParticleDeploymentPositions[Index];
 			ParticlePositions[Index] = SpawnPosition;
-			const FVector LaunchVelocity = RopeDirection * FMath::Max(0.0f, ThrowSpeed) + AnchorVelocity;
+			const FVector LaunchVelocity = (ParticleLaunchVelocities.IsValidIndex(Index)
+				? ParticleLaunchVelocities[Index] : RopeDirection * FMath::Max(0.0f, ThrowSpeed)) + AnchorVelocity;
 			PreviousParticlePositions[Index] = SpawnPosition - LaunchVelocity * StepSeconds;
 			bParticleDeployed[Index] = true;
 		}
@@ -662,6 +805,7 @@ void AWeapon_Rope::ResetRopeVisual()
 	PreviousParticlePositions.Empty();
 	bParticleDeployed.Empty();
 	ParticleDeploymentPositions.Empty();
+	ParticleLaunchVelocities.Empty();
 	RopeStartLocation = GetActorLocation();
 	LastAnchorLocation = RopeStartLocation;
 	AnchorVelocity = FVector::ZeroVector;
