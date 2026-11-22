@@ -10,6 +10,16 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimInstance.h"
+#include "BrainComponent.h"
+#include "AIController.h"
+#include "AI/EnemyAIController.h"
+#include "combat/EnemyCharacter.h"
+#include "combat/CombatComponent.h"
+#include "combat/DamageHandlerComponent.h"
 #include "combat/CombatTargetingComponent.h"
 
 AWeapon_Rope::AWeapon_Rope()
@@ -98,6 +108,8 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 		return;
 	}
 
+	PullTarget = Cast<AEnemyCharacter>(GetTargetingActor());
+
 	FVector Direction;
 	if (!ResolveThrowDirection(Direction))
 	{
@@ -119,12 +131,7 @@ bool AWeapon_Rope::ResolveThrowDirection(FVector& OutDirection) const
 		return false;
 	}
 
-	AActor* Target = nullptr;
-	if (const UCombatTargetingComponent* Targeting =
-		Character->FindComponentByClass<UCombatTargetingComponent>())
-	{
-		Target = Targeting->GetCurrentTarget();
-	}
+	AActor* Target = GetTargetingActor();
 
 	FVector ViewLocation = Character->GetPawnViewLocation();
 	FRotator ViewRotation = Character->GetActorRotation();
@@ -164,6 +171,19 @@ bool AWeapon_Rope::ResolveThrowDirection(FVector& OutDirection) const
 		OutDirection = Character->GetActorForwardVector().GetSafeNormal();
 	}
 	return !OutDirection.IsNearlyZero();
+}
+
+AActor* AWeapon_Rope::GetTargetingActor() const
+{
+	const ACharacter* Character = OwningCharacter.Get();
+	const UCombatTargetingComponent* Targeting = Character
+		? Character->FindComponentByClass<UCombatTargetingComponent>() : nullptr;
+	if (!Targeting)
+	{
+		return nullptr;
+	}
+	AActor* Target = Targeting->GetCurrentTarget();
+	return IsValid(Target) ? Target : Targeting->GetManualTarget();
 }
 
 void AWeapon_Rope::InitializeRopeSimulation(const FVector& Direction)
@@ -222,6 +242,12 @@ void AWeapon_Rope::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	if (bIsPullingTarget)
+	{
+		UpdateTargetPull(DeltaSeconds);
+		return;
+	}
+
 	if (!bSimulatingRope || ParticlePositions.Num() < 2 || !GetWorld())
 	{
 		const FVector IdleAnchor = GetActorLocation();
@@ -251,6 +277,12 @@ void AWeapon_Rope::Tick(float DeltaSeconds)
 	{
 		SimulateRopeStep(SimulationStep);
 		SimulationAccumulator -= SimulationStep;
+	}
+
+	if (TryBeginTargetPull())
+	{
+		UpdateTargetPull(DeltaSeconds);
+		return;
 	}
 
 	RopeStartLocation = CurrentAnchor;
@@ -425,8 +457,195 @@ void AWeapon_Rope::ResolveParticleCollisions()
 	}
 }
 
+bool AWeapon_Rope::TryBeginTargetPull()
+{
+	AEnemyCharacter* Target = PullTarget.Get();
+	if (!IsValid(Target) || !GetWorld() || ParticlePositions.Num() < 2)
+	{
+		return false;
+	}
+
+	const UDamageHandlerComponent* Damage = Target->DamageHandlerComponent;
+	if ((Damage && Damage->bIsDead) || Target->bIsInDamageReaction)
+	{
+		PullTarget.Reset();
+		return false;
+	}
+
+	int32 LastDeployedIndex = INDEX_NONE;
+	for (int32 Index = 0; Index < bParticleDeployed.Num(); ++Index)
+	{
+		if (bParticleDeployed[Index]) LastDeployedIndex = Index;
+		else break;
+	}
+	if (LastDeployedIndex < 1) return false;
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(RopeTargetCatch), true, this);
+	if (AActor* OwnerActor = GetOwner()) Params.AddIgnoredActor(OwnerActor);
+	Params.AddIgnoredActor(this);
+	const float CatchRadius = FMath::Max(20.0f, RopeCollisionRadius * 3.0f);
+	TArray<FHitResult> Hits;
+	GetWorld()->SweepMultiByChannel(
+		Hits, ParticlePositions[0], ParticlePositions[LastDeployedIndex], FQuat::Identity,
+		ECC_Pawn, FCollisionShape::MakeSphere(CatchRadius), Params);
+
+	for (const FHitResult& Hit : Hits)
+	{
+		if (Hit.GetActor() == Target)
+		{
+			BeginTargetPull(Target);
+			return bIsPullingTarget;
+		}
+	}
+	return false;
+}
+
+void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
+{
+	if (!IsValid(Target) || bIsPullingTarget) return;
+
+	const UDamageHandlerComponent* Damage = Target->DamageHandlerComponent;
+	if ((Damage && Damage->bIsDead) || Target->bIsInDamageReaction) return;
+	if (Target->CombatComponent &&
+		(Target->CombatComponent->CurrentCombatState == ECombatState::Dead ||
+		 Target->CombatComponent->CurrentCombatState == ECombatState::Finishing ||
+		 Target->CombatComponent->CurrentCombatState == ECombatState::Staggered))
+	{
+		return;
+	}
+
+	PullTarget = Target;
+	bIsPullingTarget = true;
+	bIsExtending = false;
+
+	if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
+	{
+		SavedTargetMovementMode = Movement->MovementMode;
+		SavedTargetCustomMovementMode = Movement->CustomMovementMode;
+		SavedTargetMaxWalkSpeed = Movement->MaxWalkSpeed;
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+	}
+
+	if (USkeletalMeshComponent* Mesh = Target->GetMesh())
+	{
+		SavedTargetPauseAnims = Mesh->bPauseAnims;
+		if (UAnimInstance* Anim = Mesh->GetAnimInstance())
+		{
+			Anim->StopAllMontages(0.0f);
+		}
+		Mesh->bPauseAnims = true;
+	}
+
+	if (Target->CombatComponent)
+	{
+		Target->CombatComponent->StopActiveAttack(true, true, 0.0f);
+	}
+	Target->CancelPendingAICombatAction();
+
+	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
+	{
+		if (UBrainComponent* Brain = AIController->GetBrainComponent())
+		{
+			Brain->PauseLogic(TEXT("Rope pull"));
+			bTargetAIWasPaused = true;
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[AWeapon_Rope] Caught enemy %s. Starting root pull."), *GetNameSafe(Target));
+}
+
+void AWeapon_Rope::UpdateTargetPull(float DeltaSeconds)
+{
+	AEnemyCharacter* Target = PullTarget.Get();
+	if (!IsValid(Target) || (Target->DamageHandlerComponent && Target->DamageHandlerComponent->bIsDead))
+	{
+		ResetRopeVisual();
+		return;
+	}
+
+	const FVector Anchor = GetActorLocation();
+	const float OwnerRadius = OwningCharacter.IsValid() && OwningCharacter->GetCapsuleComponent()
+		? OwningCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.0f;
+	const float TargetRadius = Target->GetCapsuleComponent()
+		? Target->GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.0f;
+	const float StopDistance = OwnerRadius + TargetRadius + FMath::Max(0.0f, PullStopPadding);
+
+	FVector ToAnchor = Anchor - Target->GetActorLocation();
+	const float Distance = ToAnchor.Size();
+	if (Distance <= StopDistance)
+	{
+		ResetRopeVisual();
+		return;
+	}
+
+	ToAnchor /= FMath::Max(Distance, KINDA_SMALL_NUMBER);
+	const float StepDistance = FMath::Min(Distance - StopDistance, FMath::Max(0.0f, EnemyPullSpeed) * DeltaSeconds);
+	FHitResult MoveHit;
+	Target->SetActorLocation(Target->GetActorLocation() + ToAnchor * StepDistance, true, &MoveHit, ETeleportType::None);
+
+	const FVector TargetPoint = Target->GetActorLocation() + FVector(0.0f, 0.0f,
+		Target->GetCapsuleComponent() ? Target->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.35f : 35.0f);
+	const int32 LastIndex = ParticlePositions.Num() - 1;
+	for (int32 Index = 1; Index <= LastIndex; ++Index)
+	{
+		if (!bParticleDeployed.IsValidIndex(Index) || !bParticleDeployed[Index]) break;
+		const float Alpha = static_cast<float>(Index) / static_cast<float>(LastIndex);
+		const FVector Desired = FMath::Lerp(Anchor, TargetPoint, Alpha);
+		ParticlePositions[Index] = FMath::VInterpTo(
+			ParticlePositions[Index], Desired, DeltaSeconds, FMath::Max(0.1f, RopeContractionSpeed));
+		PreviousParticlePositions[Index] = ParticlePositions[Index];
+	}
+	if (bParticleDeployed.IsValidIndex(LastIndex) && bParticleDeployed[LastIndex])
+	{
+		ParticlePositions[LastIndex] = TargetPoint;
+		PreviousParticlePositions[LastIndex] = TargetPoint;
+	}
+
+	RopeStartLocation = Anchor;
+	RopeEndLocation = TargetPoint;
+	UpdateRopeVisual();
+
+	if (MoveHit.bBlockingHit && MoveHit.GetActor() != GetOwner())
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Pull stopped by blocking actor %s."), *GetNameSafe(MoveHit.GetActor()));
+		ResetRopeVisual();
+	}
+}
+
+void AWeapon_Rope::RestorePulledTarget()
+{
+	AEnemyCharacter* Target = PullTarget.Get();
+	if (IsValid(Target))
+	{
+		if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
+		{
+			Movement->SetMovementMode(SavedTargetMovementMode, SavedTargetCustomMovementMode);
+			Movement->MaxWalkSpeed = SavedTargetMaxWalkSpeed;
+		}
+		if (USkeletalMeshComponent* Mesh = Target->GetMesh())
+		{
+			Mesh->bPauseAnims = bSavedTargetPauseAnims;
+		}
+		if (bTargetAIWasPaused)
+		{
+			if (AEnemyAIController* AIController = Cast<AEnemyAIController>(Target->GetController()))
+			{
+				if (UBrainComponent* Brain = AIController->GetBrainComponent())
+				{
+					Brain->ResumeLogic(TEXT("Rope pull complete"));
+				}
+			}
+		}
+	}
+	bTargetAIWasPaused = false;
+	PullTarget.Reset();
+	bIsPullingTarget = false;
+}
+
 void AWeapon_Rope::ResetRopeVisual()
 {
+	RestorePulledTarget();
 	bIsExtending = false;
 	bSwingActive = false;
 	bSimulatingRope = false;
