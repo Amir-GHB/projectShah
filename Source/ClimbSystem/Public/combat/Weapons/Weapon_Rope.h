@@ -71,6 +71,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Collision")
 	TEnumAsByte<ECollisionChannel> RopeTraceChannel = ECC_Visibility;
 
+	/** Test mode: automatically selects the nearest enemy inside the view-direction cone instead of requiring precise aim/lock-on. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Targeting")
+	bool bUseNonAimTargeting = false;
+
+	/** Half-angle of the automatic target selection cone, in degrees. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Targeting", meta = (ClampMin = "1.0", ClampMax = "60.0"))
+	float NonAimTargetingHalfAngle = 20.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Pull", meta = (ClampMin = "100.0"))
 	float EnemyPullSpeed = 1250.0f;
 
