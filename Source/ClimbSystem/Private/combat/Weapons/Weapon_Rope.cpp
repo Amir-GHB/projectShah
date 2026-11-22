@@ -4,8 +4,6 @@
 
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
-#include "Camera/PlayerCameraManager.h"
-#include "Camera/PlayerCameraManager.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -89,10 +87,16 @@ void AWeapon_Rope::AttachToHolster(ACharacter* TargetCharacter)
 	Super::AttachToHolster(TargetCharacter);
 }
 
+void AWeapon_Rope::BeginSwing()
+{
+	ResetRopeVisual();
+	bSwingActive = true;
+}
+
 void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 {
 	if (!IsValid(SwingMontage) || SourceAnimation != SwingMontage
-		|| bHasReleasedThisSwing || !GetWorld())
+		|| !bSwingActive || !GetWorld())
 	{
 		return;
 	}
@@ -104,7 +108,7 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 		return;
 	}
 
-	bHasReleasedThisSwing = true;
+	bSwingActive = false;
 	bIsExtending = true;
 	RopeStartLocation = GetActorLocation();
 	RopeEndLocation = RopeStartLocation;
@@ -225,7 +229,7 @@ void AWeapon_Rope::Tick(float DeltaSeconds)
 void AWeapon_Rope::ResetRopeVisual()
 {
 	bIsExtending = false;
-	bHasReleasedThisSwing = false;
+	bSwingActive = false;
 	CurrentRopeLength = 0.0f;
 	RopeStartLocation = GetActorLocation();
 	RopeEndLocation = RopeStartLocation;
