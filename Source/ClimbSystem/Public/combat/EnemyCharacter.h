@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "TimerManager.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "combat/CombatTypes.h"
 #include "EnemyCharacter.generated.h"
 
