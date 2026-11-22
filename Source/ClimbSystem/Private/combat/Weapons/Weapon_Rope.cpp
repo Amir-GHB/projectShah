@@ -68,7 +68,23 @@ void AWeapon_Rope::BeginPlay()
 	for (USplineMeshComponent* Segment : RopeSegments)
 	{
 		if (!IsValid(Segment)) continue;
+
 		Segment->SetStaticMesh(RopeSegmentMesh);
+
+		// Spline mesh components do not always refresh their material slots
+		// reliably when the mesh is assigned at runtime. Copy the source
+		// static mesh's material interfaces explicitly so every rope segment
+		// renders with the asset's authored materials.
+		Segment->EmptyOverrideMaterials();
+		if (IsValid(RopeSegmentMesh))
+		{
+			const TArray<FStaticMaterial>& SourceMaterials = RopeSegmentMesh->GetStaticMaterials();
+			for (int32 MaterialIndex = 0; MaterialIndex < SourceMaterials.Num(); ++MaterialIndex)
+			{
+				Segment->SetMaterial(MaterialIndex, SourceMaterials[MaterialIndex].MaterialInterface);
+			}
+		}
+
 		Segment->SetVisibility(false);
 	}
 
