@@ -49,16 +49,16 @@ void AWeapon_Rope::BeginPlay()
 	Super::BeginPlay();
 
 	// Reuse the existing attack lifecycle, combo state and montage callbacks,
-	// while exposing a weapon-specific SwingMontage property to designers.
+	// while exposing a weapon-specific CharacterSwingMontage property to designers.
 	WeaponConfig.WeaponType = EWeaponType::Rope;
 	WeaponConfig.AttackMontageMode = EAttackMontageMode::SingleComboMontage;
-	WeaponConfig.AttackComboMontage = SwingMontage;
+	WeaponConfig.AttackComboMontage = CharacterSwingMontage;
 	WeaponConfig.bEnableAttackPositioning = false;
 	WeaponConfig.TraceSocketNames.Empty();
 
-	if (!IsValid(SwingMontage))
+	if (!IsValid(CharacterSwingMontage))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[AWeapon_Rope] SwingMontage is not assigned on %s."), *GetName());
+		UE_LOG(LogTemp, Warning, TEXT("[AWeapon_Rope] CharacterSwingMontage is not assigned on %s."), *GetName());
 	}
 	if (!IsValid(RopeSegmentMesh))
 	{
@@ -99,7 +99,7 @@ void AWeapon_Rope::BeginSwing()
 
 void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 {
-	if (!IsValid(SwingMontage) || SourceAnimation != SwingMontage
+	if (!IsValid(CharacterSwingMontage) || SourceAnimation != CharacterSwingMontage
 		|| !bSwingActive || !GetWorld())
 	{
 		return;
