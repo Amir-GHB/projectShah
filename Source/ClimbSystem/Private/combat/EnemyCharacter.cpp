@@ -3,6 +3,7 @@
 #include "combat/EnemyCharacter.h"
 
 #include "AI/EnemyAIController.h"
+#include "BrainComponent.h"
 #include "combat/CombatComponent.h"
 #include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
@@ -25,7 +26,8 @@ namespace
 
 AEnemyCharacter::AEnemyCharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	CombatPositioningComponent = CreateDefaultSubobject<UCombatPositioningComponent>(TEXT("CombatPositioningComponent"));
 	DamageHandlerComponent = CreateDefaultSubobject<UDamageHandlerComponent>(TEXT("DamageHandlerComponent"));
@@ -65,8 +67,149 @@ void AEnemyCharacter::BeginPlay()
 	}
 }
 
+void AEnemyCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (!bIsBeingRopePulled)
+	{
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	AActor* Puller = RopePuller.Get();
+	if (!IsValid(Puller) || (DamageHandlerComponent && DamageHandlerComponent->bIsDead))
+	{
+		EndRopePull();
+		return;
+	}
+
+	const FVector ToPuller = Puller->GetActorLocation() - GetActorLocation();
+	const FVector Direction = ToPuller.GetSafeNormal2D();
+	const float Distance = ToPuller.Size2D();
+	if (Distance <= RopePullStopDistance || Direction.IsNearlyZero())
+	{
+		EndRopePull();
+		return;
+	}
+
+	const float MoveDistance = FMath::Min(
+		FMath::Max(0.0f, RopePullSpeed) * DeltaSeconds,
+		Distance - RopePullStopDistance);
+	const FRotator FacingRotation(0.0f, Direction.Rotation().Yaw, 0.0f);
+	SetActorRotation(FacingRotation);
+
+	FHitResult MoveHit;
+	AddActorWorldOffset(Direction * MoveDistance, true, &MoveHit, ETeleportType::None);
+
+	const float RemainingDistance = FVector::Dist2D(GetActorLocation(), Puller->GetActorLocation());
+	if (RemainingDistance <= RopePullStopDistance + 2.0f
+		|| (MoveHit.IsValidBlockingHit() && RemainingDistance > RopePullStopDistance + 10.0f))
+	{
+		EndRopePull();
+	}
+}
+
+bool AEnemyCharacter::BeginRopePull(AActor* Puller, float PullSpeed, float StopDistance)
+{
+	if (!IsValid(Puller) || Puller == this || bIsBeingRopePulled
+		|| (DamageHandlerComponent && DamageHandlerComponent->bIsDead))
+	{
+		return false;
+	}
+
+	RopePuller = Puller;
+	RopePullSpeed = FMath::Max(0.0f, PullSpeed);
+	RopePullStopDistance = FMath::Max(50.0f, StopDistance);
+
+	if (CombatComponent)
+	{
+		CombatComponent->StopActiveAttack(true, true, 0.0f);
+		CombatComponent->SetGuardMode(false);
+	}
+	CancelPendingAICombatAction();
+	if (AMagicEnemyCharacter* Mage = Cast<AMagicEnemyCharacter>(this))
+	{
+		Mage->CancelPendingMagicAttack();
+	}
+	if (ABowEnemyCharacter* Archer = Cast<ABowEnemyCharacter>(this))
+	{
+		Archer->CancelPendingBowAttack();
+	}
+	ReleaseAICombatSlot();
+
+	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(GetController()))
+	{
+		AIController->StopMovement();
+		AIController->ClearFocus(EAIFocusPriority::Gameplay);
+		if (UBrainComponent* Brain = AIController->GetBrainComponent())
+		{
+			bWasRopePullBrainPaused = Brain->IsPaused();
+			Brain->PauseLogic(TEXT("Enemy pulled by rope"));
+		}
+	}
+
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		PreviousRopePullMovementMode = Movement->MovementMode;
+		PreviousRopePullWalkSpeed = Movement->MaxWalkSpeed;
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+	}
+
+	if (GetMesh())
+	{
+		bPreviousRopePullPauseAnims = GetMesh()->bPauseAnims;
+		if (UAnimInstance* Anim = GetMesh()->GetAnimInstance())
+		{
+			Anim->Montage_Stop(0.0f);
+		}
+		GetMesh()->bPauseAnims = true;
+	}
+
+	bIsBeingRopePulled = true;
+	SetActorTickEnabled(true);
+	return true;
+}
+
+void AEnemyCharacter::EndRopePull()
+{
+	if (!bIsBeingRopePulled)
+	{
+		return;
+	}
+
+	bIsBeingRopePulled = false;
+	RopePuller.Reset();
+
+	if (GetMesh())
+	{
+		GetMesh()->bPauseAnims = bPreviousRopePullPauseAnims;
+	}
+
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->SetMovementMode(PreviousRopePullMovementMode);
+		Movement->MaxWalkSpeed = PreviousRopePullWalkSpeed;
+	}
+
+	if (AEnemyAIController* AIController = Cast<AEnemyAIController>(GetController()))
+	{
+		if (!bWasRopePullBrainPaused)
+		{
+			if (UBrainComponent* Brain = AIController->GetBrainComponent())
+			{
+				Brain->ResumeLogic(TEXT("Rope pull finished"));
+			}
+		}
+	}
+
+	SetActorTickEnabled(false);
+}
+
 void AEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	EndRopePull();
 	CancelPendingAICombatAction();
 	ReleaseAICombatSlot();
 	if (CombatComponent)
