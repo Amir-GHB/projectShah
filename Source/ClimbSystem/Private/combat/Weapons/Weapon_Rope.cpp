@@ -517,6 +517,11 @@ void AWeapon_Rope::BeginTargetPull(AEnemyCharacter* Target)
 	PullTarget = Target;
 	bIsPullingTarget = true;
 	bIsExtending = false;
+	// Once caught, the whole rope is paid out and contracts toward the captured actor.
+	for (int32 Index = 0; Index < bParticleDeployed.Num(); ++Index)
+	{
+		bParticleDeployed[Index] = true;
+	}
 
 	if (UCharacterMovementComponent* Movement = Target->GetCharacterMovement())
 	{
