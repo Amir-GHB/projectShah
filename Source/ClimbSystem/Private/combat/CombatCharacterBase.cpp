@@ -129,6 +129,15 @@ void ACombatCharacterBase::BeginAimCameraMode()
 	}
 }
 
+void ACombatCharacterBase::HideAimCrosshair()
+{
+	if (AimCrosshairWidget)
+	{
+		AimCrosshairWidget->RemoveFromParent();
+		AimCrosshairWidget = nullptr;
+	}
+}
+
 void ACombatCharacterBase::EndAimCameraMode()
 {
 	bRopeAimInputHeld = false;
@@ -143,11 +152,7 @@ void ACombatCharacterBase::EndAimCameraMode()
 	{
 		SetActorTickEnabled(true);
 	}
-	if (AimCrosshairWidget)
-	{
-		AimCrosshairWidget->RemoveFromParent();
-		AimCrosshairWidget = nullptr;
-	}
+	HideAimCrosshair();
 }
 
 void ACombatCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
