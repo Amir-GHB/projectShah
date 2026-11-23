@@ -76,6 +76,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera|Aim")
 	void EndAimCameraMode();
 
+	/** Hides only the aiming reticle while leaving the shoulder camera active. */
+	UFUNCTION(BlueprintCallable, Category = "Camera|Aim")
+	void HideAimCrosshair();
+
 	UFUNCTION(BlueprintPure, Category = "Camera|Aim")
 	bool IsAimCameraModeActive() const { return bAimCameraModeActive; }
 
