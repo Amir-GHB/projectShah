@@ -138,6 +138,50 @@ void AWeapon_Rope::BeginSwing()
 	LastAnchorLocation = GetActorLocation();
 }
 
+void AWeapon_Rope::BeginSwingVisual(float TotalDuration)
+{
+	if (bSimulatingRope || bIsExtending || bIsPullingTarget || bIsRetracting)
+	{
+		return;
+	}
+
+	bSwingVisualActive = true;
+	SwingVisualElapsed = 0.0f;
+	SwingVisualDuration = FMath::Max(TotalDuration, KINDA_SMALL_NUMBER);
+	UpdateSwingVisual(0.0f);
+}
+
+void AWeapon_Rope::EndSwingVisual()
+{
+	if (!bSwingVisualActive)
+	{
+		return;
+	}
+
+	bSwingVisualActive = false;
+	SwingVisualElapsed = 0.0f;
+	SwingVisualDuration = 0.0f;
+
+	// Do not hide the components if deployment has already taken ownership
+	// of them at the release notify.
+	if (bSimulatingRope || bIsExtending || bIsPullingTarget || bIsRetracting)
+	{
+		return;
+	}
+
+	for (USplineMeshComponent* Segment : RopeSegments)
+	{
+		if (IsValid(Segment))
+		{
+			Segment->SetVisibility(false);
+		}
+	}
+	if (IsValid(HookMeshComponent))
+	{
+		HookMeshComponent->SetVisibility(false);
+	}
+}
+
 void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 {
 	if (!IsValid(CharacterSwingMontage) || SourceAnimation != CharacterSwingMontage
@@ -145,6 +189,8 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 	{
 		return;
 	}
+
+	EndSwingVisual();
 
 	FVector Direction;
 	FVector AimLocation;
@@ -164,14 +210,12 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 	// not on a broad collision sweep discovering an enemy by accident.
 	PullTarget = SelectedTarget;
 	bSwingActive = false;
-	InitializeRopeSimulation(Direction, AimLocation, true);
-
-	// The actual release notify is the hand-off point: stop displaying the
-	// crosshair and blend the shared aiming camera back to its original setup.
+	bRestoreAimCameraWhenRopeLifecycleEnds = false;
 	if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
 	{
-		Character->EndAimCameraMode();
+		bRestoreAimCameraWhenRopeLifecycleEnds = Character->IsAimCameraModeActive();
 	}
+	InitializeRopeSimulation(Direction, AimLocation, true);
 
 	UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope physically thrown. Max length: %.1f"), MaxRopeLength);
 }
@@ -561,6 +605,12 @@ void AWeapon_Rope::Tick(float DeltaSeconds)
 		return;
 	}
 
+	if (bSwingVisualActive)
+	{
+		UpdateSwingVisual(DeltaSeconds);
+		return;
+	}
+
 	if (!bSimulatingRope || ParticlePositions.Num() < 2 || !GetWorld())
 	{
 		const FVector IdleAnchor = GetActorLocation();
@@ -603,6 +653,16 @@ void AWeapon_Rope::Tick(float DeltaSeconds)
 	RopeStartLocation = CurrentAnchor;
 	RopeEndLocation = ParticlePositions.Last();
 	UpdateRopeVisual();
+
+	// A successful catch keeps the camera in aim mode through the pull and
+	// full retraction. A miss restores it once the rope has finished paying out.
+	if (!bIsExtending && !bIsPullingTarget && !bIsRetracting
+		&& bRestoreAimCameraWhenRopeLifecycleEnds)
+	{
+		bRestoreAimCameraWhenRopeLifecycleEnds = false;
+		if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+			Character->EndAimCameraMode();
+	}
 }
 
 void AWeapon_Rope::SimulateRopeStep(float StepSeconds)
@@ -994,6 +1054,12 @@ void AWeapon_Rope::UpdateRopeRetraction(float DeltaSeconds)
 
 void AWeapon_Rope::ResetRopeVisual()
 {
+	const bool bShouldRestoreAimCamera = bRestoreAimCameraWhenRopeLifecycleEnds;
+	bRestoreAimCameraWhenRopeLifecycleEnds = false;
+	bSwingVisualActive = false;
+	SwingVisualElapsed = 0.0f;
+	SwingVisualDuration = 0.0f;
+
 	if (AEnemyCharacter* Target = PullTarget.Get())
 	{
 		Target->EndRopePull();
@@ -1039,6 +1105,83 @@ void AWeapon_Rope::ResetRopeVisual()
 		RopeSpline->AddSplinePoint(FVector::ZeroVector, ESplineCoordinateSpace::Local, false);
 		RopeSpline->AddSplinePoint(FVector::ZeroVector, ESplineCoordinateSpace::Local, false);
 		RopeSpline->UpdateSpline();
+	}
+
+	if (bShouldRestoreAimCamera)
+	{
+		if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+		{
+			Character->EndAimCameraMode();
+		}
+	}
+}
+
+void AWeapon_Rope::UpdateSwingVisual(float DeltaSeconds)
+{
+	if (!bSwingVisualActive || !IsValid(RopeSpline) || !IsValid(RopeSegmentMesh))
+	{
+		return;
+	}
+
+	SwingVisualElapsed = FMath::Min(SwingVisualElapsed + FMath::Max(0.0f, DeltaSeconds), SwingVisualDuration);
+	const float Alpha = SwingVisualDuration > KINDA_SMALL_NUMBER
+		? FMath::Clamp(SwingVisualElapsed / SwingVisualDuration, 0.0f, 1.0f) : 1.0f;
+	const float AngleDegrees = FMath::Lerp(
+		-FMath::Max(0.0f, SwingVisualArcDegrees) * 0.5f,
+		FMath::Max(0.0f, SwingVisualArcDegrees) * 0.5f,
+		Alpha);
+
+	const ACharacter* Character = OwningCharacter.Get();
+	const FVector Pivot = GetActorLocation();
+	const FVector Axis = IsValid(Character) ? Character->GetActorRightVector() : FVector::RightVector;
+	const FVector InitialDirection = IsValid(Character) ? Character->GetActorUpVector() : FVector::UpVector;
+	const FVector RadialDirection = FQuat(Axis.GetSafeNormal(), FMath::DegreesToRadians(AngleDegrees))
+		.RotateVector(InitialDirection).GetSafeNormal();
+	const int32 SegmentCount = FMath::Clamp(SwingVisualSegmentCount, 1, FMath::Min(6, RopeSegments.Num()));
+
+	RopeSpline->ClearSplinePoints(false);
+	for (int32 PointIndex = 0; PointIndex <= SegmentCount; ++PointIndex)
+	{
+		const float DistanceAlpha = static_cast<float>(PointIndex) / static_cast<float>(SegmentCount);
+		const FVector WorldPoint = Pivot + RadialDirection * (FMath::Max(10.0f, SwingVisualRadius) * DistanceAlpha);
+		RopeSpline->AddSplinePoint(
+			GetActorTransform().InverseTransformPosition(WorldPoint),
+			ESplineCoordinateSpace::Local, false);
+		RopeSpline->SetSplinePointType(PointIndex, ESplinePointType::Linear, false);
+	}
+	RopeSpline->UpdateSpline();
+
+	for (int32 Index = 0; Index < RopeSegments.Num(); ++Index)
+	{
+		USplineMeshComponent* Segment = RopeSegments[Index];
+		if (!IsValid(Segment)) continue;
+
+		if (Index >= SegmentCount)
+		{
+			Segment->SetVisibility(false);
+			continue;
+		}
+
+		const FVector StartPosition = RopeSpline->GetLocationAtSplinePoint(Index, ESplineCoordinateSpace::Local);
+		const FVector EndPosition = RopeSpline->GetLocationAtSplinePoint(Index + 1, ESplineCoordinateSpace::Local);
+		const FVector StartTangent = RopeSpline->GetTangentAtSplinePoint(Index, ESplineCoordinateSpace::Local);
+		const FVector EndTangent = RopeSpline->GetTangentAtSplinePoint(Index + 1, ESplineCoordinateSpace::Local);
+		Segment->SetStartAndEnd(StartPosition, StartTangent, EndPosition, EndTangent, true);
+		Segment->SetVisibility(true);
+	}
+
+	if (IsValid(HookMeshComponent) && IsValid(HookMesh))
+	{
+		const FRotator HookRotation = RadialDirection.Rotation() + HookRotationOffset;
+		const FVector HookWorldPosition = Pivot + RadialDirection * FMath::Max(10.0f, SwingVisualRadius)
+			+ HookRotation.RotateVector(HookPositionOffset);
+		HookMeshComponent->SetWorldLocationAndRotation(HookWorldPosition, HookRotation);
+		HookMeshComponent->SetRelativeScale3D(HookScale);
+		HookMeshComponent->SetVisibility(true);
+	}
+	else if (IsValid(HookMeshComponent))
+	{
+		HookMeshComponent->SetVisibility(false);
 	}
 }
 
