@@ -123,6 +123,11 @@ void UCombatComponent::EquipWeapon(EWeaponType NewWeaponType)
 
 void UCombatComponent::BeginWeaponSwap(EWeaponType NewWeaponType)
 {
+	if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+	{
+		Character->EndAimCameraMode();
+	}
+
 	bGuardInputHeld = false;
 	ClearParryTimers();
 	if (UWorld* World = GetWorld())
@@ -884,6 +889,11 @@ void UCombatComponent::EnterDeadState()
 		return;
 	}
 
+	if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+	{
+		Character->EndAimCameraMode();
+	}
+
 	bGuardInputHeld = false;
 	QueuedWeaponSwitch.Reset();
 	if (AWeapon_Bow* Bow = Cast<AWeapon_Bow>(CurrentWeapon))
@@ -975,6 +985,10 @@ bool UCombatComponent::IsLastLivingEncounterEnemy(AActor* Enemy) const
 void UCombatComponent::EnterFinisherState()
 {
 	if (CurrentCombatState == ECombatState::Dead || CurrentCombatState == ECombatState::Finishing) return;
+	if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+	{
+		Character->EndAimCameraMode();
+	}
 	bGuardInputHeld = false;
 	StopActiveAttack(true, true, 0.08f);
 	if (UWorld* World = GetWorld())
