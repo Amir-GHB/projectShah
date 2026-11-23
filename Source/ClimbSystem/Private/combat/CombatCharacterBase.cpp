@@ -10,6 +10,7 @@
 #include "MotionWarpingComponent.h"
 #include "EngineUtils.h"
 #include "Camera/CameraComponent.h"
+#include "Blueprint/UserWidget.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
@@ -19,7 +20,7 @@
 
 ACombatCharacterBase::ACombatCharacterBase()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	DamageHandlerComponent = CreateDefaultSubobject<UDamageHandlerComponent>(TEXT("DamageHandlerComponent"));
@@ -56,6 +57,12 @@ void ACombatCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (CameraBoom)
+	{
+		DefaultCameraArmLength = CameraBoom->TargetArmLength;
+		DefaultCameraSocketOffset = CameraBoom->SocketOffset;
+	}
+
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		if (ULocalPlayer* LocalPlayer = PC->GetLocalPlayer())
@@ -68,6 +75,70 @@ void ACombatCharacterBase::BeginPlay()
 				}
 			}
 		}
+	}
+}
+
+void ACombatCharacterBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (!bAimCameraTransitionActive || !CameraBoom)
+	{
+		return;
+	}
+
+	const FVector TargetOffset = bAimCameraModeActive ? AimCameraSocketOffset : DefaultCameraSocketOffset;
+	const float TargetArmLength = bAimCameraModeActive ? AimCameraArmLength : DefaultCameraArmLength;
+	CameraBoom->SocketOffset = FMath::VInterpTo(
+		CameraBoom->SocketOffset, TargetOffset, DeltaSeconds, FMath::Max(0.1f, AimCameraInterpSpeed));
+	CameraBoom->TargetArmLength = FMath::FInterpTo(
+		CameraBoom->TargetArmLength, TargetArmLength, DeltaSeconds, FMath::Max(0.1f, AimCameraInterpSpeed));
+
+	if (CameraBoom->SocketOffset.Equals(TargetOffset, 0.1f)
+		&& FMath::IsNearlyEqual(CameraBoom->TargetArmLength, TargetArmLength, 0.1f))
+	{
+		CameraBoom->SocketOffset = TargetOffset;
+		CameraBoom->TargetArmLength = TargetArmLength;
+		bAimCameraTransitionActive = false;
+	}
+}
+
+void ACombatCharacterBase::BeginAimCameraMode()
+{
+	if (bAimCameraModeActive)
+	{
+		return;
+	}
+
+	bAimCameraModeActive = true;
+	bAimCameraTransitionActive = true;
+
+	if (!AimCrosshairWidget && AimCrosshairWidgetClass)
+	{
+		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+		{
+			AimCrosshairWidget = CreateWidget<UUserWidget>(PlayerController, AimCrosshairWidgetClass);
+		}
+	}
+	if (AimCrosshairWidget && !AimCrosshairWidget->IsInViewport())
+	{
+		AimCrosshairWidget->AddToViewport(100);
+	}
+}
+
+void ACombatCharacterBase::EndAimCameraMode()
+{
+	if (!bAimCameraModeActive && !AimCrosshairWidget)
+	{
+		return;
+	}
+
+	bAimCameraModeActive = false;
+	bAimCameraTransitionActive = CameraBoom != nullptr;
+	if (AimCrosshairWidget)
+	{
+		AimCrosshairWidget->RemoveFromParent();
+		AimCrosshairWidget = nullptr;
 	}
 }
 
@@ -153,15 +224,46 @@ void ACombatCharacterBase::OnJumpEnded(const FInputActionValue& Value)
 
 void ACombatCharacterBase::OnAttackTriggered(const FInputActionValue& Value)
 {
-	if (CombatComponent)
+	if (!CombatComponent)
 	{
-		CombatComponent->HandleAttackInput();
+		return;
 	}
+
+	if (CombatComponent->CurrentWeaponType == EWeaponType::Rope
+		&& (CombatComponent->CurrentCombatState == ECombatState::Idle
+			|| CombatComponent->CurrentCombatState == ECombatState::Recovering)
+		&& CombatComponent->AnimationState.DefenseState == ECombatDefenseState::None)
+	{
+		bRopeAimInputHeld = true;
+		BeginAimCameraMode();
+		return;
+	}
+
+	CombatComponent->HandleAttackInput();
 }
 
 
 void ACombatCharacterBase::OnAttackReleased(const FInputActionValue& Value)
 {
+	if (bRopeAimInputHeld)
+	{
+		bRopeAimInputHeld = false;
+		if (CombatComponent)
+		{
+			CombatComponent->HandleAttackInput();
+			if (CombatComponent->CurrentCombatState != ECombatState::Attacking
+				&& CombatComponent->CurrentCombatState != ECombatState::ComboWindow)
+			{
+				EndAimCameraMode();
+			}
+		}
+		else
+		{
+			EndAimCameraMode();
+		}
+		return;
+	}
+
 	if (CombatComponent)
 	{
 		CombatComponent->HandleAttackReleased();
@@ -170,6 +272,11 @@ void ACombatCharacterBase::OnAttackReleased(const FInputActionValue& Value)
 
 void ACombatCharacterBase::OnAttackCanceled(const FInputActionValue& Value)
 {
+	if (bRopeAimInputHeld)
+	{
+		bRopeAimInputHeld = false;
+		EndAimCameraMode();
+	}
 	if (CombatComponent)
 	{
 		CombatComponent->CancelAttackInput();
