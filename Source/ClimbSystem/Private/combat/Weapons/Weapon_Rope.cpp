@@ -217,6 +217,13 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 	}
 	InitializeRopeSimulation(Direction, AimLocation, true);
 
+	// The reticle is only needed for target selection. Keep the shoulder camera
+	// until the rope has completed its pull/retraction lifecycle.
+	if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+	{
+		Character->HideAimCrosshair();
+	}
+
 	UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope physically thrown. Max length: %.1f"), MaxRopeLength);
 }
 
