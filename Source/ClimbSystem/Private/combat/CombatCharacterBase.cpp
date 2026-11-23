@@ -21,6 +21,7 @@
 ACombatCharacterBase::ACombatCharacterBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	DamageHandlerComponent = CreateDefaultSubobject<UDamageHandlerComponent>(TEXT("DamageHandlerComponent"));
@@ -100,6 +101,7 @@ void ACombatCharacterBase::Tick(float DeltaSeconds)
 		CameraBoom->SocketOffset = TargetOffset;
 		CameraBoom->TargetArmLength = TargetArmLength;
 		bAimCameraTransitionActive = false;
+		SetActorTickEnabled(false);
 	}
 }
 
@@ -112,6 +114,7 @@ void ACombatCharacterBase::BeginAimCameraMode()
 
 	bAimCameraModeActive = true;
 	bAimCameraTransitionActive = true;
+	SetActorTickEnabled(true);
 
 	if (!AimCrosshairWidget && AimCrosshairWidgetClass)
 	{
@@ -136,6 +139,10 @@ void ACombatCharacterBase::EndAimCameraMode()
 
 	bAimCameraModeActive = false;
 	bAimCameraTransitionActive = CameraBoom != nullptr;
+	if (bAimCameraTransitionActive)
+	{
+		SetActorTickEnabled(true);
+	}
 	if (AimCrosshairWidget)
 	{
 		AimCrosshairWidget->RemoveFromParent();
