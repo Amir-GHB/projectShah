@@ -30,6 +30,8 @@ public:
 	virtual void AttachToHolster(ACharacter* TargetCharacter) override;
 
 	void BeginSwing();
+	void BeginSwingVisual(float TotalDuration);
+	void EndSwingVisual();
 	void ReleaseRope(const UAnimSequenceBase* SourceAnimation);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Animation")
@@ -41,6 +43,18 @@ public:
 	/** Static mesh displayed at the currently simulated free end of the rope. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual")
 	TObjectPtr<UStaticMesh> HookMesh = nullptr;
+
+	/** Number of rope sections shown during the overhead swing notify. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Swing Visual", meta = (ClampMin = "1", ClampMax = "6"))
+	int32 SwingVisualSegmentCount = 3;
+
+	/** Radial reach of the temporary overhead swing rope, in centimeters. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Swing Visual", meta = (ClampMin = "10.0"))
+	float SwingVisualRadius = 150.0f;
+
+	/** Total angular travel through the overhead swing window. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Swing Visual", meta = (ClampMin = "1.0", ClampMax = "360.0"))
+	float SwingVisualArcDegrees = 150.0f;
 
 	/** World-independent scale applied to the hook mesh component. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual")
@@ -161,6 +175,10 @@ private:
 	float CurrentRopeLength = 0.0f;
 	float SimulationAccumulator = 0.0f;
 	bool bSwingActive = false;
+	bool bSwingVisualActive = false;
+	bool bRestoreAimCameraWhenRopeLifecycleEnds = false;
+	float SwingVisualElapsed = 0.0f;
+	float SwingVisualDuration = 0.0f;
 	bool bSimulatingRope = false;
 	bool bHasThrowAimLocation = false;
 	float TargetThrowDistance = 0.0f;
@@ -183,5 +201,6 @@ private:
 	void SolveRopeConstraints();
 	void ResolveParticleCollisions();
 	void UpdateRopeVisual();
+	void UpdateSwingVisual(float DeltaSeconds);
 	bool ResolveThrowDirection(FVector& OutDirection, FVector& OutAimLocation, AEnemyCharacter*& OutTarget) const;
 };
