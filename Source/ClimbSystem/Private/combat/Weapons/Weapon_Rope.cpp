@@ -16,6 +16,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "combat/EnemyCharacter.h"
+#include "combat/CombatCharacterBase.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/CombatTargetingComponent.h"
 
@@ -151,6 +152,10 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 	if (!ResolveThrowDirection(Direction, AimLocation, SelectedTarget))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[AWeapon_Rope] Could not resolve a valid throw direction."));
+		if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+		{
+			Character->EndAimCameraMode();
+		}
 		return;
 	}
 
@@ -160,6 +165,14 @@ void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 	PullTarget = SelectedTarget;
 	bSwingActive = false;
 	InitializeRopeSimulation(Direction, AimLocation, true);
+
+	// The actual release notify is the hand-off point: stop displaying the
+	// crosshair and blend the shared aiming camera back to its original setup.
+	if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+	{
+		Character->EndAimCameraMode();
+	}
+
 	UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope physically thrown. Max length: %.1f"), MaxRopeLength);
 }
 
