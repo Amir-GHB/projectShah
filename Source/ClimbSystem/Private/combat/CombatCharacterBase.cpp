@@ -128,6 +128,7 @@ void ACombatCharacterBase::BeginAimCameraMode()
 
 void ACombatCharacterBase::EndAimCameraMode()
 {
+	bRopeAimInputHeld = false;
 	if (!bAimCameraModeActive && !AimCrosshairWidget)
 	{
 		return;
