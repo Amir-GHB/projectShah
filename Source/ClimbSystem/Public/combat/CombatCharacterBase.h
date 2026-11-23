@@ -15,6 +15,7 @@ class UInputMappingContext;
 class UInputAction;
 class USpringArmComponent;
 class UCameraComponent;
+class UUserWidget;
 class UMotionWarpingComponent;
 struct FInputActionValue;
 
@@ -25,6 +26,7 @@ class CLIMBSYSTEM_API ACombatCharacterBase : public ACharacter
 
 public:
 	ACombatCharacterBase();
+	virtual void Tick(float DeltaSeconds) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
 	TObjectPtr<UCombatComponent> CombatComponent;
@@ -49,6 +51,33 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
+
+	/** Camera shoulder offset while aiming. Positive Y moves toward the character's right shoulder; negative Y selects the left. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Aim")
+	FVector AimCameraSocketOffset = FVector(0.0f, 55.0f, 30.0f);
+
+	/** Spring-arm length while aiming. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Aim", meta = (ClampMin = "0.0"))
+	float AimCameraArmLength = 220.0f;
+
+	/** Interpolation speed used when entering and leaving aim camera mode. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Aim", meta = (ClampMin = "0.1"))
+	float AimCameraInterpSpeed = 8.0f;
+
+	/** Optional crosshair widget displayed while aim camera mode is active. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Aim")
+	TSubclassOf<UUserWidget> AimCrosshairWidgetClass;
+
+	/** Enters the shared shoulder-camera aiming mode. Safe to reuse for other weapons. */
+	UFUNCTION(BlueprintCallable, Category = "Camera|Aim")
+	void BeginAimCameraMode();
+
+	/** Leaves aim mode, removes the crosshair and smoothly restores the previous camera settings. */
+	UFUNCTION(BlueprintCallable, Category = "Camera|Aim")
+	void EndAimCameraMode();
+
+	UFUNCTION(BlueprintPure, Category = "Camera|Aim")
+	bool IsAimCameraModeActive() const { return bAimCameraModeActive; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -101,6 +130,14 @@ protected:
 	void OnNextWeaponTriggered(const FInputActionValue& Value);
 	void OnTargetLockTriggered(const FInputActionValue& Value);
 	void OnThrowNearbyActorTriggered(const FInputActionValue& Value);
+
+	bool bRopeAimInputHeld = false;
+	bool bAimCameraModeActive = false;
+	bool bAimCameraTransitionActive = false;
+	float DefaultCameraArmLength = 320.0f;
+	FVector DefaultCameraSocketOffset = FVector::ZeroVector;
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> AimCrosshairWidget = nullptr;
 
 public:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
