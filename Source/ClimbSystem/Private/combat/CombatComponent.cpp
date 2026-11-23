@@ -1,6 +1,7 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/CombatComponent.h"
+#include "combat/CombatCharacterBase.h"
 #include "combat/CombatTargetingComponent.h"
 #include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
@@ -837,6 +838,16 @@ void UCombatComponent::StopActiveAttack(bool bInterrupted, bool bStopMontage, fl
 		ActiveAttackWeapon->CancelTrace();
 		ActiveAttackWeapon->SetSwingEffectsActive(false);
 		ActiveAttackWeapon->SetActiveAttackIndex(INDEX_NONE);
+
+		// If the rope swing is interrupted before its release notify, make sure
+		// the reusable aim camera mode cannot remain active.
+		if (ActiveAttackWeapon->GetWeaponType() == EWeaponType::Rope)
+		{
+			if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+			{
+				Character->EndAimCameraMode();
+			}
+		}
 	}
 	if (OwningCharacter.IsValid())
 	{
