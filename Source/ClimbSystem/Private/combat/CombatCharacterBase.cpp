@@ -232,7 +232,7 @@ void ACombatCharacterBase::OnAttackTriggered(const FInputActionValue& Value)
 	if (CombatComponent->CurrentWeaponType == EWeaponType::Rope
 		&& (CombatComponent->CurrentCombatState == ECombatState::Idle
 			|| CombatComponent->CurrentCombatState == ECombatState::Recovering)
-		&& CombatComponent->AnimationState.DefenseState == ECombatDefenseState::None)
+		&& CombatComponent->GetAnimationState().DefenseState == ECombatDefenseState::None)
 	{
 		bRopeAimInputHeld = true;
 		BeginAimCameraMode();
