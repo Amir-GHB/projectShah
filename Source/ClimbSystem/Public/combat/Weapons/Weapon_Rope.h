@@ -111,6 +111,22 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Rope|State")
 	bool bIsExtending = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rope|Collision", meta = (ClampMin = "0"))
+	float CollisionSkin = 1.0f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rope|Friction", meta = (ClampMin = "0"))
+	float GroundStaticFriction = 1.0f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rope|Friction", meta = (ClampMin = "0", ClampMax = "1"))
+	float GroundTangentialDamping = 0.25f;
+	
+	TArray<FVector> StepStartPositions;   // last validated (collision-free) positions
+	 TArray<int32>   GroundContactSteps; 
+	
+	bool SweepRope(FHitResult& OutHit, const FVector& From, const FVector& To) const;
+	void SimulateRopeStep(float StepSeconds, const FVector& StepAnchor);   // signature changed
+	void ApplyGroundFriction();
+	void ResolveSegmentCollisions();
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

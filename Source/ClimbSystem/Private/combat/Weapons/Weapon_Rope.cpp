@@ -22,6 +22,7 @@
 AWeapon_Rope::AWeapon_Rope()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.TickGroup = TG_PostUpdateWork;
 
 	WeaponConfig.WeaponType = EWeaponType::Rope;
 	WeaponConfig.WeaponDisplayName = FText::FromString(TEXT("Rope"));
@@ -402,6 +403,10 @@ void AWeapon_Rope::InitializeRopeSimulation(
 	bParticleDeployed.Init(false, ParticleCount);
 	ParticleDeploymentPositions.SetNum(ParticleCount);
 	ParticleLaunchVelocities.SetNum(ParticleCount);
+	
+	StepStartPositions.Init(Anchor, ParticleCount);
+	GroundContactSteps.Init(0, ParticleCount);
+	
 
 	RopeStartLocation = Anchor;
 	LastAnchorLocation = Anchor;
@@ -554,26 +559,28 @@ void AWeapon_Rope::Tick(float DeltaSeconds)
 	}
 
 	const FVector CurrentAnchor = GetActorLocation();
-	if (DeltaSeconds > SMALL_NUMBER)
-	{
-		AnchorVelocity = (CurrentAnchor - LastAnchorLocation) / DeltaSeconds;
-	}
-	else
-	{
-		AnchorVelocity = FVector::ZeroVector;
-	}
+	const FVector PreviousAnchor = LastAnchorLocation;
+	AnchorVelocity = DeltaSeconds > SMALL_NUMBER
+		? (CurrentAnchor - PreviousAnchor) / DeltaSeconds
+		: FVector::ZeroVector;
 	LastAnchorLocation = CurrentAnchor;
+ 
+	// Fixed-step simulation. The hand is interpolated across the substeps so
+	// the rope sees smooth motion instead of one jump per frame.
+	SimulationAccumulator += FMath::Min(DeltaSeconds, 0.1f);
+	const int32 StepCount = FMath::FloorToInt(SimulationAccumulator / SimulationStep);
+	for (int32 Step = 1; Step <= StepCount; ++Step)
+	{
+		const FVector StepAnchor = FMath::Lerp(
+			PreviousAnchor, CurrentAnchor, static_cast<float>(Step) / static_cast<float>(StepCount));
+		SimulateRopeStep(SimulationStep, StepAnchor);
+	}
+	SimulationAccumulator -= StepCount * SimulationStep;
+ 
+	// Visual start always matches the hand exactly.
 	ParticlePositions[0] = CurrentAnchor;
 	PreviousParticlePositions[0] = CurrentAnchor;
-
-	// Fixed-step simulation keeps the rope stable across variable frame rates.
-	SimulationAccumulator += FMath::Min(DeltaSeconds, 0.1f);
-	while (SimulationAccumulator >= SimulationStep)
-	{
-		SimulateRopeStep(SimulationStep);
-		SimulationAccumulator -= SimulationStep;
-	}
-
+ 
 	if (TryBeginTargetPull())
 	{
 		UpdateTargetPull(DeltaSeconds);
@@ -660,7 +667,6 @@ void AWeapon_Rope::SolveRopeConstraints()
 
 	for (int32 Iteration = 0; Iteration < Iterations; ++Iteration)
 	{
-		ParticlePositions[0] = GetActorLocation();
 
 		for (int32 Index = 0; Index < ParticleCount - 1; ++Index)
 		{
@@ -694,61 +700,78 @@ void AWeapon_Rope::SolveRopeConstraints()
 
 void AWeapon_Rope::ResolveParticleCollisions()
 {
-	UWorld* World = GetWorld();
-	if (!World)
+	if (!GetWorld())
 	{
 		return;
 	}
-
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RopeParticleCollision), true, this);
-	if (OwningCharacter.IsValid())
-	{
-		QueryParams.AddIgnoredActor(OwningCharacter.Get());
-	}
-
-	const float SafeRadius = FMath::Max(1.0f, RopeCollisionRadius);
-	const FCollisionShape CollisionShape = FCollisionShape::MakeSphere(SafeRadius);
-	int32 LastDeployedIndex = 0;
-	while (bParticleDeployed.IsValidIndex(LastDeployedIndex + 1) && bParticleDeployed[LastDeployedIndex + 1])
-	{
-		++LastDeployedIndex;
-	}
+ 
 	for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
 	{
 		if (!bParticleDeployed.IsValidIndex(Index) || !bParticleDeployed[Index])
 		{
 			break;
 		}
-
-		const FVector Previous = PreviousParticlePositions[Index];
-		const FVector Current = ParticlePositions[Index];
+ 
+		const FVector Start = StepStartPositions[Index];
+		const FVector End = ParticlePositions[Index];
+ 
 		FHitResult Hit;
-		if (World->SweepSingleByChannel(
-			Hit, Previous, Current, FQuat::Identity, RopeTraceChannel, CollisionShape, QueryParams)
-			&& Hit.bBlockingHit)
+		if (!SweepRope(Hit, Start, End))
 		{
-			// Resolve against the surface without pinning the particle there.
-			// Keep tangential momentum so the rope can slide and fall away.
-			const FVector Normal = Hit.ImpactNormal.GetSafeNormal();
-			const FVector SurfacePosition = Hit.Location + Normal * 0.5f;
-			FVector Velocity = Current - Previous;
-			const float IntoSurface = FVector::DotProduct(Velocity, Normal);
-			if (IntoSurface < 0.0f)
+			continue;
+		}
+ 
+		const FVector Normal = Hit.ImpactNormal.GetSafeNormal();
+		FVector NewPosition;
+ 
+		if (Hit.bStartPenetrating)
+		{
+			// Only happens with moving geometry (doors, enemies). Push straight out.
+			NewPosition = Start + Hit.Normal.GetSafeNormal() * (Hit.PenetrationDepth + CollisionSkin);
+		}
+		else
+		{
+			// Collide and slide: keep the movement that was left over after the
+			// hit, minus the part pointing into the surface. Without this a
+			// particle that touches the ground loses its whole sideways move.
+			const FVector Surface = Hit.Location + Normal * CollisionSkin;
+			FVector Remaining = End - Hit.Location;
+			const float Into = FVector::DotProduct(Remaining, Normal);
+			if (Into < 0.0f)
 			{
-				Velocity -= Normal * IntoSurface;
+				Remaining -= Normal * Into;
 			}
-			Velocity *= 0.85f;
-
-			ParticlePositions[Index] = SurfacePosition;
-			PreviousParticlePositions[Index] = SurfacePosition - Velocity;
-
-			// A collision at the currently leading end stops further rope payout.
-			// The endpoint itself remains free and is never attached to the hit actor/world.
-			if (bIsExtending && Index == LastDeployedIndex)
+			NewPosition = Surface + Remaining;
+ 
+			FHitResult SlideHit;
+			if (SweepRope(SlideHit, Surface, NewPosition))
 			{
-				bIsExtending = false;
-				UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Rope payout stopped by obstruction: %s"), *GetNameSafe(Hit.GetActor()));
+				NewPosition = SlideHit.bStartPenetrating
+					? Surface
+					: SlideHit.Location + SlideHit.ImpactNormal.GetSafeNormal() * CollisionSkin;
 			}
+		}
+ 
+		const bool bGround = Normal.Z > 0.6f;
+		if (bGround)
+		{
+			GroundContactSteps[Index] = 6;
+		}
+ 
+		FVector Velocity = NewPosition - Start;
+		Velocity *= bGround ? (1.0f - GroundTangentialDamping) : 0.85f;
+ 
+		ParticlePositions[Index] = NewPosition;
+		PreviousParticlePositions[Index] = NewPosition - Velocity;
+ 
+		if (bIsExtending && !bParticleDeployed.IsValidIndex(Index + 1))
+		{
+			bIsExtending = false;
+		}
+		else if (bIsExtending && bParticleDeployed.IsValidIndex(Index + 1) && !bParticleDeployed[Index + 1])
+		{
+			// Leading particle was blocked: stop paying out more rope.
+			bIsExtending = false;
 		}
 	}
 }
@@ -783,16 +806,35 @@ bool AWeapon_Rope::TryBeginTargetPull()
 		1.0f, MaxRopeLength / FMath::Max(1, ParticlePositions.Num() - 1));
 	const float CatchRadius = FMath::Max(25.0f, RopeCollisionRadius * 4.0f)
 		+ SegmentRestLength * 0.75f;
+	int32 ClosestIndex = INDEX_NONE;
 	float ClosestDistanceSquared = TNumericLimits<float>::Max();
 	for (int32 Index = 1; Index <= LastDeployedIndex; ++Index)
 	{
-		ClosestDistanceSquared = FMath::Min(
-			ClosestDistanceSquared,
-			FVector::DistSquared(ParticlePositions[Index], ThrowAimLocation));
+		const float D = FVector::DistSquared(ParticlePositions[Index], ThrowAimLocation);
+		if (D < ClosestDistanceSquared)
+		{
+			ClosestDistanceSquared = D;
+			ClosestIndex = Index;
+		}
 	}
-
-	if (ClosestDistanceSquared <= FMath::Square(CatchRadius))
+ 
+	if (ClosestIndex != INDEX_NONE && ClosestDistanceSquared <= FMath::Square(CatchRadius))
 	{
+		// Line of sight from the rope to the enemy, ignoring the enemy itself.
+		FCollisionQueryParams LosParams(SCENE_QUERY_STAT(RopeCatchLOS), false, this);
+		LosParams.AddIgnoredActor(Target);
+		if (OwningCharacter.IsValid())
+		{
+			LosParams.AddIgnoredActor(OwningCharacter.Get());
+		}
+ 
+		FHitResult LosHit;
+		if (GetWorld()->LineTraceSingleByChannel(
+			LosHit, ParticlePositions[ClosestIndex], ThrowAimLocation, RopeTraceChannel, LosParams))
+		{
+			return false; // geometry between the rope and the enemy
+		}
+ 
 		BeginTargetPull(Target);
 		return bIsPullingTarget;
 	}
@@ -959,6 +1001,8 @@ void AWeapon_Rope::ResetRopeVisual()
 	bParticleDeployed.Empty();
 	ParticleDeploymentPositions.Empty();
 	ParticleLaunchVelocities.Empty();
+	StepStartPositions.Empty();
+	GroundContactSteps.Empty();
 	RopeStartLocation = GetActorLocation();
 	LastAnchorLocation = RopeStartLocation;
 	AnchorVelocity = FVector::ZeroVector;
@@ -1065,5 +1109,189 @@ void AWeapon_Rope::UpdateRopeVisual()
 
 		Segment->SetStartAndEnd(StartPosition, StartTangent, EndPosition, EndTangent, true);
 		Segment->SetVisibility(true);
+	}
+}
+
+bool AWeapon_Rope::SweepRope(FHitResult& OutHit, const FVector& From, const FVector& To) const
+{
+	// bTraceComplex = false on purpose: sphere sweeps against triangle meshes
+	// give no depenetration data when a particle starts inside geometry.
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(RopeSweep), /*bTraceComplex=*/false, this);
+	if (OwningCharacter.IsValid())
+	{
+		Params.AddIgnoredActor(OwningCharacter.Get());
+	}
+ 
+	return GetWorld()->SweepSingleByChannel(
+		OutHit, From, To, FQuat::Identity, RopeTraceChannel,
+		FCollisionShape::MakeSphere(FMath::Max(1.0f, RopeCollisionRadius)), Params)
+		&& OutHit.bBlockingHit;
+}
+
+void AWeapon_Rope::SimulateRopeStep(float StepSeconds, const FVector& StepAnchor)
+{
+	ParticlePositions[0] = StepAnchor;
+	PreviousParticlePositions[0] = StepAnchor;
+ 
+	if (bIsExtending)
+	{
+		CurrentRopeLength = FMath::Min(
+			FMath::Max(0.0f, MaxRopeLength),
+			CurrentRopeLength + FMath::Max(0.0f, ExtensionSpeed) * StepSeconds);
+ 
+		const float SegmentRestLength = FMath::Max(1.0f, MaxRopeLength / FMath::Max(1, ParticlePositions.Num() - 1));
+		for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
+		{
+			if (bParticleDeployed[Index])
+			{
+				continue;
+			}
+ 
+			const float MaterialDistance = SegmentRestLength * Index;
+			if (MaterialDistance > CurrentRopeLength + KINDA_SMALL_NUMBER)
+			{
+				break;
+			}
+ 
+			// FIX: never teleport a particle across geometry. Sweep from the
+			// previous particle (the hand for Index 1) to the planned spawn point.
+			const FVector From = ParticlePositions[Index - 1];
+			const FVector Desired = ParticleDeploymentPositions[Index];
+ 
+			FHitResult PayoutHit;
+			if (SweepRope(PayoutHit, From, Desired))
+			{
+				const FVector Contact = PayoutHit.bStartPenetrating
+					? From
+					: PayoutHit.Location + PayoutHit.ImpactNormal.GetSafeNormal() * CollisionSkin;
+				ParticlePositions[Index] = Contact;
+				PreviousParticlePositions[Index] = Contact;
+				bParticleDeployed[Index] = true;
+				bIsExtending = false; // surface reached: stop paying out rope
+				UE_LOG(LogTemp, Verbose, TEXT("[AWeapon_Rope] Payout blocked by %s"), *GetNameSafe(PayoutHit.GetActor()));
+				break;
+			}
+ 
+			ParticlePositions[Index] = Desired;
+			const FVector LaunchVelocity = (ParticleLaunchVelocities.IsValidIndex(Index)
+				? ParticleLaunchVelocities[Index]
+				: RopeDirection * FMath::Max(0.0f, ThrowSpeed)) + AnchorVelocity;
+			PreviousParticlePositions[Index] = Desired - LaunchVelocity * StepSeconds;
+			bParticleDeployed[Index] = true;
+		}
+ 
+		if (CurrentRopeLength >= MaxRopeLength)
+		{
+			bIsExtending = false;
+		}
+	}
+ 
+	// Snapshot of validated positions. Every collision sweep this step starts here.
+	for (int32 Index = 0; Index < ParticlePositions.Num(); ++Index)
+	{
+		StepStartPositions[Index] = ParticlePositions[Index];
+	}
+ 
+	const FVector Gravity(0.0f, 0.0f, GetWorld()->GetGravityZ() * GravityScale);
+	const float Damping = FMath::Clamp(1.0f - VelocityDamping, 0.0f, 1.0f);
+ 
+	for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
+	{
+		if (!bParticleDeployed[Index])
+		{
+			continue;
+		}
+ 
+		GroundContactSteps[Index] = FMath::Max(0, GroundContactSteps[Index] - 1);
+ 
+		const FVector Current = ParticlePositions[Index];
+		const FVector Velocity = (Current - PreviousParticlePositions[Index]) * Damping;
+		PreviousParticlePositions[Index] = Current;
+		ParticlePositions[Index] = Current + Velocity + Gravity * (StepSeconds * StepSeconds);
+	}
+ 
+	// FIX: collision runs after EVERY constraint pass, so the last thing that
+	// touches the particles is always a collision sweep from a validated position.
+	for (int32 Pass = 0; Pass < 2; ++Pass)
+	{
+		SolveRopeConstraints();
+		ResolveParticleCollisions();
+	}
+ 
+	ApplyGroundFriction();
+	ResolveSegmentCollisions();
+}
+
+void AWeapon_Rope::ApplyGroundFriction()
+{
+	for (int32 Index = 1; Index < ParticlePositions.Num(); ++Index)
+	{
+		if (!bParticleDeployed.IsValidIndex(Index) || !bParticleDeployed[Index])
+		{
+			break;
+		}
+		if (GroundContactSteps[Index] <= 0)
+		{
+			continue;
+		}
+ 
+		// Uses world-up as the ground normal. Fine for floors; on steep slopes
+		// store the contact normal per particle if you need it exact.
+		const FVector Start = StepStartPositions[Index];
+		const FVector Delta = ParticlePositions[Index] - Start;
+		FVector Lateral(Delta.X, Delta.Y, 0.0f);
+		const float LateralSize = Lateral.Size();
+ 
+		if (LateralSize <= GroundStaticFriction)
+		{
+			Lateral = FVector::ZeroVector;
+			ParticlePositions[Index] = Start + FVector(0.0f, 0.0f, Delta.Z);
+			PreviousParticlePositions[Index] = ParticlePositions[Index]; // fully at rest
+		}
+		else
+		{
+			// Coulomb-style: moving still costs a fixed amount of displacement.
+			Lateral *= (LateralSize - GroundStaticFriction) / LateralSize;
+			ParticlePositions[Index] = Start + Lateral + FVector(0.0f, 0.0f, Delta.Z);
+		}
+	}
+}
+
+void AWeapon_Rope::ResolveSegmentCollisions()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+ 
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(RopeSegmentCheck), /*bTraceComplex=*/false, this);
+	if (OwningCharacter.IsValid())
+	{
+		Params.AddIgnoredActor(OwningCharacter.Get());
+	}
+ 
+	// Starts at 1: the hand segment is skipped so standing next to a wall
+	// can't pin the first particle.
+	for (int32 Index = 1; Index + 1 < ParticlePositions.Num(); ++Index)
+	{
+		if (!bParticleDeployed.IsValidIndex(Index + 1) || !bParticleDeployed[Index + 1])
+		{
+			break;
+		}
+ 
+		FHitResult Hit;
+		if (!World->LineTraceSingleByChannel(
+			Hit, ParticlePositions[Index], ParticlePositions[Index + 1], RopeTraceChannel, Params))
+		{
+			continue;
+		}
+ 
+		// Push the segment out of the surface it clips, weighted toward the
+		// nearer particle. Repeats every substep until the segment clears,
+		// so a rope sliding over a wall edge rides up and over it.
+		const FVector Push = Hit.ImpactNormal.GetSafeNormal() * (RopeCollisionRadius + CollisionSkin);
+		ParticlePositions[Index] += Push * (1.0f - Hit.Time);
+		ParticlePositions[Index + 1] += Push * Hit.Time;
 	}
 }
