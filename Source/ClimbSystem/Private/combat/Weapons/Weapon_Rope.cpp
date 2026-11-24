@@ -1177,7 +1177,9 @@ void AWeapon_Rope::UpdateSwingVisual(float DeltaSeconds)
 			(HookTarget - SwingHookPosition) * (FMath::Max(1.0f, SwingHookSpringStrength) / Mass);
 		const FVector DampingAcceleration =
 			-SwingHookVelocity * FMath::Max(0.0f, SwingHookDamping);
-		SwingHookVelocity += (SpringAcceleration + DampingAcceleration) * SafeDelta;
+		const FVector GravityAcceleration = FVector(0.0f, 0.0f,
+			GetWorld() ? GetWorld()->GetGravityZ() * FMath::Max(0.0f, SwingHookGravityScale) : 0.0f);
+		SwingHookVelocity += (SpringAcceleration + DampingAcceleration + GravityAcceleration) * SafeDelta;
 		SwingHookPosition += SwingHookVelocity * SafeDelta;
 	}
 
@@ -1231,7 +1233,7 @@ void AWeapon_Rope::UpdateSwingVisual(float DeltaSeconds)
 		const FVector HookWorldPosition = SwingHookPosition
 			+ HookRotation.RotateVector(HookPositionOffset);
 		HookMeshComponent->SetWorldLocationAndRotation(HookWorldPosition, HookRotation);
-		HookMeshComponent->SetWorldScale3D(HookScale);
+		HookMeshComponent->SetRelativeScale3D(HookScale);
 		HookMeshComponent->SetVisibility(true);
 	}
 	else if (IsValid(HookMeshComponent))
