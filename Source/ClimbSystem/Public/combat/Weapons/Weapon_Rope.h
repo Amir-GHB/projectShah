@@ -45,7 +45,7 @@ public:
 	TObjectPtr<UStaticMesh> HookMesh = nullptr;
 
 	/** Number of rope sections shown during the overhead swing notify. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Swing Visual", meta = (ClampMin = "1", ClampMax = "6"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rope|Swing Visual", meta = (ClampMin = "1", ClampMax = "6"))
 	int32 SwingVisualSegmentCount = 3;
 
 	/** Radius of the hook's horizontal orbit around the hand, in centimeters. */
@@ -79,6 +79,10 @@ public:
 	/** Velocity damping for the hook's inertial motion. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rope|Swing Physics", meta = (ClampMin = "0.0", ClampMax = "100.0"))
 	float SwingHookDamping = 18.0f;
+
+	/** Gravity contribution applied to the hook during the overhead swing. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rope|Swing Physics", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float SwingHookGravityScale = 0.2f;
 
 	/** World-independent scale applied to the hook mesh component. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rope|Visual")
