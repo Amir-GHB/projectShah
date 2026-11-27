@@ -8,6 +8,7 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Character.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Animation/AnimInstance.h"
@@ -215,6 +216,7 @@ void URidingComponent::FinishMount()
 	if (APlayerController* PC = CachedPlayerController.Get())
 	{
 		PC->Possess(Horse);
+		PC->SetViewTargetWithBlend(Horse, CameraBlendDuration);
 		PC->SetIgnoreMoveInput(false);
 		PC->SetIgnoreLookInput(false);
 	}
@@ -247,6 +249,7 @@ void URidingComponent::FinishDismount()
 	if (APlayerController* PC = CachedPlayerController.Get())
 	{
 		PC->Possess(Character);
+		PC->SetViewTargetWithBlend(Character, CameraBlendDuration);
 		PC->SetIgnoreMoveInput(false);
 		PC->SetIgnoreLookInput(false);
 	}
