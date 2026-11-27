@@ -775,6 +775,15 @@ void UCombatComponent::BeginAttackPositioning()
 {
 	if (!OwningCharacter.IsValid() || !ActiveAttackWeapon.IsValid()) return;
 
+	if (IsOwnerMounted())
+	{
+		if (UCombatPositioningComponent* Positioning = OwningCharacter->FindComponentByClass<UCombatPositioningComponent>())
+		{
+			Positioning->EndAttackPositioning();
+		}
+		return;
+	}
+
 	AActor* Target = nullptr;
 
 	// Player target acquisition remains owned by CombatTargetingComponent.
