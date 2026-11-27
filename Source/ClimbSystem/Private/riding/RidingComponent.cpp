@@ -30,6 +30,7 @@ void URidingComponent::BeginPlay()
 
 void URidingComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(CameraInputRestoreTimer);
 	if (bTransitionInProgress)
 	{
 		if (ACombatCharacterBase* Character = Rider.Get())
@@ -212,10 +213,11 @@ void URidingComponent::HandleRiderDeath()
 	CurrentHorse = nullptr;
 	if (APlayerController* PC = CachedPlayerController.Get())
 	{
+		PC->SetIgnoreMoveInput(true);
+		PC->SetIgnoreLookInput(true);
 		PC->Possess(Character);
 		PC->SetViewTargetWithBlend(Character, CameraBlendDuration);
-		PC->SetIgnoreMoveInput(false);
-		PC->SetIgnoreLookInput(false);
+		SchedulePlayerInputRestore();
 	}
 	UpdateRiderAnimationState();
 }
@@ -266,8 +268,7 @@ void URidingComponent::FinishMount()
 	{
 		PC->Possess(Horse);
 		PC->SetViewTargetWithBlend(Horse, CameraBlendDuration);
-		PC->SetIgnoreMoveInput(false);
-		PC->SetIgnoreLookInput(false);
+		SchedulePlayerInputRestore();
 	}
 }
 
@@ -299,13 +300,35 @@ void URidingComponent::FinishDismount()
 	{
 		PC->Possess(Character);
 		PC->SetViewTargetWithBlend(Character, CameraBlendDuration);
-		PC->SetIgnoreMoveInput(false);
-		PC->SetIgnoreLookInput(false);
+		SchedulePlayerInputRestore();
 	}
 	CurrentHorse = nullptr;
 	RidingState = ERidingState::Unmounted;
 	MountDirection = EHorseMountDirection::None;
 	UpdateRiderAnimationState();
+}
+
+void URidingComponent::SchedulePlayerInputRestore()
+{
+	if (CameraBlendDuration <= 0.0f || !GetWorld())
+	{
+		RestorePlayerInput();
+		return;
+	}
+
+	GetWorld()->GetTimerManager().ClearTimer(CameraInputRestoreTimer);
+	GetWorld()->GetTimerManager().SetTimer(
+		CameraInputRestoreTimer, this, &URidingComponent::RestorePlayerInput,
+		CameraBlendDuration, false);
+}
+
+void URidingComponent::RestorePlayerInput()
+{
+	if (APlayerController* PC = CachedPlayerController.Get())
+	{
+		PC->SetIgnoreMoveInput(false);
+		PC->SetIgnoreLookInput(false);
+	}
 }
 
 void URidingComponent::PlayTransitionMontage(bool bMounting, EHorseMountDirection Direction)
