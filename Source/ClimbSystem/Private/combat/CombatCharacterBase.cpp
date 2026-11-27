@@ -151,7 +151,7 @@ void ACombatCharacterBase::ConfigureHorseInput(AHorseCharacter* Horse) const
 {
 	if (!IsValid(Horse)) return;
 	Horse->SetRiderInputActions(MoveAction, LookAction, SprintAction, MountAction,
-		AttackAction, NextWeaponAction, GuardAction, ParryAction, TargetLockAction);
+		AttackAction, NextWeaponAction, GuardAction, ParryAction, TargetLockAction, HideOnHorseAction);
 }
 
 void ACombatCharacterBase::HideAimCrosshair()
@@ -231,6 +231,10 @@ void ACombatCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		if (MountAction)
 		{
 			EnhancedInput->BindAction(MountAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnMountTriggered);
+		}
+		if (HideOnHorseAction)
+		{
+			EnhancedInput->BindAction(HideOnHorseAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnHideOnHorseTriggered);
 		}
 	}
 }
@@ -363,6 +367,11 @@ void ACombatCharacterBase::OnTargetLockTriggered(const FInputActionValue& Value)
 	{
 		CombatTargetingComponent->ToggleManualLock();
 	}
+}
+
+void ACombatCharacterBase::OnHideOnHorseTriggered(const FInputActionValue& Value)
+{
+	if (RidingComponent) RidingComponent->ToggleHorseHiding();
 }
 
 void ACombatCharacterBase::OnMountTriggered(const FInputActionValue& Value)
