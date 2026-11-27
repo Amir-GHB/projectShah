@@ -99,10 +99,13 @@ private:
 	bool bWasCameraCollisionTestEnabled = true;
 	FVector DismountTargetLocation = FVector::ZeroVector;
 	FRotator DismountTargetRotation = FRotator::ZeroRotator;
+	FTimerHandle CameraInputRestoreTimer;
 
 	void BeginTransformTransition(const FTransform& Target, ERidingState NewState, EHorseMountDirection Direction);
 	void FinishMount();
 	void FinishDismount();
 	void PlayTransitionMontage(bool bMounting, EHorseMountDirection Direction);
+	void SchedulePlayerInputRestore();
+	void RestorePlayerInput();
 	void UpdateRiderAnimationState();
 };
