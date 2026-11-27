@@ -70,6 +70,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Riding")
 	void RequestDismount();
 
+	/** Detaches a mounted rider and returns control to the dying character for its death animation. */
+	void HandleRiderDeath();
+
 	UFUNCTION(BlueprintPure, Category = "Riding")
 	bool IsMounted() const { return RidingState == ERidingState::Mounted; }
 
