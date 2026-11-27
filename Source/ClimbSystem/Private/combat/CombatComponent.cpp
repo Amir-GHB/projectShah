@@ -2,6 +2,7 @@
 
 #include "combat/CombatComponent.h"
 #include "combat/CombatCharacterBase.h"
+#include "riding/RidingComponent.h"
 #include "combat/CombatTargetingComponent.h"
 #include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
@@ -383,14 +384,16 @@ void UCombatComponent::HandleAICombatAttack(bool bHeavyAttack)
 	if (!IsValid(CurrentWeapon)) return;
 
 	const FWeaponConfig& Config = CurrentWeapon->GetConfig();
+	const TArray<TObjectPtr<UAnimMontage>>& AttackMontages = GetConfiguredIndividualAttackMontages(Config);
+	UAnimMontage* ComboMontage = GetConfiguredAttackComboMontage(Config);
 	int32 AttackCount = 0;
 	if (Config.AttackMontageMode == EAttackMontageMode::IndividualAttackMontages)
 	{
-		AttackCount = Config.IndividualAttackMontages.Num();
+		AttackCount = AttackMontages.Num();
 	}
-	else if (IsValid(Config.AttackComboMontage))
+	else if (IsValid(ComboMontage))
 	{
-		AttackCount = Config.AttackComboMontage->CompositeSections.Num();
+		AttackCount = ComboMontage->CompositeSections.Num();
 	}
 
 	if (AttackCount <= 0)
@@ -478,10 +481,11 @@ bool UCombatComponent::StartNewCombo()
 
 	if (Config.AttackMontageMode == EAttackMontageMode::IndividualAttackMontages)
 	{
-		const int32 StartingAttackIndex = Config.IndividualAttackMontages.IsValidIndex(RequestedIndex)
+		const TArray<TObjectPtr<UAnimMontage>>& AttackMontages = GetConfiguredIndividualAttackMontages(Config);
+		const int32 StartingAttackIndex = AttackMontages.IsValidIndex(RequestedIndex)
 			? RequestedIndex : 0;
-		if (!Config.IndividualAttackMontages.IsValidIndex(StartingAttackIndex)
-			|| !IsValid(Config.IndividualAttackMontages[StartingAttackIndex]))
+		if (!AttackMontages.IsValidIndex(StartingAttackIndex)
+			|| !IsValid(AttackMontages[StartingAttackIndex]))
 		{
 			UE_LOG(LogTemp, Warning, TEXT("[CombatComponent] Individual montage mode requires a valid starting attack montage."));
 			ActiveAttackWeapon.Reset();
@@ -490,7 +494,7 @@ bool UCombatComponent::StartNewCombo()
 		return PlayIndividualAttack(StartingAttackIndex);
 	}
 
-	UAnimMontage* Montage = Config.AttackComboMontage;
+	UAnimMontage* Montage = GetConfiguredAttackComboMontage(Config);
 	if (!IsValid(Montage) || Montage->CompositeSections.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[CombatComponent] Single-montage mode requires a montage with sections."));
@@ -539,7 +543,7 @@ bool UCombatComponent::PlayIndividualAttack(int32 AttackIndex)
 {
 	bParryWindowOpen = false;
 	if (!OwningCharacter.IsValid() || !OwningCharacter->GetMesh() || !ActiveAttackWeapon.IsValid()) return false;
-	const TArray<TObjectPtr<UAnimMontage>>& Montages = ActiveAttackWeapon->GetConfig().IndividualAttackMontages;
+	const TArray<TObjectPtr<UAnimMontage>>& Montages = GetConfiguredIndividualAttackMontages(ActiveAttackWeapon->GetConfig());
 	if (!Montages.IsValidIndex(AttackIndex) || !IsValid(Montages[AttackIndex]))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[CombatComponent] No valid montage at individual attack index %d."), AttackIndex);
@@ -587,8 +591,9 @@ bool UCombatComponent::TryQueueComboTransition()
 	const FWeaponConfig& Config = ActiveAttackWeapon->GetConfig();
 	if (Config.AttackMontageMode == EAttackMontageMode::IndividualAttackMontages)
 	{
+		const TArray<TObjectPtr<UAnimMontage>>& AttackMontages = GetConfiguredIndividualAttackMontages(Config);
 		const int32 NextIndex = ActiveAttackIndex + 1;
-		if (!Config.IndividualAttackMontages.IsValidIndex(NextIndex) || !IsValid(Config.IndividualAttackMontages[NextIndex])) return false;
+		if (!AttackMontages.IsValidIndex(NextIndex) || !IsValid(AttackMontages[NextIndex])) return false;
 		PendingAttackIndex = NextIndex;
 		bTransitionCommittedForWindow = true;
 		ClearInputBuffer();
@@ -687,9 +692,10 @@ void UCombatComponent::NotifyComboTransitionPoint(const UAnimSequenceBase* Anima
 	if (Animation != ActiveAttackMontage || ActiveAttackToken == 0 || !ActiveAttackWeapon.IsValid()) return;
 
 	const FWeaponConfig& Config = ActiveAttackWeapon->GetConfig();
+	const TArray<TObjectPtr<UAnimMontage>>& AttackMontages = GetConfiguredIndividualAttackMontages(Config);
 	if (Config.AttackMontageMode != EAttackMontageMode::IndividualAttackMontages ||
-		PendingAttackIndex == INDEX_NONE || !Config.IndividualAttackMontages.IsValidIndex(PendingAttackIndex) ||
-		!IsValid(Config.IndividualAttackMontages[PendingAttackIndex]))
+		PendingAttackIndex == INDEX_NONE || !AttackMontages.IsValidIndex(PendingAttackIndex) ||
+		!IsValid(AttackMontages[PendingAttackIndex]))
 	{
 		return;
 	}
@@ -1520,6 +1526,24 @@ void UCombatComponent::RefreshAnimationState()
 
 	++AnimationState.Revision;
 }
+bool UCombatComponent::IsOwnerMounted() const
+{
+	const ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get());
+	return IsValid(Character) && IsValid(Character->RidingComponent) && Character->RidingComponent->IsMounted();
+}
+
+UAnimMontage* UCombatComponent::GetConfiguredAttackComboMontage(const FWeaponConfig& Config) const
+{
+	if (IsOwnerMounted() && IsValid(Config.MountedAttackComboMontage)) return Config.MountedAttackComboMontage;
+	return Config.AttackComboMontage;
+}
+
+const TArray<TObjectPtr<UAnimMontage>>& UCombatComponent::GetConfiguredIndividualAttackMontages(const FWeaponConfig& Config) const
+{
+	if (IsOwnerMounted() && !Config.MountedIndividualAttackMontages.IsEmpty()) return Config.MountedIndividualAttackMontages;
+	return Config.IndividualAttackMontages;
+}
+
 void UCombatComponent::ClearInputBuffer()
 {
 	bHasBufferedAttackInput = false;
