@@ -114,6 +114,7 @@ bool URidingComponent::TryMountHorse(AHorseCharacter* Horse, EHorseMountDirectio
 
 	CurrentHorse = Horse;
 	CachedPlayerController = PC;
+	Character->ConfigureHorseInput(Horse);
 	Horse->SetCurrentRider(Character);
 	Horse->SetRidingState(ERidingState::Mounting);
 	Character->EndAimCameraMode();
