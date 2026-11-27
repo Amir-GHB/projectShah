@@ -3,6 +3,7 @@
 #include "riding/HorseAnimInstance.h"
 #include "riding/HorseCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Controller.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 
@@ -83,7 +84,7 @@ void UHorseAnimInstance::UpdateFootIK(float DeltaSeconds, FName BoneName, FVecto
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(HorseFootIK), false, Horse);
 	const FVector Start = FootLocation + FVector::UpVector * IKTraceUp;
 	const FVector End = FootLocation - FVector::UpVector * IKTraceDown;
-	if (Horse->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params) && Hit.bBlockingHit)
+	if (Horse->GetWorld() && Horse->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params) && Hit.bBlockingHit)
 	{
 		TargetOffset = FVector(0.0f, 0.0f, Hit.ImpactPoint.Z - FootLocation.Z);
 	}
