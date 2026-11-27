@@ -163,6 +163,7 @@ void URidingComponent::RequestDismount()
 	ACombatCharacterBase* Character = Rider.Get();
 	AHorseCharacter* Horse = CurrentHorse;
 	if (!IsValid(Character) || !IsValid(Horse) || RidingState != ERidingState::Mounted) return;
+	if (Character->IsAimCameraModeActive()) return;
 	if (Character->CombatComponent
 		&& Character->CombatComponent->CurrentCombatState != ECombatState::Idle
 		&& Character->CombatComponent->CurrentCombatState != ECombatState::Recovering) return;
