@@ -90,3 +90,20 @@ Attack positioning/Motion Warping is deliberately disabled for mounted attacks b
 - Camera input and movement input are paused during the transform transition and camera handoff.
 - This first pass does not implement nonfatal knock-off/fall recovery, horse death, mounted guard-specific montages, or advanced leaning/hiding animations.
 - No Unreal build or runtime test has been run from this GitHub editing session. Compile and test in the UE 5.8 project before relying on it in a demo.
+
+## Mounted horse hiding
+
+- Assign the rider's `HideOnHorseAction` in the rider Blueprint. It is copied to the horse before possession, so the same Enhanced Input mapping remains active while mounted.
+- Assign `HideLeftMontage` on the rider's `RidingComponent`. `HideRightMontage` is reserved for a future opposite-side animation; the configured `HorseHideSide` selects the side. Optional `UnhideLeftMontage` / `UnhideRightMontage` can provide a dedicated exit animation. Without an exit montage, the hide montage is blended out.
+- The rider AnimBP can read `bIsHorseHiding` and `HorseHideSide` from `UCombatAnimInstance`.
+- While hiding, the rider's `RidingComponent` marks the possessed horse pawn as hidden from enemy sight. Enemy AI drops an already acquired horse target and ignores new sight acquisition. Hearing remains active, so enemies may still investigate sounds.
+- Hiding currently applies globally to sight perception, regardless of the enemy's position around the horse. It does not make the horse physically invisible to unrelated gameplay systems or player cameras.
+
+## Notify-driven environmental throws
+
+- On the `AThrowableTreeActor` Blueprint/defaults, assign `ThrowMontage`.
+- Set `ThrowerHandSocketName` to the hand socket on the rider's skeletal mesh (default `hand_r`).
+- Set `ThrowableGripSocketName` to a socket on the throwable's static mesh (default `GripSocket`). The throwable grip socket is aligned to the character hand socket when attached.
+- Add `Attach Throwable To Hand` to the montage at the frame the hand should grab the object.
+- Add `Release Throwable` at the actual release frame. The existing forward-view enemy selection, physics launch, and impact damage then run from that notify.
+- The nearby-throw input now starts the montage instead of immediately launching the actor. The actor remains pending on the character between the two notifies.
