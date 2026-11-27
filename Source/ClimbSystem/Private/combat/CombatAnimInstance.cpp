@@ -31,6 +31,7 @@ void UCombatAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		RidingState = Riding->RidingState;
 		MountDirection = Riding->MountDirection;
 		bIsHorseHiding = Riding->bIsHorseHiding && Riding->IsMounted();
+		HorseHidingState = Riding->IsMounted() ? Riding->HorseHidingState : EHorseHidingState::NotHiding;
 		HorseHideSide = bIsHorseHiding ? Riding->HorseHideSide : EHorseHideSide::None;
 	}
 	else
@@ -38,6 +39,7 @@ void UCombatAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		RidingState = ERidingState::Unmounted;
 		MountDirection = EHorseMountDirection::None;
 		bIsHorseHiding = false;
+		HorseHidingState = EHorseHidingState::NotHiding;
 		HorseHideSide = EHorseHideSide::None;
 	}
 
