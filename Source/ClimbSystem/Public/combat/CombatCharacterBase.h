@@ -134,6 +134,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Riding")
 	TObjectPtr<UInputAction> SprintAction;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Riding")
+	TObjectPtr<UInputAction> HideOnHorseAction;
+
 	void OnMove(const FInputActionValue& Value);
 	void OnLook(const FInputActionValue& Value);
 	void OnJumpStarted(const FInputActionValue& Value);
@@ -148,6 +151,7 @@ protected:
 	void OnTargetLockTriggered(const FInputActionValue& Value);
 	void OnThrowNearbyActorTriggered(const FInputActionValue& Value);
 	void OnMountTriggered(const FInputActionValue& Value);
+	void OnHideOnHorseTriggered(const FInputActionValue& Value);
 
 	bool bRopeAimInputHeld = false;
 	bool bAimCameraModeActive = false;
