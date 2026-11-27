@@ -58,6 +58,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Camera", meta = (ClampMin = "0.1"))
 	float CameraTransitionSpeed = 5.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Camera", meta = (ClampMin = "0.0"))
+	float CameraBlendDuration = 0.65f;
+
 	UFUNCTION(BlueprintCallable, Category = "Riding")
 	bool TryMountNearbyHorse();
 
