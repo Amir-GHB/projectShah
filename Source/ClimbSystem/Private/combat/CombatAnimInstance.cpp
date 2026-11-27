@@ -4,6 +4,7 @@
 #include "combat/CombatComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "riding/RidingComponent.h"
 
 void UCombatAnimInstance::NativeInitializeAnimation()
 {
@@ -20,6 +21,17 @@ void UCombatAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	if (CachedCharacter.Get() != Character || !CachedCombatComponent.IsValid())
 	{
 		RefreshCachedReferences();
+	}
+
+	if (URidingComponent* Riding = IsValid(Character) ? Character->FindComponentByClass<URidingComponent>() : nullptr)
+	{
+		RidingState = Riding->RidingState;
+		MountDirection = Riding->MountDirection;
+	}
+	else
+	{
+		RidingState = ERidingState::Unmounted;
+		MountDirection = EHorseMountDirection::None;
 	}
 
 	if (UCombatComponent* Combat = CachedCombatComponent.Get())
