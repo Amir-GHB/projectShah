@@ -149,7 +149,8 @@ protected:
 	void OnGuardEnded(const FInputActionValue& Value);
 	void OnParry(const FInputActionValue& Value);
 	void OnTargetLock(const FInputActionValue& Value);
-	void OnHide(const FInputActionValue& Value);
+	void OnHideStarted(const FInputActionValue& Value);
+	void OnHideEnded(const FInputActionValue& Value);
 
 private:
 	TWeakObjectPtr<UCombatComponent> RiderCombatComponent;
