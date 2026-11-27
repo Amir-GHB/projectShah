@@ -109,6 +109,17 @@ bool URidingComponent::TryMountHorse(AHorseCharacter* Horse, EHorseMountDirectio
 	{
 		return false;
 	}
+	if (Character->CombatComponent
+		&& Character->CombatComponent->CurrentCombatState != ECombatState::Idle
+		&& Character->CombatComponent->CurrentCombatState != ECombatState::Recovering)
+	{
+		return false;
+	}
+	if (Character->CombatComponent
+		&& Character->CombatComponent->GetAnimationState().DefenseState != ECombatDefenseState::None)
+	{
+		return false;
+	}
 
 	APlayerController* PC = Cast<APlayerController>(Character->GetController());
 	if (!PC) return false;
@@ -150,6 +161,11 @@ void URidingComponent::RequestDismount()
 	ACombatCharacterBase* Character = Rider.Get();
 	AHorseCharacter* Horse = CurrentHorse;
 	if (!IsValid(Character) || !IsValid(Horse) || RidingState != ERidingState::Mounted) return;
+	if (Character->CombatComponent
+		&& Character->CombatComponent->CurrentCombatState != ECombatState::Idle
+		&& Character->CombatComponent->CurrentCombatState != ECombatState::Recovering) return;
+	if (Character->CombatComponent
+		&& Character->CombatComponent->GetAnimationState().DefenseState != ECombatDefenseState::None) return;
 
 	const FTransform DismountTransform = Horse->GetDismountWorldTransform(PreferredDismountDirection);
 	DismountTargetLocation = DismountTransform.GetLocation();
@@ -187,7 +203,6 @@ void URidingComponent::HandleRiderDeath()
 	if (UCharacterMovementComponent* HorseMovement = Horse->GetCharacterMovement())
 	{
 		HorseMovement->StopMovementImmediately();
-		HorseMovement->DisableMovement();
 	}
 	if (Horse->FollowCamera) Horse->FollowCamera->Deactivate();
 	if (Character->FollowCamera) Character->FollowCamera->Activate(true);
