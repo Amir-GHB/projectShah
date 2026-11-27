@@ -42,6 +42,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Riding|Animation")
 	EHorseMountDirection MountDirection = EHorseMountDirection::None;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Riding|Animation")
+	bool bIsHorseHiding = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Riding|Animation")
+	EHorseHideSide HorseHideSide = EHorseHideSide::None;
+
 	UFUNCTION(BlueprintPure, Category = "Combat Animation")
 	UCombatComponent* GetCombatComponent() const;
 
