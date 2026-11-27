@@ -93,9 +93,10 @@ Attack positioning/Motion Warping is deliberately disabled for mounted attacks b
 
 ## Mounted horse hiding
 
-- Assign the rider's `HideOnHorseAction` in the rider Blueprint. It is copied to the horse before possession, so the same Enhanced Input mapping remains active while mounted.
-- Assign `HideLeftMontage` on the rider's `RidingComponent`. `HideRightMontage` is reserved for a future opposite-side animation; the configured `HorseHideSide` selects the side. Optional `UnhideLeftMontage` / `UnhideRightMontage` can provide a dedicated exit animation. Without an exit montage, the hide montage is blended out.
-- The rider AnimBP can read `bIsHorseHiding` and `HorseHideSide` from `UCombatAnimInstance`.
+- Assign the rider's `HideOnHorseAction` in the rider Blueprint. It is copied to the horse before possession, so the same Enhanced Input mapping remains active while mounted. The action is hold-based: Started begins hiding, while Completed/Canceled begins restoring.
+- Assign `HideLeftMontage` / `HideRightMontage` as the enter montages and `UnhideLeftMontage` / `UnhideRightMontage` as the exit montages on the rider's `RidingComponent`. The configured `HorseHideSide` selects the side.
+- In the rider AnimBP (derived from `UCombatAnimInstance`), use `HorseHidingState` for state-machine transitions: `NotHiding` -> `Entering` -> `Hidden` -> `Exiting` -> `NotHiding`. Play the low crouched/leaning loop sequence only in the `Hidden` state. The enter and exit montages play over the normal state machine.
+- `bIsHorseHiding` remains true throughout Entering, Hidden, and Exiting, so enemy sight suppression lasts until the restore montage completes. Releasing during the enter montage queues the exit until the enter montage finishes. Forced dismount/death cancels the hiding montages and restores enemy visibility immediately.
 - While hiding, the rider's `RidingComponent` marks the possessed horse pawn as hidden from enemy sight. Enemy AI drops an already acquired horse target and ignores new sight acquisition. Hearing remains active, so enemies may still investigate sounds.
 - Hiding currently applies globally to sight perception, regardless of the enemy's position around the horse. It does not make the horse physically invisible to unrelated gameplay systems or player cameras.
 
