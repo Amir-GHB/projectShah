@@ -3,6 +3,7 @@
 #include "combat/CombatCharacterBase.h"
 #include "combat/CombatComponent.h"
 #include "riding/RidingComponent.h"
+#include "riding/HorseCharacter.h"
 #include "combat/CombatTargetingComponent.h"
 #include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
@@ -85,25 +86,27 @@ void ACombatCharacterBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (!bAimCameraTransitionActive || !CameraBoom)
+	USpringArmComponent* AimBoom = ActiveAimCameraBoom.Get();
+	if (!bAimCameraTransitionActive || !IsValid(AimBoom))
 	{
 		return;
 	}
 
 	const FVector TargetOffset = bAimCameraModeActive ? AimCameraSocketOffset : DefaultCameraSocketOffset;
 	const float TargetArmLength = bAimCameraModeActive ? AimCameraArmLength : DefaultCameraArmLength;
-	CameraBoom->SocketOffset = FMath::VInterpTo(
-		CameraBoom->SocketOffset, TargetOffset, DeltaSeconds, FMath::Max(0.1f, AimCameraInterpSpeed));
-	CameraBoom->TargetArmLength = FMath::FInterpTo(
-		CameraBoom->TargetArmLength, TargetArmLength, DeltaSeconds, FMath::Max(0.1f, AimCameraInterpSpeed));
+	AimBoom->SocketOffset = FMath::VInterpTo(
+		AimBoom->SocketOffset, TargetOffset, DeltaSeconds, FMath::Max(0.1f, AimCameraInterpSpeed));
+	AimBoom->TargetArmLength = FMath::FInterpTo(
+		AimBoom->TargetArmLength, TargetArmLength, DeltaSeconds, FMath::Max(0.1f, AimCameraInterpSpeed));
 
-	if (CameraBoom->SocketOffset.Equals(TargetOffset, 0.1f)
-		&& FMath::IsNearlyEqual(CameraBoom->TargetArmLength, TargetArmLength, 0.1f))
+	if (AimBoom->SocketOffset.Equals(TargetOffset, 0.1f)
+		&& FMath::IsNearlyEqual(AimBoom->TargetArmLength, TargetArmLength, 0.1f))
 	{
-		CameraBoom->SocketOffset = TargetOffset;
-		CameraBoom->TargetArmLength = TargetArmLength;
+		AimBoom->SocketOffset = TargetOffset;
+		AimBoom->TargetArmLength = TargetArmLength;
 		bAimCameraTransitionActive = false;
 		SetActorTickEnabled(false);
+		if (!bAimCameraModeActive) ActiveAimCameraBoom.Reset();
 	}
 }
 
@@ -115,15 +118,28 @@ void ACombatCharacterBase::BeginAimCameraMode()
 	}
 
 	bAimCameraModeActive = true;
-	bAimCameraTransitionActive = true;
-	SetActorTickEnabled(true);
-
-	if (!AimCrosshairWidget && AimCrosshairWidgetClass)
+	USpringArmComponent* AimBoom = CameraBoom;
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (RidingComponent && RidingComponent->IsMounted())
 	{
-		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+		if (AHorseCharacter* Horse = RidingComponent->GetCurrentHorse())
 		{
-			AimCrosshairWidget = CreateWidget<UUserWidget>(PlayerController, AimCrosshairWidgetClass);
+			if (Horse->CameraBoom) AimBoom = Horse->CameraBoom;
+			if (!PlayerController) PlayerController = Cast<APlayerController>(Horse->GetController());
 		}
+	}
+	if (IsValid(AimBoom))
+	{
+		ActiveAimCameraBoom = AimBoom;
+		DefaultCameraArmLength = AimBoom->TargetArmLength;
+		DefaultCameraSocketOffset = AimBoom->SocketOffset;
+	}
+	bAimCameraTransitionActive = IsValid(AimBoom);
+	if (bAimCameraTransitionActive) SetActorTickEnabled(true);
+
+	if (!AimCrosshairWidget && AimCrosshairWidgetClass && PlayerController)
+	{
+		AimCrosshairWidget = CreateWidget<UUserWidget>(PlayerController, AimCrosshairWidgetClass);
 	}
 	if (AimCrosshairWidget && !AimCrosshairWidget->IsInViewport())
 	{
@@ -149,7 +165,7 @@ void ACombatCharacterBase::EndAimCameraMode()
 	}
 
 	bAimCameraModeActive = false;
-	bAimCameraTransitionActive = CameraBoom != nullptr;
+	bAimCameraTransitionActive = ActiveAimCameraBoom.IsValid();
 	if (bAimCameraTransitionActive)
 	{
 		SetActorTickEnabled(true);
