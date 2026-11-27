@@ -59,7 +59,7 @@ public:
 	float ThrownLifeSeconds = 8.0f;
 
 	UFUNCTION(BlueprintPure, Category = "Throwable")
-	bool CanBeThrown() const { return !bHasBeenThrown && IsValid(MeshComponent); }
+	bool CanBeThrown() const { return !bHasBeenThrown && !bIsAttachedToHand && IsValid(MeshComponent); }
 
 	/** Starts the configured throw montage. Attachment and release are driven by animation notifies. */
 	bool BeginThrowSequence(ACombatCharacterBase* Thrower);
