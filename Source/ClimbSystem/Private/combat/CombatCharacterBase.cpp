@@ -257,6 +257,8 @@ void ACombatCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		if (HideOnHorseAction)
 		{
 			EnhancedInput->BindAction(HideOnHorseAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnHideOnHorseTriggered);
+			EnhancedInput->BindAction(HideOnHorseAction, ETriggerEvent::Completed, this, &ACombatCharacterBase::OnHideOnHorseReleased);
+			EnhancedInput->BindAction(HideOnHorseAction, ETriggerEvent::Canceled, this, &ACombatCharacterBase::OnHideOnHorseReleased);
 		}
 	}
 }
@@ -393,7 +395,12 @@ void ACombatCharacterBase::OnTargetLockTriggered(const FInputActionValue& Value)
 
 void ACombatCharacterBase::OnHideOnHorseTriggered(const FInputActionValue& Value)
 {
-	if (RidingComponent) RidingComponent->ToggleHorseHiding();
+	if (RidingComponent) RidingComponent->StartHorseHiding();
+}
+
+void ACombatCharacterBase::OnHideOnHorseReleased(const FInputActionValue& Value)
+{
+	if (RidingComponent) RidingComponent->StopHorseHiding();
 }
 
 void ACombatCharacterBase::OnMountTriggered(const FInputActionValue& Value)
