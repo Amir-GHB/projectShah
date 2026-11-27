@@ -7,6 +7,7 @@
 #include "combat/CombatTypes.h"
 #include "combat/CombatTargetingComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "EnhancedInputComponent.h"
