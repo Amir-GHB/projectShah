@@ -1,6 +1,8 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/Weapons/Weapon_Rope.h"
+#include "riding/RidingComponent.h"
+#include "riding/HorseCharacter.h"
 
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
@@ -241,15 +243,28 @@ bool AWeapon_Rope::ResolveThrowDirection(
 		return false;
 	}
 
-	FVector ViewLocation = Character->GetPawnViewLocation();
-	FRotator ViewRotation = Character->GetActorRotation();
-	if (APlayerController* PlayerController = Cast<APlayerController>(Character->GetController()))
+	AController* AimController = Character->GetController();
+	APawn* ViewPawn = Character;
+	if (!AimController)
+	{
+		if (URidingComponent* Riding = Character->FindComponentByClass<URidingComponent>())
+		{
+			if (AHorseCharacter* Horse = Riding->GetCurrentHorse())
+			{
+				AimController = Horse->GetController();
+				ViewPawn = Horse;
+			}
+		}
+	}
+	FVector ViewLocation = ViewPawn->GetPawnViewLocation();
+	FRotator ViewRotation = ViewPawn->GetActorRotation();
+	if (APlayerController* PlayerController = Cast<APlayerController>(AimController))
 	{
 		PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
 	}
-	else if (AController* Controller = Character->GetController())
+	else if (AimController)
 	{
-		ViewRotation = Controller->GetControlRotation();
+		ViewRotation = AimController->GetControlRotation();
 	}
 
 	const FVector Anchor = GetActorLocation();
