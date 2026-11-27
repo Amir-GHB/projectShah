@@ -407,7 +407,7 @@ void ACombatCharacterBase::OnMountTriggered(const FInputActionValue& Value)
 
 void ACombatCharacterBase::OnThrowNearbyActorTriggered(const FInputActionValue& Value)
 {
-	if (!GetWorld() || (CombatComponent && (CombatComponent->CurrentCombatState == ECombatState::Dead
+	if (!GetWorld() || IsValid(PendingThrowableActor) || (CombatComponent && (CombatComponent->CurrentCombatState == ECombatState::Dead
 		|| CombatComponent->CurrentCombatState == ECombatState::Finishing)))
 	{
 		return;
