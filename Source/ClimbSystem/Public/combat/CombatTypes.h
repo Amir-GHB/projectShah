@@ -491,6 +491,19 @@ struct FWeaponConfig : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Animation", meta = (EditCondition = "AttackMontageMode == EAttackMontageMode::IndividualAttackMontages"))
 	TArray<TObjectPtr<UAnimMontage>> IndividualAttackMontages;
 
+	/** Mounted equivalents. Empty mounted slots fall back to the regular weapon montage. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Animation|Mounted", meta = (EditCondition = "AttackMontageMode == EAttackMontageMode::SingleComboMontage"))
+	TObjectPtr<UAnimMontage> MountedAttackComboMontage = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Animation|Mounted", meta = (EditCondition = "AttackMontageMode == EAttackMontageMode::IndividualAttackMontages"))
+	TArray<TObjectPtr<UAnimMontage>> MountedIndividualAttackMontages;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Animation|Mounted")
+	TObjectPtr<UAnimMontage> MountedHitReactionMontage = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Animation|Mounted")
+	TObjectPtr<UAnimMontage> MountedDeathMontage = nullptr;
+
 	/** Played when switching away from this weapon. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Animation")
 	TObjectPtr<UAnimMontage> UnequipMontage = nullptr;
