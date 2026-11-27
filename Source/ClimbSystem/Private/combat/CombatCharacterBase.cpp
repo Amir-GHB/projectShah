@@ -228,6 +228,10 @@ void ACombatCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		{
 			EnhancedInput->BindAction(ThrowNearbyActorAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnThrowNearbyActorTriggered);
 		}
+		if (MountAction)
+		{
+			EnhancedInput->BindAction(MountAction, ETriggerEvent::Started, this, &ACombatCharacterBase::OnMountTriggered);
+		}
 	}
 }
 
