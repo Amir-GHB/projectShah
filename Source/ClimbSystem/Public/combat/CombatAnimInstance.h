@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
 #include "combat/CombatTypes.h"
+#include "riding/RidingTypes.h"
 #include "CombatAnimInstance.generated.h"
 
 class ACharacter;
@@ -34,6 +35,12 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Combat Animation|Locomotion")
 	bool bIsAccelerating = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Riding|Animation")
+	ERidingState RidingState = ERidingState::Unmounted;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Riding|Animation")
+	EHorseMountDirection MountDirection = EHorseMountDirection::None;
 
 	UFUNCTION(BlueprintPure, Category = "Combat Animation")
 	UCombatComponent* GetCombatComponent() const;
