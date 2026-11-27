@@ -158,6 +158,7 @@ protected:
 	void OnThrowNearbyActorTriggered(const FInputActionValue& Value);
 	void OnMountTriggered(const FInputActionValue& Value);
 	void OnHideOnHorseTriggered(const FInputActionValue& Value);
+	void OnHideOnHorseReleased(const FInputActionValue& Value);
 
 	bool bRopeAimInputHeld = false;
 	bool bAimCameraModeActive = false;
