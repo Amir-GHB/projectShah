@@ -131,4 +131,6 @@ private:
 	float CurrentMoveInput = 0.0f;
 	float CurrentTurnInput = 0.0f;
 	float TargetControlYaw = 0.0f;
+	bool bMountedRopeAimInputHeld = false;
+	void OnAttackCanceled(const FInputActionValue& Value);
 };
