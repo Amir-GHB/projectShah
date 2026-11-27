@@ -16,6 +16,15 @@ enum class ERidingState : uint8
 };
 
 UENUM(BlueprintType)
+enum class EHorseHidingState : uint8
+{
+	NotHiding UMETA(DisplayName = "Not Hiding"),
+	Entering UMETA(DisplayName = "Entering"),
+	Hidden UMETA(DisplayName = "Hidden"),
+	Exiting UMETA(DisplayName = "Exiting")
+};
+
+UENUM(BlueprintType)
 enum class EHorseHideSide : uint8
 {
 	None UMETA(DisplayName = "None"),
