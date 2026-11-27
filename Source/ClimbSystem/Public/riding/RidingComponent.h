@@ -95,7 +95,7 @@ private:
 	FTransform TransitionTarget = FTransform::Identity;
 	float TransitionElapsed = 0.0f;
 	bool bTransitionInProgress = false;
-	bool bWasCapsuleCollisionEnabled = true;
+	ECollisionEnabled::Type PreviousCapsuleCollisionMode = ECollisionEnabled::QueryAndPhysics;
 	bool bWasCameraCollisionTestEnabled = true;
 	FVector DismountTargetLocation = FVector::ZeroVector;
 	FRotator DismountTargetRotation = FRotator::ZeroRotator;
