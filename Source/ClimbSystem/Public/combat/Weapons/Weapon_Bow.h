@@ -54,6 +54,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bow|Animation")
 	TObjectPtr<UAnimMontage> ReleaseMontage = nullptr;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bow|Animation|Mounted")
+	TObjectPtr<UAnimMontage> MountedDrawMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bow|Animation|Mounted")
+	TObjectPtr<UAnimMontage> MountedReleaseMontage = nullptr;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bow|Draw", meta = (ClampMin = "0.05"))
 	float FullDrawTime = 1.0f;
 
@@ -111,6 +117,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> ActiveInHandArrow = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveDrawMontage = nullptr;
 
 	void PlayCharacterMontage(UAnimMontage* Montage);
 };
