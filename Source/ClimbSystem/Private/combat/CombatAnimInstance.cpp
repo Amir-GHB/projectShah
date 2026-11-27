@@ -27,11 +27,15 @@ void UCombatAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	{
 		RidingState = Riding->RidingState;
 		MountDirection = Riding->MountDirection;
+		bIsHorseHiding = Riding->bIsHorseHiding && Riding->IsMounted();
+		HorseHideSide = bIsHorseHiding ? Riding->HorseHideSide : EHorseHideSide::None;
 	}
 	else
 	{
 		RidingState = ERidingState::Unmounted;
 		MountDirection = EHorseMountDirection::None;
+		bIsHorseHiding = false;
+		HorseHideSide = EHorseHideSide::None;
 	}
 
 	if (UCombatComponent* Combat = CachedCombatComponent.Get())
