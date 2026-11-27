@@ -17,6 +17,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UUserWidget;
 class UMotionWarpingComponent;
+class URidingComponent;
 struct FInputActionValue;
 
 UCLASS()
@@ -45,6 +46,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat|Motion Warping")
 	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Riding")
+	TObjectPtr<URidingComponent> RidingComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<USpringArmComponent> CameraBoom;
@@ -121,6 +125,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> ThrowNearbyActorAction;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Riding")
+	TObjectPtr<UInputAction> MountAction;
+
 	void OnMove(const FInputActionValue& Value);
 	void OnLook(const FInputActionValue& Value);
 	void OnJumpStarted(const FInputActionValue& Value);
@@ -134,6 +141,7 @@ protected:
 	void OnNextWeaponTriggered(const FInputActionValue& Value);
 	void OnTargetLockTriggered(const FInputActionValue& Value);
 	void OnThrowNearbyActorTriggered(const FInputActionValue& Value);
+	void OnMountTriggered(const FInputActionValue& Value);
 
 	bool bRopeAimInputHeld = false;
 	bool bAimCameraModeActive = false;
