@@ -19,6 +19,7 @@ class UUserWidget;
 class UMotionWarpingComponent;
 class URidingComponent;
 class AHorseCharacter;
+class AThrowableTreeActor;
 struct FInputActionValue;
 
 UCLASS()
@@ -82,6 +83,11 @@ public:
 	void EndAimCameraMode();
 
 	void ConfigureHorseInput(AHorseCharacter* Horse) const;
+
+	void SetPendingThrowable(AThrowableTreeActor* Throwable);
+	void AttachPendingThrowableToHand();
+	void ReleasePendingThrowable();
+	void CancelPendingThrowable();
 
 	/** Hides only the aiming reticle while leaving the shoulder camera active. */
 	UFUNCTION(BlueprintCallable, Category = "Camera|Aim")
@@ -161,6 +167,9 @@ protected:
 	TWeakObjectPtr<USpringArmComponent> ActiveAimCameraBoom;
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> AimCrosshairWidget = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AThrowableTreeActor> PendingThrowableActor = nullptr;
 
 public:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
