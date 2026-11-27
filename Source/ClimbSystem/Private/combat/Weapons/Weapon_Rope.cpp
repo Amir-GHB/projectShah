@@ -148,11 +148,21 @@ void AWeapon_Rope::BeginSwingVisual(float TotalDuration)
 		return;
 	}
 
+	// A repeated call (looping notify, several notifies per revolution) must
+	// not restart the orbit while it is still in progress. Restarting resets the
+	// angle to zero, which looks like the hook jumping back to its start point.
+	if (bSwingVisualActive && SwingVisualElapsed < SwingVisualDuration)
+	{
+		return;
+	}
+
 	bSwingVisualActive = true;
 	SwingVisualElapsed = 0.0f;
 	SwingVisualDuration = FMath::Max(TotalDuration, KINDA_SMALL_NUMBER);
+	bSwingHookInitialized = false;
 	UpdateSwingVisual(0.0f);
 }
+
 
 void AWeapon_Rope::EndSwingVisual()
 {
@@ -1151,6 +1161,29 @@ void AWeapon_Rope::ResetRopeVisual()
 	}
 }
 
+namespace
+{
+	// Swing-visual shaping. Constants (not UPROPERTYs) so the header does not
+	// need to change. Promote any of them to EditAnywhere properties if you
+	// want to tune them from Blueprint.
+
+	// Fraction of the swing spent accelerating. After it the hook spins at a
+	// constant speed, so the rope is at full speed when it is released.
+	constexpr float GSwingSpinUpFraction = 0.35f;
+	// The orbit starts at this fraction of SwingVisualRadius and grows to full
+	// radius during the spin-up (centrifugal pay-out).
+	constexpr float GSwingStartRadiusFraction = 0.30f;
+	// Fraction of the swing used to lift the orbit up to head height.
+	constexpr float GSwingRaiseFraction = 0.25f;
+	// Minimum height of the orbit plane above the top of the capsule.
+	constexpr float GSwingOverheadClearance = 25.0f;
+	// How far the middle of the rope bows backwards, as a fraction of the radius.
+	constexpr float GSwingTrailFraction = 0.35f;
+	// If the release notify never arrives (montage interrupted) stop this long
+	// after the planned duration instead of spinning forever.
+	constexpr float GSwingStaleGraceSeconds = 1.0f;
+}
+
 void AWeapon_Rope::UpdateSwingVisual(float DeltaSeconds)
 {
 	if (!bSwingVisualActive || !IsValid(RopeSpline) || !IsValid(RopeSegmentMesh))
@@ -1158,13 +1191,41 @@ void AWeapon_Rope::UpdateSwingVisual(float DeltaSeconds)
 		return;
 	}
 
-	const ACharacter* Character = OwningCharacter.Get();
-	const FVector Pivot = GetActorLocation();
+	SwingVisualElapsed += FMath::Max(0.0f, DeltaSeconds);
+	if (SwingVisualElapsed > SwingVisualDuration + GSwingStaleGraceSeconds)
+	{
+		EndSwingVisual();
+		return;
+	}
 
-	// The rope circles in the horizontal plane above the character. Rotating
-	// around world-up makes the motion travel right-to-left over the head,
-	// rather than swinging vertically in the character's forward plane.
+	const ACharacter* Character = OwningCharacter.Get();
+	const FVector Hand = GetActorLocation();
 	const FVector WorldUp = FVector::UpVector;
+
+	// ------------------------------------------------------------------
+	// Orbit angle. The hook position is computed ANALYTICALLY from time, not
+	// chased by a spring. A spring-damper is a low-pass filter: once the
+	// orbit frequency is above sqrt(k/m) the hook can no longer follow, its
+	// radius collapses and it lags by up to half a turn, which reads as a
+	// little back-and-forth jiggle instead of a circle.
+	// ------------------------------------------------------------------
+	const float Alpha = SwingVisualElapsed / FMath::Max(SwingVisualDuration, KINDA_SMALL_NUMBER);
+	const float SpinUp = GSwingSpinUpFraction;
+
+	// Angular speed ramps 0 -> 1 over SpinUp and then stays at 1. This is its
+	// integral, normalised so that Alpha == 1 is exactly SwingVisualTurns turns.
+	const float RawProgress = (Alpha < SpinUp)
+		? (Alpha * Alpha) / (2.0f * SpinUp)
+		: (0.5f * SpinUp + (Alpha - SpinUp));
+	const float Progress = RawProgress / (1.0f - 0.5f * SpinUp);
+	const float Speed01 = FMath::Clamp(Alpha / SpinUp, 0.0f, 1.0f);
+
+	const float Turns = FMath::Max(0.1f, SwingVisualTurns);
+	const float DirectionSign = SwingVisualDirection < 0.0f ? -1.0f : 1.0f;
+	const float AngleRadians = 2.0f * PI * Turns * Progress * DirectionSign;
+
+	// Orbit reference: the character's right vector flattened onto the
+	// horizontal plane, so the swing stays aligned with the character.
 	FVector InitialRadial = IsValid(Character)
 		? FVector::VectorPlaneProject(Character->GetActorRightVector(), WorldUp).GetSafeNormal()
 		: FVector::RightVector;
@@ -1172,55 +1233,61 @@ void AWeapon_Rope::UpdateSwingVisual(float DeltaSeconds)
 	{
 		InitialRadial = FVector::RightVector;
 	}
+	const FVector Radial = FQuat(WorldUp, AngleRadians).RotateVector(InitialRadial).GetSafeNormal();
+	// Direction of travel on the circle (unreal: yaw +angle takes X toward Y).
+	const FVector MoveDirection = FVector::CrossProduct(WorldUp, Radial) * DirectionSign;
 
-	SwingVisualElapsed = FMath::Min(
-		SwingVisualElapsed + FMath::Max(0.0f, DeltaSeconds),
-		SwingVisualDuration);
-	const float Alpha = SwingVisualDuration > KINDA_SMALL_NUMBER
-		? FMath::Clamp(SwingVisualElapsed / SwingVisualDuration, 0.0f, 1.0f)
-		: 1.0f;
-	const float DirectionSign = SwingVisualDirection < 0.0f ? -1.0f : 1.0f;
-	const float AngleRadians = FMath::DegreesToRadians(360.0f * FMath::Max(0.1f, SwingVisualTurns) * Alpha * DirectionSign);
-	const FVector OrbitRadial = FQuat(WorldUp, AngleRadians).RotateVector(InitialRadial).GetSafeNormal();
+	// ------------------------------------------------------------------
+	// Orbit centre and radius. The orbit stays centred on the hand in the
+	// horizontal plane (so the rope stays attached), but its height is lifted
+	// to above the head so the circle is truly an overhead one, even if the
+	// montage keeps the hand low at the start.
+	// ------------------------------------------------------------------
+	const float CapsuleHalfHeight = (IsValid(Character) && Character->GetCapsuleComponent())
+		? Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.0f;
+	const float HeadTopZ = (IsValid(Character) ? Character->GetActorLocation().Z : Hand.Z) + CapsuleHalfHeight;
+	const float OverheadZ = FMath::Max(Hand.Z, HeadTopZ + GSwingOverheadClearance);
+	const float Raise = FMath::SmoothStep(0.0f, GSwingRaiseFraction, Alpha);
+	const FVector OrbitCenter(Hand.X, Hand.Y, FMath::Lerp(Hand.Z, OverheadZ, Raise));
 
-	const float OrbitRadius = FMath::Max(10.0f, SwingVisualRadius);
-	const FVector HookTarget = Pivot + OrbitRadial * OrbitRadius
+	const float FullRadius = FMath::Max(10.0f, SwingVisualRadius);
+	const float Radius = FMath::Lerp(
+		FullRadius * GSwingStartRadiusFraction, FullRadius,
+		FMath::SmoothStep(0.0f, SpinUp, Alpha));
+
+	const FVector HookPosition = OrbitCenter + Radial * Radius
 		- WorldUp * FMath::Max(0.0f, SwingHookVerticalDrop);
 
-	// The hook is not hard-attached to the orbit target. A spring-damper
-	// simulation gives it weight and rotational lag while the rope follows it.
-	if (!bSwingHookInitialized)
-	{
-		SwingHookPosition = HookTarget;
-		SwingHookVelocity = FVector::ZeroVector;
-		bSwingHookInitialized = true;
-	}
-	else if (DeltaSeconds > SMALL_NUMBER)
-	{
-		const float SafeDelta = FMath::Min(DeltaSeconds, 0.05f);
-		const float Mass = FMath::Max(0.1f, SwingHookMass);
-		const FVector SpringAcceleration =
-			(HookTarget - SwingHookPosition) * (FMath::Max(1.0f, SwingHookSpringStrength) / Mass);
-		const FVector DampingAcceleration =
-			-SwingHookVelocity * FMath::Max(0.0f, SwingHookDamping);
-		const FVector GravityAcceleration = FVector(0.0f, 0.0f,
-			GetWorld() ? GetWorld()->GetGravityZ() * FMath::Max(0.0f, SwingHookGravityScale) : 0.0f);
-		SwingHookVelocity += (SpringAcceleration + DampingAcceleration + GravityAcceleration) * SafeDelta;
-		SwingHookPosition += SwingHookVelocity * SafeDelta;
-	}
+	// Kept up to date for anything else that reads the hook state.
+	SwingHookVelocity = (bSwingHookInitialized && DeltaSeconds > SMALL_NUMBER)
+		? (HookPosition - SwingHookPosition) / DeltaSeconds
+		: FVector::ZeroVector;
+	SwingHookPosition = HookPosition;
+	bSwingHookInitialized = true;
 
+	// ------------------------------------------------------------------
+	// Rope shape between the hand and the hook. At rest it sags; as the
+	// swing speeds up the sag fades out and the middle of the rope bows
+	// backwards against the direction of travel, like a rope under centrifugal
+	// load. Both offsets are zero at the two ends.
+	// ------------------------------------------------------------------
 	const int32 SegmentCount = FMath::Clamp(
 		SwingVisualSegmentCount, 1, FMath::Min(6, RopeSegments.Num()));
+	const float TrailLength = Radius * GSwingTrailFraction * Speed01;
+	const float Droop = FMath::Max(0.0f, SwingRopeSag) * (1.0f - 0.85f * Speed01);
 
-	// Build a short catenary-like curve between the moving hand and the
-	// inertial hook. The sag is strongest at the middle and zero at both ends.
+	TArray<FVector, TInlineAllocator<8>> WorldPoints;
+	WorldPoints.Reserve(SegmentCount + 1);
 	RopeSpline->ClearSplinePoints(false);
 	for (int32 PointIndex = 0; PointIndex <= SegmentCount; ++PointIndex)
 	{
 		const float T = static_cast<float>(PointIndex) / static_cast<float>(SegmentCount);
-		const float SagFactor = 4.0f * T * (1.0f - T);
-		const FVector WorldPoint = FMath::Lerp(Pivot, SwingHookPosition, T)
-			- WorldUp * (FMath::Max(0.0f, SwingRopeSag) * SagFactor);
+		const float Bow = 4.0f * T * (1.0f - T);
+		const FVector WorldPoint = FMath::Lerp(Hand, HookPosition, T)
+			- MoveDirection * (TrailLength * Bow)
+			- WorldUp * (Droop * Bow);
+		WorldPoints.Add(WorldPoint);
+
 		RopeSpline->AddSplinePoint(
 			GetActorTransform().InverseTransformPosition(WorldPoint),
 			ESplineCoordinateSpace::Local, false);
@@ -1252,11 +1319,12 @@ void AWeapon_Rope::UpdateSwingVisual(float DeltaSeconds)
 
 	if (IsValid(HookMeshComponent) && IsValid(HookMesh))
 	{
-		const FVector HookTangent = (SwingHookPosition
-			- RopeSpline->GetLocationAtSplinePoint(SegmentCount - 1, ESplineCoordinateSpace::World)).GetSafeNormal();
+		// Orient the hook along the last rope segment, using our own points so
+		// there is no dependency on the spline component's transform update.
+		const FVector HookTangent = (HookPosition - WorldPoints[SegmentCount - 1]).GetSafeNormal();
 		const FRotator HookRotation = (HookTangent.IsNearlyZero()
-			? OrbitRadial : HookTangent).Rotation() + HookRotationOffset;
-		const FVector HookWorldPosition = SwingHookPosition
+			? Radial : HookTangent).Rotation() + HookRotationOffset;
+		const FVector HookWorldPosition = HookPosition
 			+ HookRotation.RotateVector(HookPositionOffset);
 		HookMeshComponent->SetWorldLocationAndRotation(HookWorldPosition, HookRotation);
 		HookMeshComponent->SetRelativeScale3D(HookScale);
@@ -1267,6 +1335,7 @@ void AWeapon_Rope::UpdateSwingVisual(float DeltaSeconds)
 		HookMeshComponent->SetVisibility(false);
 	}
 }
+
 
 void AWeapon_Rope::UpdateRopeVisual()
 {
