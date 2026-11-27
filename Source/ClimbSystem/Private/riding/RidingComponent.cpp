@@ -127,6 +127,7 @@ bool URidingComponent::TryMountHorse(AHorseCharacter* Horse, EHorseMountDirectio
 
 	CurrentHorse = Horse;
 	CachedPlayerController = PC;
+	GetWorld()->GetTimerManager().ClearTimer(CameraInputRestoreTimer);
 	Character->ConfigureHorseInput(Horse);
 	Horse->SetCurrentRider(Character);
 	Horse->SetRidingState(ERidingState::Mounting);
@@ -281,7 +282,7 @@ void URidingComponent::FinishDismount()
 	Character->SetActorLocationAndRotation(DismountTargetLocation, DismountTargetRotation, false, nullptr, ETeleportType::TeleportPhysics);
 	Character->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	if (UCapsuleComponent* Capsule = Character->GetCapsuleComponent())
-		Capsule->SetCollisionEnabled(bWasCapsuleCollisionEnabled ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+		Capsule->SetCollisionEnabled(PreviousCapsuleCollisionMode);
 	if (Character->CameraBoom)
 		Character->CameraBoom->bDoCollisionTest = bWasCameraCollisionTestEnabled;
 	if (UCharacterMovementComponent* Movement = Character->GetCharacterMovement())
