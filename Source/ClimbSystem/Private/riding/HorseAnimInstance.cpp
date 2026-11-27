@@ -4,7 +4,6 @@
 #include "riding/HorseCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 
@@ -60,20 +59,26 @@ void UHorseAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	TiltRotation = FRotator(0.0f, 0.0f, -Turn * 9.0f);
 
 	const bool bGrounded = Horse->GetCharacterMovement() && !Horse->GetCharacterMovement()->IsFalling();
-	if (bGrounded)
+	const USkeletalMeshComponent* HorseMesh = Horse->GetMesh();
+	const bool bFrontBonesValid = HorseMesh->GetBoneIndex(FrontLeftFootBone) != INDEX_NONE
+		&& HorseMesh->GetBoneIndex(FrontRightFootBone) != INDEX_NONE;
+	const bool bBackBonesValid = HorseMesh->GetBoneIndex(BackLeftFootBone) != INDEX_NONE
+		&& HorseMesh->GetBoneIndex(BackRightFootBone) != INDEX_NONE;
+
+	if (bGrounded && bFrontBonesValid)
 	{
 		UpdateFootIK(DeltaSeconds, FrontLeftFootBone, FrontLeftIK, FrontLeftIKTarget);
 		UpdateFootIK(DeltaSeconds, FrontRightFootBone, FrontRightIK, FrontRightIKTarget);
+	}
+	if (bGrounded && bBackBonesValid)
+	{
 		UpdateFootIK(DeltaSeconds, BackLeftFootBone, BackLeftIK, BackLeftIKTarget);
 		UpdateFootIK(DeltaSeconds, BackRightFootBone, BackRightIK, BackRightIKTarget);
-		FrontLegIKAlpha = FMath::FInterpTo(FrontLegIKAlpha, 1.0f, DeltaSeconds, IKInterpSpeed);
-		BackLegIKAlpha = FMath::FInterpTo(BackLegIKAlpha, 1.0f, DeltaSeconds, IKInterpSpeed);
 	}
-	else
-	{
-		FrontLegIKAlpha = FMath::FInterpTo(FrontLegIKAlpha, 0.0f, DeltaSeconds, IKInterpSpeed);
-		BackLegIKAlpha = FMath::FInterpTo(BackLegIKAlpha, 0.0f, DeltaSeconds, IKInterpSpeed);
-	}
+	FrontLegIKAlpha = FMath::FInterpTo(FrontLegIKAlpha,
+		(bGrounded && bFrontBonesValid) ? 1.0f : 0.0f, DeltaSeconds, IKInterpSpeed);
+	BackLegIKAlpha = FMath::FInterpTo(BackLegIKAlpha,
+		(bGrounded && bBackBonesValid) ? 1.0f : 0.0f, DeltaSeconds, IKInterpSpeed);
 }
 
 void UHorseAnimInstance::UpdateFootIK(float DeltaSeconds, FName BoneName, FVector& CurrentOffset, FVector& TargetOffset)
