@@ -336,6 +336,15 @@ void URidingComponent::NotifyHorseHiddenForAI(bool bHidden)
 
 void URidingComponent::ResetHorseHiding()
 {
+	const bool bWasHidden = bIsHorseHiding;
+
+	// Clear the state before stopping montages so their interrupted callbacks
+	// cannot advance the hiding state machine during a forced transition.
+	bIsHorseHiding = false;
+	bHideInputHeld = false;
+	bHideReleaseRequested = false;
+	HorseHidingState = EHorseHidingState::NotHiding;
+
 	ACombatCharacterBase* Character = Rider.Get();
 	UAnimInstance* Anim = IsValid(Character) && Character->GetMesh()
 		? Character->GetMesh()->GetAnimInstance() : nullptr;
@@ -349,11 +358,6 @@ void URidingComponent::ResetHorseHiding()
 		if (IsValid(UnhideMontage)) Anim->Montage_Stop(0.1f, UnhideMontage);
 	}
 
-	const bool bWasHidden = bIsHorseHiding;
-	bIsHorseHiding = false;
-	bHideInputHeld = false;
-	bHideReleaseRequested = false;
-	HorseHidingState = EHorseHidingState::NotHiding;
 	if (bWasHidden) NotifyHorseHiddenForAI(false);
 	UpdateRiderAnimationState();
 }
