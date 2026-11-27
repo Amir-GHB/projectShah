@@ -37,7 +37,7 @@ AHorseCharacter::AHorseCharacter()
 		Movement->MaxWalkSpeed = WalkSpeed;
 		Movement->MaxAcceleration = 900.0f;
 		Movement->BrakingDecelerationWalking = 500.0f;
-		Movement->bOrientRotationToMovement = true;
+		Movement->bOrientRotationToMovement = false;
 		Movement->RotationRate = FRotator(0.0f, TurnRate, 0.0f);
 		Movement->MaxWalkSpeedCrouched = 0.0f;
 	}
@@ -151,21 +151,30 @@ void AHorseCharacter::OnMove(const FInputActionValue& Value)
 	const FVector2D Input = Value.Get<FVector2D>();
 	if (!Controller || RidingState != ERidingState::Mounted) return;
 
-	const FRotator ControlYaw(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
-	const FVector Forward = FRotationMatrix(ControlYaw).GetUnitAxis(EAxis::X);
-	const FVector Right = FRotationMatrix(ControlYaw).GetUnitAxis(EAxis::Y);
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	const float DeltaSeconds = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.016f;
+	if (Input.Y < -0.05f && bAllowReverseMovement)
+	{
+		if (Movement) Movement->MaxWalkSpeed = ReverseSpeed;
+		AddMovementInput(GetActorForwardVector(), Input.Y);
+	}
+	else
+	{
+		if (Movement) Movement->MaxWalkSpeed = bIsSprinting ? SprintSpeed : WalkSpeed;
+		const float CurrentYaw = GetActorRotation().Yaw;
+		const float DesiredYaw = Controller->GetControlRotation().Yaw;
+		const float NewYaw = FMath::FixedTurn(CurrentYaw, DesiredYaw, TurnRate * DeltaSeconds);
+		SetActorRotation(FRotator(0.0f, NewYaw, 0.0f));
+		AddMovementInput(GetActorForwardVector(), Input.Y);
+	}
 
-	if (Input.Y >= 0.0f)
-	{
-		AddMovementInput(Forward, Input.Y);
-	}
-	else if (bAllowReverseMovement)
-	{
-		AddMovementInput(-GetActorForwardVector(), FMath::Abs(Input.Y) * (ReverseSpeed / FMath::Max(1.0f, WalkSpeed)));
-	}
 	if (bAllowStrafeMovement && !FMath::IsNearlyZero(Input.X))
 	{
-		AddMovementInput(Right, Input.X * 0.5f);
+		AddMovementInput(GetActorRightVector(), Input.X * 0.5f);
+	}
+	else if (!FMath::IsNearlyZero(Input.X))
+	{
+		AddActorWorldRotation(FRotator(0.0f, Input.X * TurnRate * DeltaSeconds, 0.0f));
 	}
 }
 
