@@ -157,10 +157,17 @@ void AHorseCharacter::OnMove(const FInputActionValue& Value)
 
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	const float DeltaSeconds = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.016f;
-	if (Input.Y < -0.05f && bAllowReverseMovement)
+	if (Input.Y < -0.05f)
 	{
-		if (Movement) Movement->MaxWalkSpeed = ReverseSpeed;
-		AddMovementInput(GetActorForwardVector(), Input.Y);
+		if (bAllowReverseMovement)
+		{
+			if (Movement) Movement->MaxWalkSpeed = ReverseSpeed;
+			AddMovementInput(GetActorForwardVector(), Input.Y);
+		}
+		else if (Movement)
+		{
+			Movement->MaxWalkSpeed = WalkSpeed;
+		}
 	}
 	else
 	{
