@@ -1,6 +1,7 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/DamageReactionComponent.h"
+#include "riding/RidingComponent.h"
 
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -334,7 +335,15 @@ void UDamageReactionComponent::HandleDamageTaken(
 		}
 	}
 
-	PlayReaction(FindBestHitReaction(DamageInfo), HitReactionBlendOutTime);
+	UAnimMontage* HitMontage = FindBestHitReaction(DamageInfo);
+	if (AActor* OwnerActor = GetOwner())
+	{
+		if (URidingComponent* Riding = OwnerActor->FindComponentByClass<URidingComponent>())
+		{
+			if (Riding->IsMounted() && IsValid(MountedHitReactionMontage)) HitMontage = MountedHitReactionMontage;
+		}
+	}
+	PlayReaction(HitMontage, HitReactionBlendOutTime);
 }
 
 bool UDamageReactionComponent::TryParry(AActor* Attacker, AWeaponBase* AttackingWeapon, const FHitResult& HitResult)
@@ -554,6 +563,12 @@ void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 	}
 	bDeathHandled = true;
 
+	if (AActor* OwnerActor = GetOwner())
+	{
+		if (URidingComponent* Riding = OwnerActor->FindComponentByClass<URidingComponent>())
+			Riding->HandleRiderDeath();
+	}
+
 	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
 	{
 		if (UCombatComponent* Combat = Character->FindComponentByClass<UCombatComponent>())
@@ -568,6 +583,14 @@ void UDamageReactionComponent::HandleDeath(AActor* KillerActor)
 	}
 
 	UAnimMontage* SelectedDeathMontage = FindBestReaction(DeathReactions, DeathDamageInfo);
+	if (AActor* OwnerActor = GetOwner())
+	{
+		if (URidingComponent* Riding = OwnerActor->FindComponentByClass<URidingComponent>())
+		{
+			if (Riding->RidingState == ERidingState::Falling && IsValid(MountedDeathMontage))
+				SelectedDeathMontage = MountedDeathMontage;
+		}
+	}
 	UAnimMontage* FinalDeathMontage;
 	if (IsValid(SelectedDeathMontage))
 	{
