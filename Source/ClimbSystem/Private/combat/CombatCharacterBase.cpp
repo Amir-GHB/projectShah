@@ -2,6 +2,7 @@
 
 #include "combat/CombatCharacterBase.h"
 #include "combat/CombatComponent.h"
+#include "riding/RidingComponent.h"
 #include "combat/CombatTargetingComponent.h"
 #include "combat/CombatPositioningComponent.h"
 #include "combat/DamageHandlerComponent.h"
@@ -29,6 +30,7 @@ ACombatCharacterBase::ACombatCharacterBase()
 	CombatPositioningComponent = CreateDefaultSubobject<UCombatPositioningComponent>(TEXT("CombatPositioningComponent"));
 	DamageReactionComponent = CreateDefaultSubobject<UDamageReactionComponent>(TEXT("DamageReactionComponent"));
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
+	RidingComponent = CreateDefaultSubobject<URidingComponent>(TEXT("RidingComponent"));
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -333,6 +335,15 @@ void ACombatCharacterBase::OnTargetLockTriggered(const FInputActionValue& Value)
 	if (CombatTargetingComponent)
 	{
 		CombatTargetingComponent->ToggleManualLock();
+	}
+}
+
+void ACombatCharacterBase::OnMountTriggered(const FInputActionValue& Value)
+{
+	if (RidingComponent && (!CombatComponent || (CombatComponent->CurrentCombatState != ECombatState::Dead
+		&& CombatComponent->CurrentCombatState != ECombatState::Finishing)))
+	{
+		RidingComponent->TryMountNearbyHorse();
 	}
 }
 
