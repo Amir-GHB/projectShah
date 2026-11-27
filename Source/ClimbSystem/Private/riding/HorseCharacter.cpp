@@ -5,6 +5,7 @@
 #include "combat/CombatComponent.h"
 #include "combat/CombatCharacterBase.h"
 #include "combat/CombatTypes.h"
+#include "combat/CombatTargetingComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -77,6 +78,7 @@ void AHorseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	}
 	if (NextWeaponAction) Enhanced->BindAction(NextWeaponAction, ETriggerEvent::Started, this, &AHorseCharacter::OnNextWeapon);
 	if (ParryAction) Enhanced->BindAction(ParryAction, ETriggerEvent::Started, this, &AHorseCharacter::OnParry);
+	if (TargetLockAction) Enhanced->BindAction(TargetLockAction, ETriggerEvent::Started, this, &AHorseCharacter::OnTargetLock);
 	if (GuardAction)
 	{
 		Enhanced->BindAction(GuardAction, ETriggerEvent::Started, this, &AHorseCharacter::OnGuardStarted);
@@ -121,7 +123,7 @@ void AHorseCharacter::SetRidingState(ERidingState NewState)
 
 void AHorseCharacter::SetRiderInputActions(UInputAction* Move, UInputAction* Look, UInputAction* Sprint,
 	UInputAction* Dismount, UInputAction* Attack, UInputAction* NextWeapon,
-	UInputAction* Guard, UInputAction* Parry)
+	UInputAction* Guard, UInputAction* Parry, UInputAction* TargetLock)
 {
 	MoveAction = Move;
 	LookAction = Look;
@@ -131,6 +133,7 @@ void AHorseCharacter::SetRiderInputActions(UInputAction* Move, UInputAction* Loo
 	NextWeaponAction = NextWeapon;
 	GuardAction = Guard;
 	ParryAction = Parry;
+	TargetLockAction = TargetLock;
 }
 
 void AHorseCharacter::SetSprinting(bool bEnable)
@@ -262,4 +265,13 @@ void AHorseCharacter::OnGuardEnded(const FInputActionValue& Value)
 void AHorseCharacter::OnParry(const FInputActionValue& Value)
 {
 	if (UCombatComponent* Combat = RiderCombatComponent.Get()) Combat->BeginParryAttempt();
+}
+
+void AHorseCharacter::OnTargetLock(const FInputActionValue& Value)
+{
+	if (ACharacter* Rider = CurrentRider.Get())
+	{
+		if (UCombatTargetingComponent* Targeting = Rider->FindComponentByClass<UCombatTargetingComponent>())
+			Targeting->ToggleManualLock();
+	}
 }
