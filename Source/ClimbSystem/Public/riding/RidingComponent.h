@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "TimerManager.h"
 #include "riding/RidingTypes.h"
 #include "RidingComponent.generated.h"
 
