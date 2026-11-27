@@ -26,7 +26,8 @@ void UHorseAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	if (!IsValid(Horse) || !Horse->GetMesh())
 	{
 		GroundSpeed = ForwardSpeed = TurnAlpha = 0.0f;
-		bIsMoving = bIsSprinting = bSideStack = false;
+		bIsMoving = bIsSprinting = bSideStack = bIsAccelerating = false;
+		Acceleration = 0.0f;
 		FrontLegIKAlpha = BackLegIKAlpha = 0.0f;
 		return;
 	}
@@ -36,6 +37,11 @@ void UHorseAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	ForwardSpeed = FVector::DotProduct(Velocity, Horse->GetActorForwardVector());
 	bIsMoving = GroundSpeed > 5.0f;
 	bIsSprinting = Horse->bIsSprinting;
+	if (const UCharacterMovementComponent* Movement = Horse->GetCharacterMovement())
+	{
+		Acceleration = Movement->GetCurrentAcceleration().Size2D();
+		bIsAccelerating = Acceleration > 5.0f;
+	}
 
 	float YawError = 0.0f;
 	if (AController* Controller = Horse->GetController())
