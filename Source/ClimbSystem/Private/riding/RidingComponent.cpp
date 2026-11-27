@@ -150,13 +150,9 @@ void URidingComponent::RequestDismount()
 	AHorseCharacter* Horse = CurrentHorse;
 	if (!IsValid(Character) || !IsValid(Horse) || RidingState != ERidingState::Mounted) return;
 
-	const FVector Right = Horse->GetActorRightVector();
-	const FVector Forward = Horse->GetActorForwardVector();
-	const FVector Offset = Horse->DismountOffset;
-	const FVector TargetLocation = Horse->GetActorLocation()
-		+ Right * Offset.Y + Forward * Offset.X + FVector::UpVector * Offset.Z;
-	DismountTargetLocation = TargetLocation;
-	DismountTargetRotation = FRotator(0.0f, Horse->GetActorRotation().Yaw, 0.0f);
+	const FTransform DismountTransform = Horse->GetDismountWorldTransform(PreferredDismountDirection);
+	DismountTargetLocation = DismountTransform.GetLocation();
+	DismountTargetRotation = DismountTransform.Rotator();
 
 	if (APlayerController* PC = CachedPlayerController.Get())
 	{
@@ -167,8 +163,8 @@ void URidingComponent::RequestDismount()
 		Movement->DisableMovement();
 
 	Character->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	BeginTransformTransition(FTransform(DismountTargetRotation, DismountTargetLocation), ERidingState::Dismounting, EHorseMountDirection::Right);
-	PlayTransitionMontage(false, EHorseMountDirection::Right);
+	BeginTransformTransition(FTransform(DismountTargetRotation, DismountTargetLocation), ERidingState::Dismounting, PreferredDismountDirection);
+	PlayTransitionMontage(false, PreferredDismountDirection);
 	Horse->SetRidingState(ERidingState::Dismounting);
 }
 
@@ -294,23 +290,6 @@ void URidingComponent::FinishDismount()
 	RidingState = ERidingState::Unmounted;
 	MountDirection = EHorseMountDirection::None;
 	UpdateRiderAnimationState();
-}
-
-void URidingComponent::RestoreRiderControl()
-{
-	if (ACombatCharacterBase* Character = Rider.Get())
-	{
-		if (UCharacterMovementComponent* Movement = Character->GetCharacterMovement())
-			Movement->SetMovementMode(MOVE_Walking);
-		if (UCapsuleComponent* Capsule = Character->GetCapsuleComponent())
-			Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	}
-	if (APlayerController* PC = CachedPlayerController.Get())
-	{
-		if (ACombatCharacterBase* Character = Rider.Get()) PC->Possess(Character);
-		PC->SetIgnoreMoveInput(false);
-		PC->SetIgnoreLookInput(false);
-	}
 }
 
 void URidingComponent::PlayTransitionMontage(bool bMounting, EHorseMountDirection Direction)
