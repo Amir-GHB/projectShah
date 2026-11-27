@@ -3,6 +3,8 @@
 #include "riding/HorseCharacter.h"
 #include "riding/RidingComponent.h"
 #include "combat/CombatComponent.h"
+#include "combat/CombatCharacterBase.h"
+#include "combat/CombatTypes.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -79,7 +81,7 @@ void AHorseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	{
 		Enhanced->BindAction(AttackAction, ETriggerEvent::Started, this, &AHorseCharacter::OnAttackStarted);
 		Enhanced->BindAction(AttackAction, ETriggerEvent::Completed, this, &AHorseCharacter::OnAttackReleased);
-		Enhanced->BindAction(AttackAction, ETriggerEvent::Canceled, this, &AHorseCharacter::OnAttackReleased);
+		Enhanced->BindAction(AttackAction, ETriggerEvent::Canceled, this, &AHorseCharacter::OnAttackCanceled);
 	}
 	if (NextWeaponAction) Enhanced->BindAction(NextWeaponAction, ETriggerEvent::Started, this, &AHorseCharacter::OnNextWeapon);
 	if (GuardAction)
@@ -176,16 +178,46 @@ void AHorseCharacter::OnDismount(const FInputActionValue& Value)
 
 void AHorseCharacter::OnAttackStarted(const FInputActionValue& Value)
 {
-	if (UCombatComponent* Combat = RiderCombatComponent.Get()) Combat->HandleAttackInput();
+	UCombatComponent* Combat = RiderCombatComponent.Get();
+	ACombatCharacterBase* Rider = Cast<ACombatCharacterBase>(CurrentRider.Get());
+	if (!Combat) return;
+	if (Combat->CurrentWeaponType == EWeaponType::Rope
+		&& (Combat->CurrentCombatState == ECombatState::Idle || Combat->CurrentCombatState == ECombatState::Recovering)
+		&& Combat->GetAnimationState().DefenseState == ECombatDefenseState::None)
+	{
+		bMountedRopeAimInputHeld = true;
+		if (Rider) Rider->BeginAimCameraMode();
+		return;
+	}
+	Combat->HandleAttackInput();
 }
 
 void AHorseCharacter::OnAttackReleased(const FInputActionValue& Value)
 {
-	if (UCombatComponent* Combat = RiderCombatComponent.Get())
+	UCombatComponent* Combat = RiderCombatComponent.Get();
+	if (!Combat) return;
+	if (bMountedRopeAimInputHeld)
 	{
-		Combat->HandleAttackReleased();
-		Combat->CancelAttackInput();
+		bMountedRopeAimInputHeld = false;
+		Combat->HandleAttackInput();
+		if (Combat->CurrentCombatState != ECombatState::Attacking && Combat->CurrentCombatState != ECombatState::ComboWindow)
+		{
+			if (ACombatCharacterBase* Rider = Cast<ACombatCharacterBase>(CurrentRider.Get())) Rider->EndAimCameraMode();
+		}
+		return;
 	}
+	Combat->HandleAttackReleased();
+	Combat->CancelAttackInput();
+}
+
+void AHorseCharacter::OnAttackCanceled(const FInputActionValue& Value)
+{
+	if (bMountedRopeAimInputHeld)
+	{
+		bMountedRopeAimInputHeld = false;
+		if (ACombatCharacterBase* Rider = Cast<ACombatCharacterBase>(CurrentRider.Get())) Rider->EndAimCameraMode();
+	}
+	if (UCombatComponent* Combat = RiderCombatComponent.Get()) Combat->CancelAttackInput();
 }
 
 void AHorseCharacter::OnNextWeapon(const FInputActionValue& Value)
