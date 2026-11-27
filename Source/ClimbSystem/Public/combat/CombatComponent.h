@@ -323,4 +323,7 @@ protected:
 	void RefreshAnimationState();
 	void ClearInputBuffer();
 	bool IsInputBufferValid() const;
+	bool IsOwnerMounted() const;
+	UAnimMontage* GetConfiguredAttackComboMontage(const FWeaponConfig& Config) const;
+	const TArray<TObjectPtr<UAnimMontage>>& GetConfiguredIndividualAttackMontages(const FWeaponConfig& Config) const;
 };
