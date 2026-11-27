@@ -13,6 +13,7 @@
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
 #include "Components/CapsuleComponent.h"
