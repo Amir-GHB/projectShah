@@ -80,7 +80,12 @@ void AHorseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	if (NextWeaponAction) Enhanced->BindAction(NextWeaponAction, ETriggerEvent::Started, this, &AHorseCharacter::OnNextWeapon);
 	if (ParryAction) Enhanced->BindAction(ParryAction, ETriggerEvent::Started, this, &AHorseCharacter::OnParry);
 	if (TargetLockAction) Enhanced->BindAction(TargetLockAction, ETriggerEvent::Started, this, &AHorseCharacter::OnTargetLock);
-	if (HideAction) Enhanced->BindAction(HideAction, ETriggerEvent::Started, this, &AHorseCharacter::OnHide);
+	if (HideAction)
+	{
+		Enhanced->BindAction(HideAction, ETriggerEvent::Started, this, &AHorseCharacter::OnHideStarted);
+		Enhanced->BindAction(HideAction, ETriggerEvent::Completed, this, &AHorseCharacter::OnHideEnded);
+		Enhanced->BindAction(HideAction, ETriggerEvent::Canceled, this, &AHorseCharacter::OnHideEnded);
+	}
 	if (GuardAction)
 	{
 		Enhanced->BindAction(GuardAction, ETriggerEvent::Started, this, &AHorseCharacter::OnGuardStarted);
@@ -286,12 +291,21 @@ void AHorseCharacter::OnParry(const FInputActionValue& Value)
 	if (UCombatComponent* Combat = RiderCombatComponent.Get()) Combat->BeginParryAttempt();
 }
 
-void AHorseCharacter::OnHide(const FInputActionValue& Value)
+void AHorseCharacter::OnHideStarted(const FInputActionValue& Value)
 {
 	if (ACharacter* Rider = CurrentRider.Get())
 	{
 		if (URidingComponent* Riding = Rider->FindComponentByClass<URidingComponent>())
-			Riding->ToggleHorseHiding();
+			Riding->StartHorseHiding();
+	}
+}
+
+void AHorseCharacter::OnHideEnded(const FInputActionValue& Value)
+{
+	if (ACharacter* Rider = CurrentRider.Get())
+	{
+		if (URidingComponent* Riding = Rider->FindComponentByClass<URidingComponent>())
+			Riding->StopHorseHiding();
 	}
 }
 
