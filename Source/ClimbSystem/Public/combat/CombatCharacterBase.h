@@ -148,6 +148,7 @@ protected:
 	bool bAimCameraTransitionActive = false;
 	float DefaultCameraArmLength = 320.0f;
 	FVector DefaultCameraSocketOffset = FVector::ZeroVector;
+	TWeakObjectPtr<USpringArmComponent> ActiveAimCameraBoom;
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> AimCrosshairWidget = nullptr;
 
