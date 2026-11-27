@@ -16,7 +16,7 @@
 
 AHorseCharacter::AHorseCharacter()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("HorseCameraBoom"));
@@ -94,6 +94,14 @@ bool AHorseCharacter::CanAcceptRider() const
 
 FTransform AHorseCharacter::GetMountWorldTransform(EHorseMountDirection Direction) const
 {
+	if (USkeletalMeshComponent* HorseMesh = GetMesh())
+	{
+		if (HorseMesh->DoesSocketExist(RiderAttachSocketName))
+		{
+			return HorseMesh->GetSocketTransform(RiderAttachSocketName, RTS_World);
+		}
+	}
+
 	const FTransform Offset = Direction == EHorseMountDirection::Left ? LeftMountOffset
 		: Direction == EHorseMountDirection::Right ? RightMountOffset : RearMountOffset;
 	return Offset * GetActorTransform();
