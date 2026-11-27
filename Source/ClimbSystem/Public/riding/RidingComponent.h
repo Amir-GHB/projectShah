@@ -39,10 +39,16 @@ public:
 	EHorseHideSide HorseHideSide = EHorseHideSide::Left;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Hiding")
-	TObjectPtr<UAnimMontage> HideMontage = nullptr;
+	TObjectPtr<UAnimMontage> HideLeftMontage = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Hiding")
-	TObjectPtr<UAnimMontage> UnhideMontage = nullptr;
+	TObjectPtr<UAnimMontage> HideRightMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Hiding")
+	TObjectPtr<UAnimMontage> UnhideLeftMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Hiding")
+	TObjectPtr<UAnimMontage> UnhideRightMontage = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Mounting", meta = (ClampMin = "50.0"))
 	float MountSearchRadius = 350.0f;
