@@ -53,15 +53,6 @@ void AHorseCharacter::BeginPlay()
 	}
 }
 
-void AHorseCharacter::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-	if (Controller)
-	{
-		TargetControlYaw = Controller->GetControlRotation().Yaw;
-	}
-}
-
 void AHorseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -103,6 +94,17 @@ FTransform AHorseCharacter::GetMountWorldTransform(EHorseMountDirection Directio
 	const FTransform Offset = Direction == EHorseMountDirection::Left ? LeftMountOffset
 		: Direction == EHorseMountDirection::Right ? RightMountOffset : RearMountOffset;
 	return Offset * GetActorTransform();
+}
+
+FTransform AHorseCharacter::GetDismountWorldTransform(EHorseMountDirection Direction) const
+{
+	const FVector Offset = Direction == EHorseMountDirection::Left ? LeftDismountOffset
+		: Direction == EHorseMountDirection::Center ? RearDismountOffset : RightDismountOffset;
+	const FVector WorldLocation = GetActorLocation()
+		+ GetActorRightVector() * Offset.Y
+		+ GetActorForwardVector() * Offset.X
+		+ FVector::UpVector * Offset.Z;
+	return FTransform(FRotator(0.0f, GetActorRotation().Yaw, 0.0f), WorldLocation);
 }
 
 void AHorseCharacter::SetCurrentRider(ACharacter* Rider)
@@ -148,9 +150,6 @@ void AHorseCharacter::OnMove(const FInputActionValue& Value)
 {
 	const FVector2D Input = Value.Get<FVector2D>();
 	if (!Controller || RidingState != ERidingState::Mounted) return;
-
-	CurrentMoveInput = Input.Y;
-	CurrentTurnInput = Input.X;
 
 	const FRotator ControlYaw(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
 	const FVector Forward = FRotationMatrix(ControlYaw).GetUnitAxis(EAxis::X);
