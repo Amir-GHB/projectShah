@@ -23,7 +23,6 @@ public:
 	AHorseCharacter();
 
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
-	virtual void Tick(float DeltaSeconds) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Horse|Camera")
 	TObjectPtr<USpringArmComponent> CameraBoom;
@@ -45,6 +44,15 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Riding")
 	FVector DismountOffset = FVector(0.0f, 180.0f, 35.0f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Riding")
+	FVector LeftDismountOffset = FVector(0.0f, -180.0f, 35.0f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Riding")
+	FVector RightDismountOffset = FVector(0.0f, 180.0f, 35.0f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Riding")
+	FVector RearDismountOffset = FVector(-220.0f, 0.0f, 35.0f);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Movement", meta = (ClampMin = "0.0"))
 	float WalkSpeed = 450.0f;
@@ -103,6 +111,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Horse|Riding")
 	FTransform GetMountWorldTransform(EHorseMountDirection Direction) const;
 
+	UFUNCTION(BlueprintPure, Category = "Horse|Riding")
+	FTransform GetDismountWorldTransform(EHorseMountDirection Direction) const;
+
 	UFUNCTION(BlueprintCallable, Category = "Horse|Riding")
 	void SetCurrentRider(ACharacter* Rider);
 
@@ -136,9 +147,6 @@ protected:
 
 private:
 	TWeakObjectPtr<UCombatComponent> RiderCombatComponent;
-	float CurrentMoveInput = 0.0f;
-	float CurrentTurnInput = 0.0f;
-	float TargetControlYaw = 0.0f;
 	bool bMountedRopeAimInputHeld = false;
 	void OnAttackCanceled(const FInputActionValue& Value);
 };
