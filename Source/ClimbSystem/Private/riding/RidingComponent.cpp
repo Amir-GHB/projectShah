@@ -128,6 +128,7 @@ bool URidingComponent::TryMountHorse(AHorseCharacter* Horse, EHorseMountDirectio
 	CurrentHorse = Horse;
 	CachedPlayerController = PC;
 	GetWorld()->GetTimerManager().ClearTimer(CameraInputRestoreTimer);
+	CameraTransitionHorse.Reset();
 	Character->ConfigureHorseInput(Horse);
 	Horse->SetCurrentRider(Character);
 	Horse->SetRidingState(ERidingState::Mounting);
@@ -207,7 +208,8 @@ void URidingComponent::HandleRiderDeath()
 	{
 		HorseMovement->StopMovementImmediately();
 	}
-	if (Horse->FollowCamera) Horse->FollowCamera->Deactivate();
+	CameraTransitionHorse = Horse;
+	if (Horse->FollowCamera) Horse->FollowCamera->Activate(true);
 	if (Character->FollowCamera) Character->FollowCamera->Activate(true);
 
 	RidingState = ERidingState::Falling;
@@ -218,6 +220,7 @@ void URidingComponent::HandleRiderDeath()
 		PC->SetIgnoreMoveInput(true);
 		PC->SetIgnoreLookInput(true);
 		PC->Possess(Character);
+		PC->SetViewTarget(Horse);
 		PC->SetViewTargetWithBlend(Character, CameraBlendDuration);
 		SchedulePlayerInputRestore();
 	}
@@ -264,11 +267,13 @@ void URidingComponent::FinishMount()
 	Horse->SetRidingState(ERidingState::Mounted);
 	UpdateRiderAnimationState();
 
-	if (Character->FollowCamera) Character->FollowCamera->Deactivate();
+	CameraTransitionHorse = Horse;
+	if (Character->FollowCamera) Character->FollowCamera->Activate(true);
 	if (Horse->FollowCamera) Horse->FollowCamera->Activate(true);
 	if (APlayerController* PC = CachedPlayerController.Get())
 	{
 		PC->Possess(Horse);
+		PC->SetViewTarget(Character);
 		PC->SetViewTargetWithBlend(Horse, CameraBlendDuration);
 		SchedulePlayerInputRestore();
 	}
@@ -295,12 +300,14 @@ void URidingComponent::FinishDismount()
 	Horse->SetSprinting(false);
 	Horse->SetCurrentRider(nullptr);
 	Horse->SetRidingState(ERidingState::Unmounted);
-	if (Horse->FollowCamera) Horse->FollowCamera->Deactivate();
+	CameraTransitionHorse = Horse;
+	if (Horse->FollowCamera) Horse->FollowCamera->Activate(true);
 	if (Character->FollowCamera) Character->FollowCamera->Activate(true);
 
 	if (APlayerController* PC = CachedPlayerController.Get())
 	{
 		PC->Possess(Character);
+		PC->SetViewTarget(Horse);
 		PC->SetViewTargetWithBlend(Character, CameraBlendDuration);
 		SchedulePlayerInputRestore();
 	}
@@ -326,6 +333,22 @@ void URidingComponent::SchedulePlayerInputRestore()
 
 void URidingComponent::RestorePlayerInput()
 {
+	if (RidingState == ERidingState::Mounted)
+	{
+		if (ACombatCharacterBase* Character = Rider.Get())
+		{
+			if (Character->FollowCamera) Character->FollowCamera->Deactivate();
+		}
+	}
+	else
+	{
+		if (AHorseCharacter* Horse = CameraTransitionHorse.Get())
+		{
+			if (Horse->FollowCamera) Horse->FollowCamera->Deactivate();
+		}
+	}
+	CameraTransitionHorse.Reset();
+
 	if (APlayerController* PC = CachedPlayerController.Get())
 	{
 		PC->SetIgnoreMoveInput(false);
