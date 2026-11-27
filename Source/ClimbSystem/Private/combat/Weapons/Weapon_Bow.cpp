@@ -1,6 +1,8 @@
 // Copyright Epic Games / Modular Combat System. All Rights Reserved.
 
 #include "combat/Weapons/Weapon_Bow.h"
+#include "riding/RidingComponent.h"
+#include "riding/HorseCharacter.h"
 #include "AI/EnemyAIController.h"
 #include "combat/DamageHandlerComponent.h"
 #include "combat/CombatProjectile.h"
@@ -65,7 +67,16 @@ bool AWeapon_Bow::BeginDraw()
 	DrawAlpha = 0.0f;
 	DrawStartTime = GetWorld()->GetTimeSeconds();
 	SpawnInHandArrow();
-	PlayCharacterMontage(DrawMontage);
+	UAnimMontage* DrawToPlay = DrawMontage;
+	if (ACharacter* Character = OwningCharacter.Get())
+	{
+		if (URidingComponent* Riding = Character->FindComponentByClass<URidingComponent>())
+		{
+			if (Riding->IsMounted() && IsValid(MountedDrawMontage)) DrawToPlay = MountedDrawMontage;
+		}
+	}
+	ActiveDrawMontage = DrawToPlay;
+	PlayCharacterMontage(DrawToPlay);
 	OnBowDrawStateChanged.Broadcast(true, DrawAlpha);
 	return true;
 }
@@ -85,7 +96,16 @@ bool AWeapon_Bow::ReleaseShot()
 	const bool bFired = SpawnArrow(ChargeAlpha);
 	DestroyInHandArrow();
 	DrawAlpha = 0.0f;
-	PlayCharacterMontage(ReleaseMontage);
+	UAnimMontage* ReleaseToPlay = ReleaseMontage;
+	if (ACharacter* Character = OwningCharacter.Get())
+	{
+		if (URidingComponent* Riding = Character->FindComponentByClass<URidingComponent>())
+		{
+			if (Riding->IsMounted() && IsValid(MountedReleaseMontage)) ReleaseToPlay = MountedReleaseMontage;
+		}
+	}
+	PlayCharacterMontage(ReleaseToPlay);
+	ActiveDrawMontage = nullptr;
 	//change drawing state after montage is played to pervent flicking between non aim state and release montage
 	bIsDrawing = false;
 	OnBowDrawStateChanged.Broadcast(false, 0.0f);
@@ -99,13 +119,14 @@ void AWeapon_Bow::CancelDraw()
 	bIsDrawing = false;
 	DrawAlpha = 0.0f;
 	DestroyInHandArrow();
-	if (IsValid(DrawMontage) && OwningCharacter.IsValid() && OwningCharacter->GetMesh())
+	if (IsValid(ActiveDrawMontage) && OwningCharacter.IsValid() && OwningCharacter->GetMesh())
 	{
 		if (UAnimInstance* Anim = OwningCharacter->GetMesh()->GetAnimInstance())
 		{
-			Anim->Montage_Stop(0.12f, DrawMontage);
+			Anim->Montage_Stop(0.12f, ActiveDrawMontage);
 		}
 	}
+	ActiveDrawMontage = nullptr;
 	OnBowDrawStateChanged.Broadcast(false, 0.0f);
 }
 
@@ -235,7 +256,16 @@ bool AWeapon_Bow::GetAimDirectionAndSpawnTransform(FVector& OutDirection, FTrans
 		SocketTransform = FTransform(Character->GetActorRotation(), FallbackLocation);
 	}
 
-	const FVector AimOrigin = Character->GetPawnViewLocation();
+	AController* AimController = Character->GetController();
+	if (!AimController)
+	{
+		if (URidingComponent* Riding = Character->FindComponentByClass<URidingComponent>())
+		{
+			if (AHorseCharacter* Horse = Riding->GetCurrentHorse()) AimController = Horse->GetController();
+		}
+	}
+	const APawn* ViewPawn = AimController ? AimController->GetPawn() : Character;
+	const FVector AimOrigin = IsValid(ViewPawn) ? ViewPawn->GetPawnViewLocation() : Character->GetPawnViewLocation();
 	FRotator AimRotation = Character->GetActorRotation();
 	FVector AimTarget = FVector::ZeroVector;
 	bool bHasAITarget = false;
@@ -278,9 +308,9 @@ bool AWeapon_Bow::GetAimDirectionAndSpawnTransform(FVector& OutDirection, FTrans
 
 	if (!bHasAITarget)
 	{
-		if (AController* Controller = Character->GetController())
+		if (AimController)
 		{
-			AimRotation = Controller->GetControlRotation();
+			AimRotation = AimController->GetControlRotation();
 		}
 
 		const FVector AimEnd = AimOrigin + AimRotation.Vector() * 10000.0f;
