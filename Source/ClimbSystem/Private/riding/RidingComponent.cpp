@@ -2,6 +2,8 @@
 
 #include "riding/RidingComponent.h"
 #include "riding/HorseCharacter.h"
+#include "AI/EnemyAIController.h"
+#include "combat/EnemyCharacter.h"
 #include "combat/CombatCharacterBase.h"
 #include "combat/CombatComponent.h"
 #include "combat/CombatAnimInstance.h"
@@ -171,6 +173,7 @@ void URidingComponent::RequestDismount()
 	if (Character->CombatComponent
 		&& Character->CombatComponent->GetAnimationState().DefenseState != ECombatDefenseState::None) return;
 
+	if (bIsHorseHiding) SetHorseHiding(false);
 	const FTransform DismountTransform = Horse->GetDismountWorldTransform(PreferredDismountDirection);
 	DismountTargetLocation = DismountTransform.GetLocation();
 	DismountTargetRotation = DismountTransform.Rotator();
@@ -189,12 +192,65 @@ void URidingComponent::RequestDismount()
 	Horse->SetRidingState(ERidingState::Dismounting);
 }
 
+bool URidingComponent::ToggleHorseHiding()
+{
+	if (RidingState != ERidingState::Mounted || !IsValid(CurrentHorse)
+		|| IsInRidingTransition()) return false;
+	ACombatCharacterBase* Character = Rider.Get();
+	if (!IsValid(Character) || Character->IsAimCameraModeActive()) return false;
+	if (Character->CombatComponent
+		&& Character->CombatComponent->CurrentCombatState != ECombatState::Idle
+		&& Character->CombatComponent->CurrentCombatState != ECombatState::Recovering) return false;
+	SetHorseHiding(!bIsHorseHiding);
+	return true;
+}
+
+void URidingComponent::SetHorseHiding(bool bHide)
+{
+	if (bIsHorseHiding == bHide || RidingState != ERidingState::Mounted) return;
+	ACombatCharacterBase* Character = Rider.Get();
+	AHorseCharacter* Horse = CurrentHorse;
+	if (!IsValid(Character) || !IsValid(Horse)) return;
+
+	bIsHorseHiding = bHide;
+	if (USkeletalMeshComponent* RiderMesh = Character->GetMesh())
+	{
+		if (UAnimInstance* Anim = RiderMesh->GetAnimInstance())
+		{
+			if (bHide && IsValid(HideMontage))
+			{
+				Anim->Montage_Play(HideMontage);
+			}
+			else if (!bHide)
+			{
+				if (IsValid(UnhideMontage)) Anim->Montage_Play(UnhideMontage);
+				else if (IsValid(HideMontage)) Anim->Montage_Stop(0.15f, HideMontage);
+			}
+		}
+	}
+
+	// AI perceives the possessed horse pawn, not the attached rider. Notify every
+	// enemy controller so an already-acquired horse target is dropped immediately.
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AEnemyCharacter> It(World); It; ++It)
+		{
+			if (AEnemyAIController* AI = Cast<AEnemyAIController>(It->GetController()))
+			{
+				AI->HandlePlayerHidden(Horse, bHide);
+			}
+		}
+	}
+	UpdateRiderAnimationState();
+}
+
 void URidingComponent::HandleRiderDeath()
 {
 	ACombatCharacterBase* Character = Rider.Get();
 	AHorseCharacter* Horse = CurrentHorse;
 	if (!IsValid(Character) || !IsValid(Horse) || RidingState != ERidingState::Mounted) return;
 
+	if (bIsHorseHiding) SetHorseHiding(false);
 	Character->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	if (UCapsuleComponent* Capsule = Character->GetCapsuleComponent())
 		Capsule->SetCollisionEnabled(PreviousCapsuleCollisionMode);
@@ -393,6 +449,8 @@ void URidingComponent::UpdateRiderAnimationState()
 		{
 			Anim->RidingState = RidingState;
 			Anim->MountDirection = MountDirection;
+			Anim->bIsHorseHiding = bIsHorseHiding && RidingState == ERidingState::Mounted;
+			Anim->HorseHideSide = bIsHorseHiding ? HorseHideSide : EHorseHideSide::None;
 		}
 	}
 }
