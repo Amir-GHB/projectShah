@@ -27,6 +27,12 @@ public:
 	bool bIsMoving = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Horse|Locomotion")
+	bool bIsAccelerating = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Horse|Locomotion")
+	float Acceleration = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Horse|Locomotion")
 	bool bIsSprinting = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Horse|Locomotion")
