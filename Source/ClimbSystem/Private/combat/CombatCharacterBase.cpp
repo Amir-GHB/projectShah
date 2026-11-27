@@ -147,6 +147,13 @@ void ACombatCharacterBase::BeginAimCameraMode()
 	}
 }
 
+void ACombatCharacterBase::ConfigureHorseInput(AHorseCharacter* Horse) const
+{
+	if (!IsValid(Horse)) return;
+	Horse->SetRiderInputActions(MoveAction, LookAction, SprintAction, MountAction,
+		AttackAction, NextWeaponAction, GuardAction, ParryAction);
+}
+
 void ACombatCharacterBase::HideAimCrosshair()
 {
 	if (AimCrosshairWidget)
