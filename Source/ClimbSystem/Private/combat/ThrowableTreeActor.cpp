@@ -11,6 +11,8 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 
 AThrowableTreeActor::AThrowableTreeActor()
 {
@@ -34,6 +36,55 @@ void AThrowableTreeActor::BeginPlay()
 		MeshComponent->SetStaticMesh(TreeMesh);
 	}
 	MeshComponent->OnComponentHit.AddDynamic(this, &AThrowableTreeActor::HandleMeshHit);
+}
+
+bool AThrowableTreeActor::BeginThrowSequence(ACombatCharacterBase* Thrower)
+{
+	if (!CanBeThrown() || !IsValid(Thrower) || !IsValid(ThrowMontage) || !Thrower->GetMesh()) return false;
+	UAnimInstance* Anim = Thrower->GetMesh()->GetAnimInstance();
+	if (!Anim) return false;
+	Thrower->SetPendingThrowable(this);
+	if (Anim->Montage_Play(ThrowMontage) <= 0.0f)
+	{
+		Thrower->CancelPendingThrowable();
+		return false;
+	}
+	return true;
+}
+
+bool AThrowableTreeActor::AttachToThrowerHand(ACombatCharacterBase* Thrower)
+{
+	if (!CanBeThrown() || !IsValid(Thrower) || !Thrower->GetMesh()
+		|| !Thrower->GetMesh()->DoesSocketExist(ThrowerHandSocketName)
+		|| !MeshComponent->DoesSocketExist(ThrowableGripSocketName)) return false;
+
+	MeshComponent->SetSimulatePhysics(false);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComponent->SetPhysicsLinearVelocity(FVector::ZeroVector);
+	MeshComponent->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+	const FTransform GripSocketLocal = MeshComponent->GetSocketTransform(ThrowableGripSocketName, RTS_Component);
+	if (!AttachToComponent(Thrower->GetMesh(),
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale, ThrowerHandSocketName)) return false;
+	SetActorRelativeTransform(GripSocketLocal.Inverse());
+	bIsAttachedToHand = true;
+	ThrowingCharacter = Thrower;
+	SetOwner(Thrower);
+	return true;
+}
+
+bool AThrowableTreeActor::ReleaseFromThrowerHand(ACombatCharacterBase* Thrower)
+{
+	if (!bIsAttachedToHand || !IsValid(Thrower) || ThrowingCharacter.Get() != Thrower) return false;
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	bIsAttachedToHand = false;
+	const bool bLaunched = ThrowAtClosestVisibleEnemy(Thrower);
+	if (!bLaunched && IsValid(MeshComponent))
+	{
+		MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		MeshComponent->SetSimulatePhysics(true);
+		MeshComponent->WakeAllRigidBodies();
+	}
+	return bLaunched;
 }
 
 bool AThrowableTreeActor::ThrowAtClosestVisibleEnemy(ACombatCharacterBase* Thrower)
@@ -114,6 +165,7 @@ bool AThrowableTreeActor::ThrowAtClosestVisibleEnemy(ACombatCharacterBase* Throw
 	}
 
 	bHasBeenThrown = true;
+	bIsAttachedToHand = false;
 	ThrowingCharacter = Thrower;
 	SetOwner(Thrower);
 	MeshComponent->IgnoreActorWhenMoving(Thrower, true);
