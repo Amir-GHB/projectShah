@@ -4,6 +4,7 @@
 #include "riding/HorseCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 
@@ -52,7 +53,8 @@ void UHorseAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	RightLegRotation = FRotator(0.0f, FMath::Max(0.0f, -Turn) * 7.0f, 0.0f);
 	TiltRotation = FRotator(0.0f, 0.0f, -Turn * 9.0f);
 
-	if (bIsMoving)
+	const bool bGrounded = Horse->GetCharacterMovement() && !Horse->GetCharacterMovement()->IsFalling();
+	if (bGrounded)
 	{
 		UpdateFootIK(DeltaSeconds, FrontLeftFootBone, FrontLeftIK, FrontLeftIKTarget);
 		UpdateFootIK(DeltaSeconds, FrontRightFootBone, FrontRightIK, FrontRightIKTarget);
