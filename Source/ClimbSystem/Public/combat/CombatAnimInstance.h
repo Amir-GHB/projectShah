@@ -46,6 +46,9 @@ public:
 	bool bIsHorseHiding = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Riding|Animation")
+	EHorseHidingState HorseHidingState = EHorseHidingState::NotHiding;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Riding|Animation")
 	EHorseHideSide HorseHideSide = EHorseHideSide::None;
 
 	UFUNCTION(BlueprintPure, Category = "Combat Animation")
