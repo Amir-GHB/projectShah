@@ -35,7 +35,7 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Riding|Hiding")
 	bool bIsHorseHiding = false;
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Riding|Hiding")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Hiding")
 	EHorseHideSide HorseHideSide = EHorseHideSide::Left;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Hiding")
