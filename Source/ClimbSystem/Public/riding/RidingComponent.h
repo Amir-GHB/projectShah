@@ -32,6 +32,18 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Riding|State")
 	TObjectPtr<AHorseCharacter> CurrentHorse = nullptr;
 
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Riding|Hiding")
+	bool bIsHorseHiding = false;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Riding|Hiding")
+	EHorseHideSide HorseHideSide = EHorseHideSide::Left;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Hiding")
+	TObjectPtr<UAnimMontage> HideMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Hiding")
+	TObjectPtr<UAnimMontage> UnhideMontage = nullptr;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Mounting", meta = (ClampMin = "50.0"))
 	float MountSearchRadius = 350.0f;
 
@@ -70,6 +82,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Riding")
 	void RequestDismount();
+
+	UFUNCTION(BlueprintCallable, Category = "Riding|Hiding")
+	bool ToggleHorseHiding();
+
+	UFUNCTION(BlueprintCallable, Category = "Riding|Hiding")
+	void SetHorseHiding(bool bHide);
+
+	UFUNCTION(BlueprintPure, Category = "Riding|Hiding")
+	bool IsHiddenFromEnemies() const { return bIsHorseHiding && RidingState == ERidingState::Mounted; }
 
 	/** Detaches a mounted rider and returns control to the dying character for its death animation. */
 	void HandleRiderDeath();
