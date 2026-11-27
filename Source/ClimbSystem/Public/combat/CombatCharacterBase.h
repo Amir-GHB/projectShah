@@ -18,6 +18,7 @@ class UCameraComponent;
 class UUserWidget;
 class UMotionWarpingComponent;
 class URidingComponent;
+class AHorseCharacter;
 struct FInputActionValue;
 
 UCLASS()
@@ -80,6 +81,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera|Aim")
 	void EndAimCameraMode();
 
+	void ConfigureHorseInput(AHorseCharacter* Horse) const;
+
 	/** Hides only the aiming reticle while leaving the shoulder camera active. */
 	UFUNCTION(BlueprintCallable, Category = "Camera|Aim")
 	void HideAimCrosshair();
@@ -110,6 +113,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> GuardAction;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> ParryAction;
+
 	/** Press input for a weapon-specific parry attempt while guarding. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> ParryAction;
@@ -127,6 +133,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Riding")
 	TObjectPtr<UInputAction> MountAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Riding")
+	TObjectPtr<UInputAction> SprintAction;
 
 	void OnMove(const FInputActionValue& Value);
 	void OnLook(const FInputActionValue& Value);
