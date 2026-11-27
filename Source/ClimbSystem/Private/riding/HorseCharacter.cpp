@@ -11,6 +11,7 @@
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "GameFramework/Controller.h"
+#include "Engine/World.h"
 
 AHorseCharacter::AHorseCharacter()
 {
