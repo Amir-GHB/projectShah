@@ -10,6 +10,7 @@ class UStaticMesh;
 class UStaticMeshComponent;
 class ACombatCharacterBase;
 class AEnemyCharacter;
+class UAnimMontage;
 
 /**
  * Temporary environmental throw test actor.
@@ -29,6 +30,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Throwable")
 	TObjectPtr<UStaticMesh> TreeMesh = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Throwable|Throw")
+	TObjectPtr<UAnimMontage> ThrowMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Throwable|Throw")
+	FName ThrowerHandSocketName = TEXT("hand_r");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Throwable|Throw")
+	FName ThrowableGripSocketName = TEXT("GripSocket");
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Throwable|Interaction", meta = (ClampMin = "50.0"))
 	float InteractionRange = 300.0f;
@@ -51,6 +61,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Throwable")
 	bool CanBeThrown() const { return !bHasBeenThrown && IsValid(MeshComponent); }
 
+	/** Starts the configured throw montage. Attachment and release are driven by animation notifies. */
+	bool BeginThrowSequence(ACombatCharacterBase* Thrower);
+	bool AttachToThrowerHand(ACombatCharacterBase* Thrower);
+	bool ReleaseFromThrowerHand(ACombatCharacterBase* Thrower);
+
 	/** Selects the closest enemy in the thrower's forward view and launches this actor. */
 	bool ThrowAtClosestVisibleEnemy(ACombatCharacterBase* Thrower);
 
@@ -63,6 +78,7 @@ protected:
 
 private:
 	bool bHasBeenThrown = false;
+	bool bIsAttachedToHand = false;
 	TWeakObjectPtr<ACombatCharacterBase> ThrowingCharacter;
 	void StopAfterImpact();
 };
