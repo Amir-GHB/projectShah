@@ -71,10 +71,6 @@ void UHorseAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	}
 	else
 	{
-		FrontLeftIK = FMath::VInterpTo(FrontLeftIK, FVector::ZeroVector, DeltaSeconds, IKInterpSpeed);
-		FrontRightIK = FMath::VInterpTo(FrontRightIK, FVector::ZeroVector, DeltaSeconds, IKInterpSpeed);
-		BackLeftIK = FMath::VInterpTo(BackLeftIK, FVector::ZeroVector, DeltaSeconds, IKInterpSpeed);
-		BackRightIK = FMath::VInterpTo(BackRightIK, FVector::ZeroVector, DeltaSeconds, IKInterpSpeed);
 		FrontLegIKAlpha = FMath::FInterpTo(FrontLegIKAlpha, 0.0f, DeltaSeconds, IKInterpSpeed);
 		BackLegIKAlpha = FMath::FInterpTo(BackLegIKAlpha, 0.0f, DeltaSeconds, IKInterpSpeed);
 	}
@@ -85,8 +81,11 @@ void UHorseAnimInstance::UpdateFootIK(float DeltaSeconds, FName BoneName, FVecto
 	AHorseCharacter* Horse = CachedHorse.Get();
 	if (!IsValid(Horse) || !Horse->GetMesh() || BoneName.IsNone()) return;
 
-	const FVector FootLocation = Horse->GetMesh()->GetBoneLocation(BoneName);
-	if (FootLocation.IsNearlyZero()) return;
+	USkeletalMeshComponent* Mesh = Horse->GetMesh();
+	if (Mesh->GetBoneIndex(BoneName) == INDEX_NONE) return;
+
+	const FVector FootLocation = Mesh->GetBoneLocation(BoneName);
+	FVector TargetWorldLocation = FootLocation;
 
 	FHitResult Hit;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(HorseFootIK), false, Horse);
@@ -94,11 +93,10 @@ void UHorseAnimInstance::UpdateFootIK(float DeltaSeconds, FName BoneName, FVecto
 	const FVector End = FootLocation - FVector::UpVector * IKTraceDown;
 	if (Horse->GetWorld() && Horse->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params) && Hit.bBlockingHit)
 	{
-		TargetOffset = FVector(0.0f, 0.0f, Hit.ImpactPoint.Z - FootLocation.Z);
+		TargetWorldLocation.Z = Hit.ImpactPoint.Z;
 	}
-	else
-	{
-		TargetOffset = FVector::ZeroVector;
-	}
+
+	// The Two Bone IK nodes should consume these values in Component Space.
+	TargetOffset = Mesh->GetComponentTransform().InverseTransformPosition(TargetWorldLocation);
 	CurrentOffset = FMath::VInterpTo(CurrentOffset, TargetOffset, DeltaSeconds, IKInterpSpeed);
 }
