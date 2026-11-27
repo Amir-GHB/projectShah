@@ -97,6 +97,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Input")
 	TObjectPtr<UInputAction> TargetLockAction;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Input")
+	TObjectPtr<UInputAction> HideAction;
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Horse|Riding")
 	TObjectPtr<ACharacter> CurrentRider = nullptr;
 
@@ -126,7 +129,7 @@ public:
 
 	void SetRiderInputActions(UInputAction* Move, UInputAction* Look, UInputAction* Sprint,
 		UInputAction* Dismount, UInputAction* Attack, UInputAction* NextWeapon,
-		UInputAction* Guard, UInputAction* Parry, UInputAction* TargetLock);
+		UInputAction* Guard, UInputAction* Parry, UInputAction* TargetLock, UInputAction* Hide);
 
 	UFUNCTION(BlueprintPure, Category = "Horse|Movement")
 	float GetCurrentHorseSpeed() const;
@@ -146,6 +149,7 @@ protected:
 	void OnGuardEnded(const FInputActionValue& Value);
 	void OnParry(const FInputActionValue& Value);
 	void OnTargetLock(const FInputActionValue& Value);
+	void OnHide(const FInputActionValue& Value);
 
 private:
 	TWeakObjectPtr<UCombatComponent> RiderCombatComponent;
