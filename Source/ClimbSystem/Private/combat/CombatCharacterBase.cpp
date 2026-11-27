@@ -154,6 +154,28 @@ void ACombatCharacterBase::ConfigureHorseInput(AHorseCharacter* Horse) const
 		AttackAction, NextWeaponAction, GuardAction, ParryAction, TargetLockAction, HideOnHorseAction);
 }
 
+void ACombatCharacterBase::SetPendingThrowable(AThrowableTreeActor* Throwable)
+{
+	PendingThrowableActor = IsValid(Throwable) ? Throwable : nullptr;
+}
+
+void ACombatCharacterBase::AttachPendingThrowableToHand()
+{
+	if (IsValid(PendingThrowableActor)) PendingThrowableActor->AttachToThrowerHand(this);
+}
+
+void ACombatCharacterBase::ReleasePendingThrowable()
+{
+	AThrowableTreeActor* Throwable = PendingThrowableActor;
+	PendingThrowableActor = nullptr;
+	if (IsValid(Throwable)) Throwable->ReleaseFromThrowerHand(this);
+}
+
+void ACombatCharacterBase::CancelPendingThrowable()
+{
+	PendingThrowableActor = nullptr;
+}
+
 void ACombatCharacterBase::HideAimCrosshair()
 {
 	if (AimCrosshairWidget)
@@ -392,7 +414,7 @@ void ACombatCharacterBase::OnThrowNearbyActorTriggered(const FInputActionValue& 
 	}
 
 	AThrowableTreeActor* NearbyTree = nullptr;
-	float BestDistanceSquared = FMath::Square(300.0f);
+	float BestDistanceSquared = TNumericLimits<float>::Max();
 	for (TActorIterator<AThrowableTreeActor> It(GetWorld()); It; ++It)
 	{
 		AThrowableTreeActor* Candidate = *It;
@@ -402,7 +424,7 @@ void ACombatCharacterBase::OnThrowNearbyActorTriggered(const FInputActionValue& 
 		}
 
 		const float DistanceSquared = FVector::DistSquared(GetActorLocation(), Candidate->GetActorLocation());
-		if (DistanceSquared < BestDistanceSquared)
+		if (DistanceSquared <= FMath::Square(Candidate->InteractionRange) && DistanceSquared < BestDistanceSquared)
 		{
 			BestDistanceSquared = DistanceSquared;
 			NearbyTree = Candidate;
@@ -411,7 +433,7 @@ void ACombatCharacterBase::OnThrowNearbyActorTriggered(const FInputActionValue& 
 
 	if (IsValid(NearbyTree))
 	{
-		NearbyTree->ThrowAtClosestVisibleEnemy(this);
+		NearbyTree->BeginThrowSequence(this);
 	}
 }
 
