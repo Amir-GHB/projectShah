@@ -160,6 +160,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions")
 	TObjectPtr<UAnimMontage> DeathMontage = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions|Mounted")
+	TObjectPtr<UAnimMontage> MountedHitReactionMontage = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Reactions|Mounted")
+	TObjectPtr<UAnimMontage> MountedDeathMontage = nullptr;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat|Finishers")
 	TArray<FFinisherMontagePair> FinisherMontages;
 
