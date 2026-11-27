@@ -36,7 +36,7 @@ void URidingComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		{
 			if (UCharacterMovementComponent* Movement = Character->GetCharacterMovement())
 				Movement->SetMovementMode(MOVE_Walking);
-			Character->GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			Character->GetCapsuleComponent()->SetCollisionEnabled(PreviousCapsuleCollisionMode);
 		}
 	}
 	Super::EndPlay(EndPlayReason);
@@ -137,7 +137,7 @@ bool URidingComponent::TryMountHorse(AHorseCharacter* Horse, EHorseMountDirectio
 	}
 	if (UCapsuleComponent* Capsule = Character->GetCapsuleComponent())
 	{
-		bWasCapsuleCollisionEnabled = Capsule->GetCollisionEnabled() != ECollisionEnabled::NoCollision;
+		PreviousCapsuleCollisionMode = Capsule->GetCollisionEnabled();
 		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 	if (Character->CameraBoom)
@@ -193,7 +193,7 @@ void URidingComponent::HandleRiderDeath()
 
 	Character->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	if (UCapsuleComponent* Capsule = Character->GetCapsuleComponent())
-		Capsule->SetCollisionEnabled(bWasCapsuleCollisionEnabled ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+		Capsule->SetCollisionEnabled(PreviousCapsuleCollisionMode);
 	if (Character->CameraBoom)
 		Character->CameraBoom->bDoCollisionTest = bWasCameraCollisionTestEnabled;
 
