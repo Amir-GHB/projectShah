@@ -217,14 +217,18 @@ void URidingComponent::SetHorseHiding(bool bHide)
 	{
 		if (UAnimInstance* Anim = RiderMesh->GetAnimInstance())
 		{
-			if (bHide && IsValid(HideMontage))
+			UAnimMontage* HideToPlay = HorseHideSide == EHorseHideSide::Right && IsValid(HideRightMontage)
+				? HideRightMontage : HideLeftMontage;
+			UAnimMontage* UnhideToPlay = HorseHideSide == EHorseHideSide::Right && IsValid(UnhideRightMontage)
+				? UnhideRightMontage : UnhideLeftMontage;
+			if (bHide && IsValid(HideToPlay))
 			{
-				Anim->Montage_Play(HideMontage);
+				Anim->Montage_Play(HideToPlay);
 			}
 			else if (!bHide)
 			{
-				if (IsValid(UnhideMontage)) Anim->Montage_Play(UnhideMontage);
-				else if (IsValid(HideMontage)) Anim->Montage_Stop(0.15f, HideMontage);
+				if (IsValid(UnhideToPlay)) Anim->Montage_Play(UnhideToPlay);
+				else if (IsValid(HideToPlay)) Anim->Montage_Stop(0.15f, HideToPlay);
 			}
 		}
 	}
