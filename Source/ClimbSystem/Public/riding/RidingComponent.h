@@ -92,6 +92,7 @@ protected:
 private:
 	TWeakObjectPtr<ACombatCharacterBase> Rider;
 	TWeakObjectPtr<APlayerController> CachedPlayerController;
+	TWeakObjectPtr<AHorseCharacter> CameraTransitionHorse;
 	FTransform TransitionStart = FTransform::Identity;
 	FTransform TransitionTarget = FTransform::Identity;
 	float TransitionElapsed = 0.0f;
