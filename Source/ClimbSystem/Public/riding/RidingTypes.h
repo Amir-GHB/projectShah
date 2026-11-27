@@ -16,6 +16,14 @@ enum class ERidingState : uint8
 };
 
 UENUM(BlueprintType)
+enum class EHorseHideSide : uint8
+{
+	None UMETA(DisplayName = "None"),
+	Left UMETA(DisplayName = "Left"),
+	Right UMETA(DisplayName = "Right")
+};
+
+UENUM(BlueprintType)
 enum class EHorseMountDirection : uint8
 {
 	None UMETA(DisplayName = "None"),
