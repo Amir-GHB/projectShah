@@ -42,8 +42,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Riding")
 	FTransform RearMountOffset = FTransform(FRotator(0.0f, 90.0f, 0.0f), FVector(-150.0f, 0.0f, 0.0f));
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Riding")
-	FVector DismountOffset = FVector(0.0f, 180.0f, 35.0f);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Horse|Riding")
 	FVector LeftDismountOffset = FVector(0.0f, -180.0f, 35.0f);
