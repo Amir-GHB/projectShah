@@ -12,7 +12,28 @@
 #include "combat/EnemyCharacter.h"
 #include "combat/CombatComponent.h"
 #include "combat/DamageHandlerComponent.h"
+#include "combat/CombatCharacterBase.h"
+#include "riding/RidingComponent.h"
+#include "riding/HorseCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
+
+namespace
+{
+	bool IsPlayerActorHidden(const AActor* Actor)
+	{
+		const ACombatCharacterBase* Rider = Cast<ACombatCharacterBase>(Actor);
+		if (!Rider)
+		{
+			if (const AHorseCharacter* Horse = Cast<AHorseCharacter>(Actor))
+			{
+				Rider = Cast<ACombatCharacterBase>(Horse->CurrentRider.Get());
+			}
+		}
+		const URidingComponent* Riding = IsValid(Rider)
+			? Rider->FindComponentByClass<URidingComponent>() : nullptr;
+		return Riding && Riding->IsHiddenFromEnemies();
+	}
+}
 
 namespace EnemyAIKeys
 {
@@ -152,6 +173,30 @@ void AEnemyAIController::ClearCurrentTarget()
 	StopMovement();
 }
 
+void AEnemyAIController::HandlePlayerHidden(AActor* PlayerActor, bool bHidden)
+{
+	if (!IsValid(PlayerActor)) return;
+	if (bHidden)
+	{
+		if (CurrentTarget.Get() == PlayerActor)
+		{
+			SetCurrentTarget(nullptr);
+			InvestigationExpiryTime = 0.0;
+			ClearBlackboardInvestigation();
+			ClearFocus(EAIFocusPriority::Gameplay);
+			StopMovement();
+			if (AEnemyCharacter* Enemy = ControlledEnemy.Get())
+			{
+				if (Enemy->CombatComponent) Enemy->CombatComponent->CancelAttackInput();
+			}
+		}
+	}
+	else if (AIPerception)
+	{
+		AIPerception->RequestStimuliListenerUpdate();
+	}
+}
+
 void AEnemyAIController::HandleCurrentTargetDeath(AActor* KillerActor)
 {
 	SetCurrentTarget(nullptr);
@@ -218,6 +263,20 @@ void AEnemyAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimulu
 	const FAISenseID SightID = UAISense::GetSenseID(UAISense_Sight::StaticClass());
 	const FAISenseID HearingID = UAISense::GetSenseID(UAISense_Hearing::StaticClass());
 
+	if (Stimulus.Type == SightID && IsPlayerActorHidden(Actor))
+	{
+		if (CurrentTarget.Get() == Actor)
+		{
+			SetCurrentTarget(nullptr);
+			InvestigationExpiryTime = 0.0;
+			ClearBlackboardInvestigation();
+			ClearFocus(EAIFocusPriority::Gameplay);
+			StopMovement();
+			if (Enemy->CombatComponent) Enemy->CombatComponent->CancelAttackInput();
+		}
+		return;
+	}
+
 	if (Stimulus.Type == SightID)
 	{
 		if (Stimulus.WasSuccessfullySensed() && IsValidCombatTarget(Actor))
@@ -262,7 +321,7 @@ bool AEnemyAIController::IsValidCombatTarget(const AActor* Candidate) const
 {
 	if (!IsValid(Candidate) || Candidate == GetPawn()) return false;
 	const APawn* CandidatePawn = Cast<APawn>(Candidate);
-	if (!CandidatePawn || !CandidatePawn->IsPlayerControlled()) return false;
+	if (!CandidatePawn || !CandidatePawn->IsPlayerControlled() || IsPlayerActorHidden(Candidate)) return false;
 	const UDamageHandlerComponent* DamageHandler = Candidate->FindComponentByClass<UDamageHandlerComponent>();
 	return !DamageHandler || !DamageHandler->bIsDead;
 }
