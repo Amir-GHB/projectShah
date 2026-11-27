@@ -189,7 +189,17 @@ void AWeapon_Rope::EndSwingVisual()
 
 void AWeapon_Rope::ReleaseRope(const UAnimSequenceBase* SourceAnimation)
 {
-	if (!IsValid(CharacterSwingMontage) || SourceAnimation != CharacterSwingMontage
+	UAnimMontage* ExpectedSwingMontage = CharacterSwingMontage;
+	if (ACombatCharacterBase* Character = Cast<ACombatCharacterBase>(OwningCharacter.Get()))
+	{
+		if (Character->RidingComponent && Character->RidingComponent->IsMounted()
+			&& IsValid(WeaponConfig.MountedAttackComboMontage))
+		{
+			ExpectedSwingMontage = WeaponConfig.MountedAttackComboMontage;
+		}
+	}
+
+	if (!IsValid(ExpectedSwingMontage) || SourceAnimation != ExpectedSwingMontage
 		|| !bSwingActive || !GetWorld())
 	{
 		return;
