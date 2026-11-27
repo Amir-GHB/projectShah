@@ -19,6 +19,7 @@ public:
 	AEnemyAIController();
 	AActor* GetCurrentTarget() const { return CurrentTarget.Get(); }
 	void ClearCurrentTarget();
+	void HandlePlayerHidden(AActor* PlayerActor, bool bHidden);
 	FVector GetInvestigationLocation() const { return InvestigationLocation; }
 	bool HasActiveInvestigation() const;
 	int32 GetPatrolPointIndex() const { return PatrolPointIndex; }
