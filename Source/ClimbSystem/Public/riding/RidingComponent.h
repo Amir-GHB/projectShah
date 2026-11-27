@@ -55,11 +55,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Dismounting")
 	TObjectPtr<UAnimMontage> DismountRearMontage = nullptr;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Camera", meta = (ClampMin = "0.1"))
-	float CameraTransitionSpeed = 5.0f;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Camera", meta = (ClampMin = "0.0"))
 	float CameraBlendDuration = 0.65f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Dismounting")
+	EHorseMountDirection PreferredDismountDirection = EHorseMountDirection::Right;
 
 	UFUNCTION(BlueprintCallable, Category = "Riding")
 	bool TryMountNearbyHorse();
@@ -103,7 +103,6 @@ private:
 	void BeginTransformTransition(const FTransform& Target, ERidingState NewState, EHorseMountDirection Direction);
 	void FinishMount();
 	void FinishDismount();
-	void RestoreRiderControl();
 	void PlayTransitionMontage(bool bMounting, EHorseMountDirection Direction);
 	void UpdateRiderAnimationState();
 };
