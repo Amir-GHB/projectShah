@@ -227,8 +227,9 @@ bool URidingComponent::StartHorseHiding()
 		return true;
 	}
 
-	Anim->Montage_SetEndDelegate(
-		FOnMontageEnded::CreateUObject(this, &URidingComponent::HandleHideStartMontageEnded), HideMontage);
+	FOnMontageEnded HideMontageEndedDelegate =
+		FOnMontageEnded::CreateUObject(this, &URidingComponent::HandleHideStartMontageEnded);
+	Anim->Montage_SetEndDelegate(HideMontageEndedDelegate, HideMontage);
 	return true;
 }
 
@@ -287,8 +288,9 @@ void URidingComponent::BeginHorseHideExit()
 		return;
 	}
 
-	Anim->Montage_SetEndDelegate(
-		FOnMontageEnded::CreateUObject(this, &URidingComponent::HandleHideEndMontageEnded), UnhideMontage);
+	FOnMontageEnded UnhideMontageEndedDelegate =
+		FOnMontageEnded::CreateUObject(this, &URidingComponent::HandleHideEndMontageEnded);
+	Anim->Montage_SetEndDelegate(UnhideMontageEndedDelegate, UnhideMontage);
 }
 
 void URidingComponent::HandleHideStartMontageEnded(UAnimMontage* Montage, bool bInterrupted)
