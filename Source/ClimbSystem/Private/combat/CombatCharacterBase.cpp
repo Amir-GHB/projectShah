@@ -151,7 +151,7 @@ void ACombatCharacterBase::ConfigureHorseInput(AHorseCharacter* Horse) const
 {
 	if (!IsValid(Horse)) return;
 	Horse->SetRiderInputActions(MoveAction, LookAction, SprintAction, MountAction,
-		AttackAction, NextWeaponAction, GuardAction, ParryAction);
+		AttackAction, NextWeaponAction, GuardAction, ParryAction, TargetLockAction);
 }
 
 void ACombatCharacterBase::HideAimCrosshair()
