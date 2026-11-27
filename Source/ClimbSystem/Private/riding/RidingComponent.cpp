@@ -32,6 +32,7 @@ void URidingComponent::BeginPlay()
 
 void URidingComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (bIsHorseHiding) ResetHorseHiding();
 	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(CameraInputRestoreTimer);
 	if (bTransitionInProgress)
 	{
@@ -173,7 +174,7 @@ void URidingComponent::RequestDismount()
 	if (Character->CombatComponent
 		&& Character->CombatComponent->GetAnimationState().DefenseState != ECombatDefenseState::None) return;
 
-	if (bIsHorseHiding) SetHorseHiding(false);
+	if (bIsHorseHiding) ResetHorseHiding();
 	const FTransform DismountTransform = Horse->GetDismountWorldTransform(PreferredDismountDirection);
 	DismountTargetLocation = DismountTransform.GetLocation();
 	DismountTargetRotation = DismountTransform.Rotator();
@@ -192,59 +193,168 @@ void URidingComponent::RequestDismount()
 	Horse->SetRidingState(ERidingState::Dismounting);
 }
 
-bool URidingComponent::ToggleHorseHiding()
+bool URidingComponent::StartHorseHiding()
 {
 	if (RidingState != ERidingState::Mounted || !IsValid(CurrentHorse)
-		|| IsInRidingTransition()) return false;
+		|| IsInRidingTransition() || HorseHidingState != EHorseHidingState::NotHiding)
+	{
+		return false;
+	}
+
 	ACombatCharacterBase* Character = Rider.Get();
 	if (!IsValid(Character) || Character->IsAimCameraModeActive()) return false;
 	if (Character->CombatComponent
 		&& Character->CombatComponent->CurrentCombatState != ECombatState::Idle
-		&& Character->CombatComponent->CurrentCombatState != ECombatState::Recovering) return false;
-	SetHorseHiding(!bIsHorseHiding);
+		&& Character->CombatComponent->CurrentCombatState != ECombatState::Recovering)
+	{
+		return false;
+	}
+
+	bHideInputHeld = true;
+	bHideReleaseRequested = false;
+	bIsHorseHiding = true;
+	HorseHidingState = EHorseHidingState::Entering;
+	NotifyHorseHiddenForAI(true);
+	UpdateRiderAnimationState();
+
+	UAnimMontage* HideMontage = HorseHideSide == EHorseHideSide::Right && IsValid(HideRightMontage)
+		? HideRightMontage : HideLeftMontage;
+	UAnimInstance* Anim = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr;
+	if (!IsValid(HideMontage) || !Anim || Anim->Montage_Play(HideMontage) <= 0.0f)
+	{
+		HorseHidingState = EHorseHidingState::Hidden;
+		UpdateRiderAnimationState();
+		return true;
+	}
+
+	Anim->Montage_SetEndDelegate(
+		FOnMontageEnded::CreateUObject(this, &URidingComponent::HandleHideStartMontageEnded), HideMontage);
+	return true;
+}
+
+void URidingComponent::StopHorseHiding()
+{
+	bHideInputHeld = false;
+	if (HorseHidingState == EHorseHidingState::Entering)
+	{
+		bHideReleaseRequested = true;
+	}
+	else if (HorseHidingState == EHorseHidingState::Hidden)
+	{
+		BeginHorseHideExit();
+	}
+}
+
+bool URidingComponent::ToggleHorseHiding()
+{
+	if (HorseHidingState == EHorseHidingState::NotHiding) return StartHorseHiding();
+	StopHorseHiding();
 	return true;
 }
 
 void URidingComponent::SetHorseHiding(bool bHide)
 {
-	if (bIsHorseHiding == bHide || RidingState != ERidingState::Mounted) return;
-	ACombatCharacterBase* Character = Rider.Get();
-	AHorseCharacter* Horse = CurrentHorse;
-	if (!IsValid(Character) || !IsValid(Horse)) return;
+	if (bHide) StartHorseHiding();
+	else ResetHorseHiding();
+}
 
-	bIsHorseHiding = bHide;
-	if (USkeletalMeshComponent* RiderMesh = Character->GetMesh())
+void URidingComponent::BeginHorseHideExit()
+{
+	if (HorseHidingState == EHorseHidingState::Entering)
 	{
-		if (UAnimInstance* Anim = RiderMesh->GetAnimInstance())
-		{
-			UAnimMontage* HideToPlay = HorseHideSide == EHorseHideSide::Right && IsValid(HideRightMontage)
-				? HideRightMontage : HideLeftMontage;
-			UAnimMontage* UnhideToPlay = HorseHideSide == EHorseHideSide::Right && IsValid(UnhideRightMontage)
-				? UnhideRightMontage : UnhideLeftMontage;
-			if (bHide && IsValid(HideToPlay))
-			{
-				Anim->Montage_Play(HideToPlay);
-			}
-			else if (!bHide)
-			{
-				if (IsValid(UnhideToPlay)) Anim->Montage_Play(UnhideToPlay);
-				else if (IsValid(HideToPlay)) Anim->Montage_Stop(0.15f, HideToPlay);
-			}
-		}
+		bHideReleaseRequested = true;
+		return;
+	}
+	if (HorseHidingState != EHorseHidingState::Hidden) return;
+
+	ACombatCharacterBase* Character = Rider.Get();
+	if (!IsValid(Character))
+	{
+		ResetHorseHiding();
+		return;
 	}
 
-	// AI perceives the possessed horse pawn, not the attached rider. Notify every
-	// enemy controller so an already-acquired horse target is dropped immediately.
+	HorseHidingState = EHorseHidingState::Exiting;
+	bHideReleaseRequested = false;
+	UpdateRiderAnimationState();
+
+	UAnimMontage* UnhideMontage = HorseHideSide == EHorseHideSide::Right && IsValid(UnhideRightMontage)
+		? UnhideRightMontage : UnhideLeftMontage;
+	UAnimInstance* Anim = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr;
+	if (!IsValid(UnhideMontage) || !Anim || Anim->Montage_Play(UnhideMontage) <= 0.0f)
+	{
+		FinishHorseHideExit();
+		return;
+	}
+
+	Anim->Montage_SetEndDelegate(
+		FOnMontageEnded::CreateUObject(this, &URidingComponent::HandleHideEndMontageEnded), UnhideMontage);
+}
+
+void URidingComponent::HandleHideStartMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (HorseHidingState != EHorseHidingState::Entering) return;
+
+	HorseHidingState = EHorseHidingState::Hidden;
+	UpdateRiderAnimationState();
+	if (bHideReleaseRequested || !bHideInputHeld) BeginHorseHideExit();
+}
+
+void URidingComponent::HandleHideEndMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (HorseHidingState == EHorseHidingState::Exiting) FinishHorseHideExit();
+}
+
+void URidingComponent::FinishHorseHideExit()
+{
+	if (HorseHidingState == EHorseHidingState::NotHiding) return;
+	bIsHorseHiding = false;
+	bHideInputHeld = false;
+	bHideReleaseRequested = false;
+	HorseHidingState = EHorseHidingState::NotHiding;
+	NotifyHorseHiddenForAI(false);
+	UpdateRiderAnimationState();
+}
+
+void URidingComponent::NotifyHorseHiddenForAI(bool bHidden)
+{
+	AHorseCharacter* Horse = CurrentHorse;
+	if (!IsValid(Horse)) return;
+
+	// AI perceives the possessed horse pawn, not the attached rider.
 	if (UWorld* World = GetWorld())
 	{
 		for (TActorIterator<AEnemyCharacter> It(World); It; ++It)
 		{
 			if (AEnemyAIController* AI = Cast<AEnemyAIController>(It->GetController()))
 			{
-				AI->HandlePlayerHidden(Horse, bHide);
+				AI->HandlePlayerHidden(Horse, bHidden);
 			}
 		}
 	}
+}
+
+void URidingComponent::ResetHorseHiding()
+{
+	ACombatCharacterBase* Character = Rider.Get();
+	UAnimInstance* Anim = IsValid(Character) && Character->GetMesh()
+		? Character->GetMesh()->GetAnimInstance() : nullptr;
+	if (Anim)
+	{
+		UAnimMontage* HideMontage = HorseHideSide == EHorseHideSide::Right && IsValid(HideRightMontage)
+			? HideRightMontage : HideLeftMontage;
+		UAnimMontage* UnhideMontage = HorseHideSide == EHorseHideSide::Right && IsValid(UnhideRightMontage)
+			? UnhideRightMontage : UnhideLeftMontage;
+		if (IsValid(HideMontage)) Anim->Montage_Stop(0.1f, HideMontage);
+		if (IsValid(UnhideMontage)) Anim->Montage_Stop(0.1f, UnhideMontage);
+	}
+
+	const bool bWasHidden = bIsHorseHiding;
+	bIsHorseHiding = false;
+	bHideInputHeld = false;
+	bHideReleaseRequested = false;
+	HorseHidingState = EHorseHidingState::NotHiding;
+	if (bWasHidden) NotifyHorseHiddenForAI(false);
 	UpdateRiderAnimationState();
 }
 
@@ -454,6 +564,7 @@ void URidingComponent::UpdateRiderAnimationState()
 			Anim->RidingState = RidingState;
 			Anim->MountDirection = MountDirection;
 			Anim->bIsHorseHiding = bIsHorseHiding && RidingState == ERidingState::Mounted;
+			Anim->HorseHidingState = RidingState == ERidingState::Mounted ? HorseHidingState : EHorseHidingState::NotHiding;
 			Anim->HorseHideSide = bIsHorseHiding ? HorseHideSide : EHorseHideSide::None;
 		}
 	}
