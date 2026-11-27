@@ -210,6 +210,7 @@ void AHorseCharacter::OnSprintEnded(const FInputActionValue& Value) { SetSprinti
 
 void AHorseCharacter::OnDismount(const FInputActionValue& Value)
 {
+	if (bMountedRopeAimInputHeld) return;
 	if (ACharacter* Rider = CurrentRider.Get())
 	{
 		if (URidingComponent* Riding = Rider->FindComponentByClass<URidingComponent>())
