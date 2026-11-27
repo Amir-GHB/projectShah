@@ -173,10 +173,10 @@ void AEnemyAIController::ClearCurrentTarget()
 	StopMovement();
 }
 
-void AEnemyAIController::HandlePlayerHidden(AActor* PlayerActor, bool bHidden)
+void AEnemyAIController::HandlePlayerHidden(AActor* PlayerActor, bool Hidden)
 {
 	if (!IsValid(PlayerActor)) return;
-	if (bHidden)
+	if (Hidden)
 	{
 		if (CurrentTarget.Get() == PlayerActor)
 		{
