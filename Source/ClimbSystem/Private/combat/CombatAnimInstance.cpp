@@ -18,6 +18,9 @@ void UCombatAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 
 	APawn* PawnOwner = TryGetPawnOwner();
 	ACharacter* Character = Cast<ACharacter>(PawnOwner);
+	// The rider is unpossessed while mounted, but its attached mesh AnimBP must
+	// continue reading riding/hiding state from the owning rider actor.
+	if (!Character) Character = Cast<ACharacter>(GetOwningActor());
 	if (CachedCharacter.Get() != Character || !CachedCombatComponent.IsValid())
 	{
 		RefreshCachedReferences();
@@ -90,6 +93,7 @@ void UCombatAnimInstance::RefreshCachedReferences()
 {
 	LastAnimationStateRevision = INDEX_NONE;
 	ACharacter* Character = Cast<ACharacter>(TryGetPawnOwner());
+	if (!Character) Character = Cast<ACharacter>(GetOwningActor());
 	CachedCharacter = Character;
 	CachedCombatComponent = IsValid(Character) ? Character->FindComponentByClass<UCombatComponent>() : nullptr;
 	if (!CachedCombatComponent.IsValid())
