@@ -172,6 +172,42 @@ void URidingComponent::RequestDismount()
 	Horse->SetRidingState(ERidingState::Dismounting);
 }
 
+void URidingComponent::HandleRiderDeath()
+{
+	ACombatCharacterBase* Character = Rider.Get();
+	AHorseCharacter* Horse = CurrentHorse;
+	if (!IsValid(Character) || !IsValid(Horse) || RidingState != ERidingState::Mounted) return;
+
+	Character->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	if (UCapsuleComponent* Capsule = Character->GetCapsuleComponent())
+		Capsule->SetCollisionEnabled(bWasCapsuleCollisionEnabled ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	if (Character->CameraBoom)
+		Character->CameraBoom->bDoCollisionTest = bWasCameraCollisionTestEnabled;
+
+	Horse->SetSprinting(false);
+	Horse->SetCurrentRider(nullptr);
+	Horse->SetRidingState(ERidingState::Unmounted);
+	if (UCharacterMovementComponent* HorseMovement = Horse->GetCharacterMovement())
+	{
+		HorseMovement->StopMovementImmediately();
+		HorseMovement->DisableMovement();
+	}
+	if (Horse->FollowCamera) Horse->FollowCamera->Deactivate();
+	if (Character->FollowCamera) Character->FollowCamera->Activate(true);
+
+	RidingState = ERidingState::Falling;
+	MountDirection = EHorseMountDirection::None;
+	CurrentHorse = nullptr;
+	if (APlayerController* PC = CachedPlayerController.Get())
+	{
+		PC->Possess(Character);
+		PC->SetViewTargetWithBlend(Character, CameraBlendDuration);
+		PC->SetIgnoreMoveInput(false);
+		PC->SetIgnoreLookInput(false);
+	}
+	UpdateRiderAnimationState();
+}
+
 void URidingComponent::BeginTransformTransition(const FTransform& Target, ERidingState NewState, EHorseMountDirection Direction)
 {
 	ACombatCharacterBase* Character = Rider.Get();
