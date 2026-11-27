@@ -35,6 +35,10 @@ public:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Riding|Hiding")
 	bool bIsHorseHiding = false;
 
+	/** Animation phase for the rider AnimBP: enter montage, held loop, exit montage. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Riding|Hiding")
+	EHorseHidingState HorseHidingState = EHorseHidingState::NotHiding;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Riding|Hiding")
 	EHorseHideSide HorseHideSide = EHorseHideSide::Left;
 
@@ -89,9 +93,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Riding")
 	void RequestDismount();
 
+	/** Input Started: begin entering the hidden pose. */
+	UFUNCTION(BlueprintCallable, Category = "Riding|Hiding")
+	bool StartHorseHiding();
+
+	/** Input Completed/Canceled: leave the hidden pose after the enter montage finishes. */
+	UFUNCTION(BlueprintCallable, Category = "Riding|Hiding")
+	void StopHorseHiding();
+
+	/** Compatibility helper for existing Blueprint callers. */
 	UFUNCTION(BlueprintCallable, Category = "Riding|Hiding")
 	bool ToggleHorseHiding();
 
+	/** Compatibility helper. False performs an immediate reset for forced transitions. */
 	UFUNCTION(BlueprintCallable, Category = "Riding|Hiding")
 	void SetHorseHiding(bool bHide);
 
@@ -137,4 +151,12 @@ private:
 	void SchedulePlayerInputRestore();
 	void RestorePlayerInput();
 	void UpdateRiderAnimationState();
+	void BeginHorseHideExit();
+	void FinishHorseHideExit();
+	void HandleHideStartMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void HandleHideEndMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void NotifyHorseHiddenForAI(bool bHidden);
+	void ResetHorseHiding();
+	bool bHideInputHeld = false;
+	bool bHideReleaseRequested = false;
 };
