@@ -84,6 +84,7 @@ void AHorseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		Enhanced->BindAction(AttackAction, ETriggerEvent::Canceled, this, &AHorseCharacter::OnAttackCanceled);
 	}
 	if (NextWeaponAction) Enhanced->BindAction(NextWeaponAction, ETriggerEvent::Started, this, &AHorseCharacter::OnNextWeapon);
+	if (ParryAction) Enhanced->BindAction(ParryAction, ETriggerEvent::Started, this, &AHorseCharacter::OnParry);
 	if (GuardAction)
 	{
 		Enhanced->BindAction(GuardAction, ETriggerEvent::Started, this, &AHorseCharacter::OnGuardStarted);
@@ -113,6 +114,20 @@ void AHorseCharacter::SetCurrentRider(ACharacter* Rider)
 void AHorseCharacter::SetRidingState(ERidingState NewState)
 {
 	RidingState = NewState;
+}
+
+void AHorseCharacter::SetRiderInputActions(UInputAction* Move, UInputAction* Look, UInputAction* Sprint,
+	UInputAction* Dismount, UInputAction* Attack, UInputAction* NextWeapon,
+	UInputAction* Guard, UInputAction* Parry)
+{
+	MoveAction = Move;
+	LookAction = Look;
+	SprintAction = Sprint;
+	DismountAction = Dismount;
+	AttackAction = Attack;
+	NextWeaponAction = NextWeapon;
+	GuardAction = Guard;
+	ParryAction = Parry;
 }
 
 void AHorseCharacter::SetSprinting(bool bEnable)
@@ -233,4 +248,9 @@ void AHorseCharacter::OnGuardStarted(const FInputActionValue& Value)
 void AHorseCharacter::OnGuardEnded(const FInputActionValue& Value)
 {
 	if (UCombatComponent* Combat = RiderCombatComponent.Get()) Combat->SetGuardMode(false);
+}
+
+void AHorseCharacter::OnParry(const FInputActionValue& Value)
+{
+	if (UCombatComponent* Combat = RiderCombatComponent.Get()) Combat->BeginParryAttempt();
 }
